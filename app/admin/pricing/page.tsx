@@ -7,7 +7,7 @@ import toast, { Toaster } from 'react-hot-toast'
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Room {
   id: string; name: string; slug: string; category: string
-  display_price_from: number; price: number; is_active: boolean
+  display_price_from: number; price?: number; is_active: boolean
   offer_label: string | null; offer_badge_text: string | null
   offer_discount_percent: number; offer_is_active: boolean
   offer_valid_until: string | null; max_extra_beds: number
