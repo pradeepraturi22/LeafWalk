@@ -113,7 +113,7 @@ export default function TourOperatorsPage() {
       } else {
         const res = await fetch('/api/admin/data?type=operator', {
           method: 'POST',
-          headers: { 'Authorization': `Bearer ${await getToken()}`, 'Content-Type': 'application/json', 'Authorization': `Bearer ${await getToken()}` },
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await getToken()}` },getToken()}` },
           body: JSON.stringify(formData)
         })
         const result = await res.json()
