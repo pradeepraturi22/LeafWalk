@@ -3,13 +3,14 @@
 // Hides Navbar + Footer on /maintenance and /admin/* routes
 
 import { usePathname } from 'next/navigation'
+import type { ReactNode } from 'react'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
 import ScrollAnimation from '@/components/ScrollAnimation'
 
 const NO_CHROME_ROUTES = ['/maintenance', '/admin']
 
-export default function ConditionalLayout({ children }: { children: React.ReactNode }) {
+export default function ConditionalLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname()
 
   // Hide Navbar/Footer on maintenance page and all admin pages

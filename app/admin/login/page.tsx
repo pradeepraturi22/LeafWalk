@@ -1,70 +1,74 @@
 // app/admin/login/page.tsx
 'use client'
+import React from 'react'
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabaseClient'
-import { useRouter } from 'next/navigation'
 import toast, { Toaster } from 'react-hot-toast'
 
 export default function AdminLogin() {
-  const router    = useRouter()
   const [email,    setEmail]    = useState('')
   const [password, setPassword] = useState('')
   const [loading,  setLoading]  = useState(false)
   const [checking, setChecking] = useState(true)
   const [showPwd,  setShowPwd]  = useState(false)
 
-  // If already logged in as admin/manager, go straight to dashboard
+  // If already logged in as admin, skip login page
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user) {
-        const { data: u } = await supabase
-          .from('users').select('role').eq('id', session.user.id).single()
-        if (u && ['admin', 'manager'].includes(u.role)) {
-          window.location.href = '/admin/dashboard'
-          return
-        }
-      }
+      if (!session?.access_token) { setChecking(false); return }
+      try {
+        const res = await fetch('/api/admin/verify', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+        })
+        if (res.ok) { window.location.href = '/admin/dashboard'; return }
+      } catch {}
       setChecking(false)
     })
   }, [])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!email || !password) { toast.error('Please enter email and password'); return }
+    if (!email || !password) { toast.error('Enter email and password'); return }
     setLoading(true)
 
-    // Step 1: Sign in
+    // Step 1: Sign in with Supabase auth
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ email, password })
     if (authError) {
-      toast.error('Invalid email or password')
+      toast.error('Incorrect email or password')
       setLoading(false); return
     }
 
-    // Step 2: Check role in users table
-    const { data: userData, error: userError } = await supabase
-      .from('users').select('role, name').eq('id', authData.user.id).single()
+    // Step 2: Verify role via server-side API (service role, no RLS issues)
+    const res = await fetch('/api/admin/verify', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authData.session?.access_token}`,
+      },
+    })
 
-    if (userError || !userData) {
+    if (res.status === 401 || res.status === 404) {
       toast.error('User profile not found. Contact system administrator.')
       await supabase.auth.signOut()
       setLoading(false); return
     }
-
-    if (!['admin', 'manager'].includes(userData.role)) {
-      toast.error('Access denied. This portal is for Admin/Manager only.')
+    if (res.status === 403) {
+      const d = await res.json()
+      toast.error(`Access denied. Your role is "${d.role || 'user'}" — Admin/Manager only.`)
+      await supabase.auth.signOut()
+      setLoading(false); return
+    }
+    if (!res.ok) {
+      toast.error('Verification failed. Please try again.')
       await supabase.auth.signOut()
       setLoading(false); return
     }
 
-    // Step 3: Store role in auth metadata for fast access (no DB call on every page)
-    await supabase.auth.updateUser({
-      data: { role: userData.role, name: userData.name }
-    })
-
-    toast.success(`Welcome back, ${userData.name || 'Admin'}!`)
-
-    // Use window.location for hard redirect (avoids Next.js router session race condition)
-    setTimeout(() => { window.location.href = '/admin/dashboard' }, 800)
+    const { role, name } = await res.json()
+    toast.success(`Welcome back, ${name || email.split('@')[0]}!`)
+    // Hard redirect after short delay (let toast show)
+    setTimeout(() => { window.location.href = '/admin/dashboard' }, 700)
   }
 
   if (checking) return (
@@ -82,7 +86,8 @@ export default function AdminLogin() {
           <p className="text-white/50">Admin &amp; Manager Portal</p>
         </div>
 
-        <form onSubmit={handleLogin} className="bg-white/5 backdrop-blur-xl rounded-2xl p-8 border border-white/10 shadow-2xl space-y-5">
+        <form onSubmit={handleLogin}
+          className="bg-white/5 backdrop-blur-xl rounded-2xl p-8 border border-white/10 shadow-2xl space-y-5">
           <div>
             <h2 className="text-2xl font-semibold text-white mb-1">Welcome Back</h2>
             <p className="text-white/40 text-sm">Sign in to access the admin panel</p>
@@ -113,7 +118,12 @@ export default function AdminLogin() {
 
           <button type="submit" disabled={loading}
             className="w-full bg-gradient-to-r from-[#c9a14a] to-[#e6c87a] text-black font-bold py-3.5 rounded-xl hover:opacity-90 disabled:opacity-50 transition-all flex items-center justify-center gap-2">
-            {loading && <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>}
+            {loading && (
+              <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+            )}
             {loading ? 'Signing in...' : 'Login to Admin Panel'}
           </button>
 
@@ -123,7 +133,10 @@ export default function AdminLogin() {
         </form>
 
         <p className="text-center text-white/30 text-xs mt-6 flex items-center justify-center gap-2">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+          </svg>
           Secure Admin Access
         </p>
       </div>
