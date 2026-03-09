@@ -113,7 +113,7 @@ export default function TourOperatorsPage() {
       } else {
         const res = await fetch('/api/admin/data?type=operator', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await getToken()}` },getToken()}` },
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await getToken()}` },
           body: JSON.stringify(formData)
         })
         const result = await res.json()
@@ -148,7 +148,8 @@ export default function TourOperatorsPage() {
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this tour operator?')) return
     try {
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await getToken()}` },it getToken()}` } })
+      const token = await getToken()
+      const res = await fetch(`/api/admin/data?type=operator&id=${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } })
       const result = await res.json()
       if (!res.ok) throw new Error(result.error)
       toast.success('Tour operator deleted')
