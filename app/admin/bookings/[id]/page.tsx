@@ -61,30 +61,20 @@ export default function BookingDetailPage() {
   useEffect(() => { checkAuthAndLoad() }, [])
 
   async function checkAuthAndLoad() {
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session?.access_token) { window.location.href = '/admin/login'; return }
-      const res = await fetch('/api/admin/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-      })
-      if (!res.ok) { window.location.href = '/admin/login'; return }
-      const { role } = await res.json()
-      setUserRole(role)
-      await loadBooking(session.access_token)
-    } catch { window.location.href = '/admin/login' }
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { router.push('/admin/login'); return }
+
+    const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single()
+    if (!userData || !['admin', 'manager'].includes(userData.role)) {
+      router.push('/admin/login'); return
+    }
+    setUserRole(userData.role)
+    await loadBooking()
   }
 
-  async function loadBooking(token?: string) {
-    let t = token
-    if (!t) {
-      const { data: { session } } = await supabase.auth.getSession()
-      t = session?.access_token || ''
-    }
+  async function loadBooking() {
     try {
-      const res = await fetch(`/api/admin/data?type=booking-detail&id=${bookingId}`, {
-        headers: { 'Authorization': `Bearer ${t}` }
-      })
+      const res = await fetch(`/api/admin/data?type=booking-detail&id=${bookingId}`)
       const { data, error } = await res.json()
       if (error || !data) { toast.error('Booking not found'); router.push('/admin/bookings'); return }
       setBooking(data)
@@ -103,11 +93,9 @@ export default function BookingDetailPage() {
       if (newStatus === 'checked_in') body.checked_in_at = new Date().toISOString()
       if (newStatus === 'checked_out') body.checked_out_at = new Date().toISOString()
 
-      const { data: { session: s2 } } = await supabase.auth.getSession()
-      const t2 = s2?.access_token || ''
       const res = await fetch(`/api/admin/data?type=booking-status&id=${bookingId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${t2}` },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       })
       const result = await res.json()
@@ -177,11 +165,9 @@ export default function BookingDetailPage() {
         advance_paid_at: new Date().toISOString(),
       }
 
-      const { data: { session: s2 } } = await supabase.auth.getSession()
-      const t2 = s2?.access_token || ''
       const res = await fetch(`/api/admin/data?type=booking-status&id=${bookingId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${t2}` },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
       const result = await res.json()
@@ -353,7 +339,7 @@ export default function BookingDetailPage() {
                   </div>
                   {booking.hold_notes && <p className="text-white/50 text-xs bg-black/20 rounded-lg px-3 py-2">📝 {booking.hold_notes}</p>}
                   <button
-                    onClick={() => { setConfirmPayment({ method: 'bank_transfer', advance: 0 }); setShowConfirmModal(true) }}
+                    onClick={() => { setConfirmPayment({ method: 'bank_transfer', advance: 0, transaction_number: '', payment_date: '', payment_notes: '' }); setShowConfirmModal(true) }}
                     className="mt-3 w-full py-3 bg-gradient-to-r from-green-700 to-green-500 text-white rounded-xl font-semibold hover:opacity-90 transition-all">
                     ✅ Payment Receive Karke Confirm Karo
                   </button>
