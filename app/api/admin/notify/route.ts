@@ -12,11 +12,13 @@ const supabase = createClient(
 )
 
 async function log(booking_id: string, type: string, recipient: string, status: string, content?: string) {
-  await supabase.from('notification_logs').insert({
-    booking_id, type, recipient, status,
-    content: content?.slice(0, 500),
-    sent_at: status === 'sent' ? new Date().toISOString() : null
-  }).catch(() => {})
+  try {
+    await supabase.from('notification_logs').insert({
+      booking_id, type, recipient, status,
+      content: content?.slice(0, 500),
+      sent_at: status === 'sent' ? new Date().toISOString() : null
+    })
+  } catch (_) {}
 }
 
 export async function POST(request: Request) {
