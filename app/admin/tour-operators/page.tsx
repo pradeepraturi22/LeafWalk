@@ -148,7 +148,7 @@ export default function TourOperatorsPage() {
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this tour operator?')) return
     try {
-      const res = await fetch(`/api/admin/data?type=operator&id=${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${await getToken()}` } })
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await getToken()}` },it getToken()}` } })
       const result = await res.json()
       if (!res.ok) throw new Error(result.error)
       toast.success('Tour operator deleted')
