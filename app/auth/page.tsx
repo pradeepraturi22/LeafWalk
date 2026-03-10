@@ -488,7 +488,7 @@ function AuthPageInner() {
 }
 export default function AuthPage() {
   return (
-    <Suspense fallback={}>
+    <Suspense fallback={<></>}>
       <AuthPageInner />
     </Suspense>
   )

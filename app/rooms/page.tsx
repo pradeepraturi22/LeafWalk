@@ -347,7 +347,7 @@ function RoomsPageInner() {
 }
 export default function RoomsPage() {
   return (
-    <Suspense fallback={}>
+    <Suspense fallback={<></>}>
       <RoomsPageInner />
     </Suspense>
   )

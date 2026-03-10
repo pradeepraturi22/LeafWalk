@@ -906,7 +906,7 @@ function BookingPageInner() {
 }
 export default function BookingPage() {
   return (
-    <Suspense fallback={}>
+    <Suspense fallback={<></>}>
       <BookingPageInner />
     </Suspense>
   )

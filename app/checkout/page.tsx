@@ -399,7 +399,7 @@ function CheckoutPageInner() {
 
 export default function CheckoutPage() {
   return (
-    <Suspense fallback={}>
+    <Suspense fallback={<></>}>
       <CheckoutPageInner />
     </Suspense>
   )
