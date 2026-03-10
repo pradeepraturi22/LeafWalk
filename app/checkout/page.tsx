@@ -1,7 +1,7 @@
 // app/checkout/page.tsx - UPDATED VERSION WITH SERVER-SIDE BOOKING CREATION
 
 'use client'
-
+import React from 'react'
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'

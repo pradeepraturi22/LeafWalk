@@ -18,7 +18,7 @@ export interface Room {
   name: string
   slug: string
   description: string
-  price: number
+  price?: number
   max_guests: number
   total_rooms: number
   amenities: string[]
