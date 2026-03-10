@@ -10,7 +10,7 @@ function getAdmin() {
     { auth: { autoRefreshToken: false, persistSession: false } }
   )
 }
-const supabaseAdmin = { 
+const getSupabaseAdmin() = { 
   get auth() { return getAdmin().auth },
   from: (...args: any[]) => (getAdmin() as any).from(...args),
 }
@@ -19,9 +19,9 @@ const supabaseAdmin = {
 async function requireAdmin(request: NextRequest): Promise<{ userId: string; role: string } | null> {
   const token = request.headers.get('authorization')?.replace('Bearer ', '')
   if (!token) return null
-  const { data: { user }, error } = await supabaseAdmin.auth.getUser(token)
+  const { data: { user }, error } = await getSupabaseAdmin().auth.getUser(token)
   if (error || !user) return null
-  const { data: u } = await supabaseAdmin.from('users').select('role').eq('id', user.id).single() as any
+  const { data: u } = await getSupabaseAdmin().from('users').select('role').eq('id', user.id).single() as any
   if (!u || !['admin', 'manager'].includes(u.role)) return null
   return { userId: user.id, role: u.role }
 }
@@ -37,16 +37,16 @@ export async function GET(request: NextRequest) {
 
   try {
     if (type === 'dashboard') {
-      const { data: allBookings } = await supabaseAdmin.from('bookings').select('*')
-      const { data: rooms } = await supabaseAdmin.from('rooms').select('*')
-      const { data: recent } = await supabaseAdmin
+      const { data: allBookings } = await getSupabaseAdmin().from('bookings').select('*')
+      const { data: rooms } = await getSupabaseAdmin().from('rooms').select('*')
+      const { data: recent } = await getSupabaseAdmin()
         .from('bookings').select(`*, room:rooms(name)`)
         .order('created_at', { ascending: false }).limit(10)
       return NextResponse.json({ allBookings, rooms, recent })
     }
 
     if (type === 'bookings') {
-      const { data, error } = await supabaseAdmin
+      const { data, error } = await getSupabaseAdmin()
         .from('bookings').select(`*, room:rooms(name, category)`)
         .order('created_at', { ascending: false })
       if (error) throw error
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
     if (type === 'booking-detail') {
       const id = searchParams.get('id')
       if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
-      const { data, error } = await supabaseAdmin
+      const { data, error } = await getSupabaseAdmin()
         .from('bookings')
         .select(`*, room:rooms(name, category, featured_image), tour_operator:tour_operators(company_name, contact_person, email, phone)`)
         .eq('id', id).single() as any
@@ -65,20 +65,20 @@ export async function GET(request: NextRequest) {
     }
 
     if (type === 'rooms') {
-      const { data, error } = await supabaseAdmin
+      const { data, error } = await getSupabaseAdmin()
         .from('rooms').select('*').eq('is_active', true)
       if (error) throw error
       return NextResponse.json({ data })
     }
 
     if (type === 'operators') {
-      const { data: operators, error } = await supabaseAdmin
+      const { data: operators, error } = await getSupabaseAdmin()
         .from('tour_operators').select('*')
         .order('created_at', { ascending: false })
       if (error) throw error
       if (!operators?.length) return NextResponse.json({ data: [] })
 
-      const { data: allBookings } = await supabaseAdmin
+      const { data: allBookings } = await getSupabaseAdmin()
         .from('bookings')
         .select('tour_operator_id, total_amount')
         .not('tour_operator_id', 'is', null)
@@ -102,9 +102,9 @@ export async function GET(request: NextRequest) {
       if (!roomId || !checkin || !checkout) {
         return NextResponse.json({ error: 'room_id, check_in, check_out required' }, { status: 400 })
       }
-      const { data: room } = await supabaseAdmin.from('rooms').select('category').eq('id', roomId).single() as any
+      const { data: room } = await getSupabaseAdmin().from('rooms').select('category').eq('id', roomId).single() as any
       if (!room) return NextResponse.json({ error: 'Room not found' }, { status: 404 })
-      const { data: rates } = await supabaseAdmin
+      const { data: rates } = await getSupabaseAdmin()
         .from('room_rates')
         .select('*, season:seasons(*)')
         .eq('room_category', room.category)
@@ -134,12 +134,12 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'room_id, check_in, check_out required' }, { status: 400 })
       }
       // Direct query (no RPC needed, service role bypasses RLS)
-      const { data: room } = await supabaseAdmin.from('rooms').select('category, total_rooms').eq('id', room_id).single() as any
+      const { data: room } = await getSupabaseAdmin().from('rooms').select('category, total_rooms').eq('id', room_id).single() as any
       if (!room) return NextResponse.json({ error: 'Room not found' }, { status: 404 })
-      const { data: catRooms } = await supabaseAdmin.from('rooms').select('id, total_rooms').eq('category', room.category).eq('is_active', true)
+      const { data: catRooms } = await getSupabaseAdmin().from('rooms').select('id, total_rooms').eq('category', room.category).eq('is_active', true)
       const catTotal = catRooms?.reduce((s, r) => s + (r.total_rooms || 0), 0) || 0
       const catIds   = catRooms?.map(r => r.id) || []
-      const { data: overlapping } = await supabaseAdmin.from('bookings').select('rooms_booked')
+      const { data: overlapping } = await getSupabaseAdmin().from('bookings').select('rooms_booked')
         .in('room_id', catIds).in('booking_status', ['pending', 'confirmed', 'hold', 'checked_in'])
         .lt('check_in', check_out).gt('check_out', check_in)
       const booked = overlapping?.reduce((s, b) => s + (b.rooms_booked || 1), 0) || 0
@@ -154,11 +154,11 @@ export async function POST(request: NextRequest) {
       delete bookingData.guests
       // Set created_by
       bookingData.created_by = admin.userId
-      const { data, error } = await supabaseAdmin
+      const { data, error } = await getSupabaseAdmin()
         .from('bookings').insert(bookingData).select('id, booking_number').single() as any
       if (error) throw error
       if (room_items?.length && data?.id) {
-        await supabaseAdmin.from('booking_room_items').insert(
+        await getSupabaseAdmin().from('booking_room_items').insert(
           room_items.map((item: any) => ({ ...item, booking_id: data.id }))
         )
       }
@@ -166,7 +166,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (type === 'operator') {
-      const { error } = await supabaseAdmin.from('tour_operators').insert(body)
+      const { error } = await getSupabaseAdmin().from('tour_operators').insert(body)
       if (error) throw error
       return NextResponse.json({ success: true })
     }
@@ -207,14 +207,14 @@ export async function PATCH(request: NextRequest) {
       if (body.balance_amount  !== undefined) updateData.balance_amount  = body.balance_amount
       if (body.advance_paid_at) updateData.advance_paid_at = body.advance_paid_at
       if (body.admin_notes)     updateData.admin_notes     = body.admin_notes
-      const { error } = await supabaseAdmin.from('bookings').update(updateData as any).eq('id', id)
+      const { error } = await getSupabaseAdmin().from('bookings').update(updateData as any).eq('id', id)
       if (error) throw error
       return NextResponse.json({ success: true })
     }
 
     if (type === 'operator') {
       if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
-      const { error } = await supabaseAdmin.from('tour_operators').update(body as any).eq('id', id)
+      const { error } = await getSupabaseAdmin().from('tour_operators').update(body as any).eq('id', id)
       if (error) throw error
       return NextResponse.json({ success: true })
     }
@@ -238,7 +238,7 @@ export async function DELETE(request: NextRequest) {
     if (type === 'operator') {
       if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
       // Don't actually delete — soft deactivate
-      const { error } = await supabaseAdmin.from('tour_operators').update({ status: 'inactive' } as any).eq('id', id)
+      const { error } = await getSupabaseAdmin().from('tour_operators').update({ status: 'inactive' } as any).eq('id', id)
       if (error) throw error
       return NextResponse.json({ success: true })
     }

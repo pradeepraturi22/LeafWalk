@@ -2,7 +2,7 @@
 // Uses Supabase admin to update user password — requires service role key
 
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabaseServer'
+import { getSupabaseAdmin } from '@/lib/supabaseServer'
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Find user by email in auth
-    const { data: listData, error: listErr } = await supabaseAdmin.auth.admin.listUsers()
+    const { data: listData, error: listErr } = await getSupabaseAdmin().auth.admin.listUsers()
     if (listErr) return NextResponse.json({ error: 'Failed to find user' }, { status: 500 })
 
     const users = (listData as any)?.users ?? []
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     if (!authUser) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
     // Update password
-    const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(authUser.id, {
+    const { error: updateErr } = await getSupabaseAdmin().auth.admin.updateUserById(authUser.id, {
       password: new_password,
     })
     if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 })

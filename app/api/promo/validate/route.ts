@@ -1,6 +1,6 @@
 // app/api/promo/validate/route.ts
 import { NextResponse } from 'next/server'
-import { supabaseAdmin as supabase } from '@/lib/supabaseServer'
+import { getSupabaseAdmin() as supabase } from '@/lib/supabaseServer'
 
 export async function POST(req: Request) {
   try {

@@ -1,7 +1,7 @@
 // app/api/check-availability/route.ts
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabaseClient'
-import { supabaseAdmin } from '@/lib/supabaseServer'
+import { getSupabaseAdmin } from '@/lib/supabaseServer'
 
 export async function POST(req: Request) {
   try {
@@ -56,8 +56,8 @@ export async function POST(req: Request) {
     const catRoomIds    = catRooms.map(r => r.id)
     const categoryTotal = catRooms.reduce((s, r) => s + (Number(r.total_rooms) || 0), 0)
 
-    // Count overlapping bookings using supabaseAdmin (bypasses RLS — CORRECT count)
-    const { data: overlapping, error: bookErr } = await supabaseAdmin
+    // Count overlapping bookings using getSupabaseAdmin() (bypasses RLS — CORRECT count)
+    const { data: overlapping, error: bookErr } = await getSupabaseAdmin()
       .from('bookings')
       .select('rooms_booked')
       .in('room_id', catRoomIds)

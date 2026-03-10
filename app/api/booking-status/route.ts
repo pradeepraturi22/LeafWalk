@@ -4,7 +4,7 @@
 // Does NOT expose sensitive admin notes or payment signatures
 
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabaseServer'
+import { getSupabaseAdmin } from '@/lib/supabaseServer'
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid booking ID' }, { status: 400 })
     }
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await getSupabaseAdmin()
       .from('bookings')
       .select(`
         id, booking_number, guest_name, guest_email, guest_phone,

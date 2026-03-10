@@ -10,7 +10,7 @@ if (!supabaseUrl || !serviceRoleKey) {
   )
 }
 
-export const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+export const getSupabaseAdmin() = createClient(supabaseUrl, serviceRoleKey, {
   auth: {
     autoRefreshToken:  false,
     persistSession:    false,

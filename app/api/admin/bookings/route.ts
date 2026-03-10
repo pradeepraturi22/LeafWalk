@@ -1,7 +1,7 @@
 // app/api/admin/bookings/route.ts
 // Fetches ALL bookings for admin panel — uses service role to bypass RLS
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabaseServer'
+import { getSupabaseAdmin } from '@/lib/supabaseServer'
 
 export async function POST(request: NextRequest) {
   try {
@@ -9,16 +9,16 @@ export async function POST(request: NextRequest) {
     const token = request.headers.get('authorization')?.replace('Bearer ', '')
     if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token)
+    const { data: { user }, error: authErr } = await getSupabaseAdmin().auth.getUser(token)
     if (authErr || !user) return NextResponse.json({ error: 'Invalid session' }, { status: 401 })
 
-    const { data: u } = await supabaseAdmin.from('users').select('role').eq('id', user.id).single() as any
+    const { data: u } = await getSupabaseAdmin().from('users').select('role').eq('id', user.id).single() as any
     if (!u || !['admin', 'manager'].includes(u.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     // Fetch ALL bookings with full details
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await getSupabaseAdmin()
       .from('bookings')
       .select(`
         id, booking_number, guest_name, guest_email, guest_phone,
@@ -50,10 +50,10 @@ export async function PATCH(request: NextRequest) {
     const token = request.headers.get('authorization')?.replace('Bearer ', '')
     if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token)
+    const { data: { user }, error: authErr } = await getSupabaseAdmin().auth.getUser(token)
     if (authErr || !user) return NextResponse.json({ error: 'Invalid session' }, { status: 401 })
 
-    const { data: u } = await supabaseAdmin.from('users').select('role').eq('id', user.id).single() as any
+    const { data: u } = await getSupabaseAdmin().from('users').select('role').eq('id', user.id).single() as any
     if (!u || !['admin', 'manager'].includes(u.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
@@ -70,7 +70,7 @@ export async function PATCH(request: NextRequest) {
       if (key in updates) safeUpdates[key] = updates[key]
     }
 
-    const { error } = await supabaseAdmin
+    const { error } = await getSupabaseAdmin()
       .from('bookings').update(safeUpdates).eq('id', booking_id)
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })

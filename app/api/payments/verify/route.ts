@@ -2,7 +2,7 @@
 // Fixed: correct payment_status='fully_paid', increments promo used_count, logs to payments table
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
-import { supabaseAdmin as supabase } from '@/lib/supabaseServer'
+import { getSupabaseAdmin() as supabase } from '@/lib/supabaseServer'
 
 export async function POST(request: NextRequest) {
   try {

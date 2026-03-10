@@ -1,9 +1,9 @@
 // app/api/bookings/create/route.ts
-// Uses service role (supabaseAdmin) to bypass RLS — this is the CORRECT approach
+// Uses service role (getSupabaseAdmin()) to bypass RLS — this is the CORRECT approach
 // Never expose service role key on client side
 
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabaseServer'
+import { getSupabaseAdmin } from '@/lib/supabaseServer'
 
 export async function POST(request: NextRequest) {
   try {
@@ -33,14 +33,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Room check
-    const { data: room, error: roomErr } = await supabaseAdmin
+    const { data: room, error: roomErr } = await getSupabaseAdmin()
       .from('rooms').select('id,is_active,total_rooms').eq('id', room_id).single() as any
     if (roomErr || !room?.is_active) {
       return NextResponse.json({ error: 'Room not found or inactive' }, { status: 404 })
     }
 
     // Availability double-check at server side
-    const { data: existing } = await supabaseAdmin
+    const { data: existing } = await getSupabaseAdmin()
       .from('bookings').select('rooms_booked')
       .eq('room_id', room_id)
       .in('booking_status', ['pending', 'confirmed', 'hold', 'checked_in'])
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
     const sgst     = Math.round(afterDisc * 0.06)
     const total    = afterDisc + cgst + sgst
 
-    const { data: booking, error: bErr } = await supabaseAdmin
+    const { data: booking, error: bErr } = await getSupabaseAdmin()
       .from('bookings').insert({
         guest_name:               String(guest_name).trim().slice(0, 200),
         guest_email:              guest_email || null,

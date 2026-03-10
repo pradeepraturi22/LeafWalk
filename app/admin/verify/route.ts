@@ -3,7 +3,7 @@
 // Returns role if user is admin/manager, else 403
 
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabaseServer'
+import { getSupabaseAdmin } from '@/lib/supabaseServer'
 import { createClient } from '@supabase/supabase-js'
 
 export async function POST(request: NextRequest) {
@@ -17,14 +17,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify the JWT token using Supabase admin
-    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token)
+    const { data: { user }, error } = await getSupabaseAdmin().auth.getUser(token)
 
     if (error || !user) {
       return NextResponse.json({ error: 'Invalid or expired session' }, { status: 401 })
     }
 
     // Look up role in users table using service role (bypasses RLS)
-    const { data: userData, error: userErr } = await supabaseAdmin
+    const { data: userData, error: userErr } = await getSupabaseAdmin()
       .from('users')
       .select('role, name')
       .eq('id', user.id)
