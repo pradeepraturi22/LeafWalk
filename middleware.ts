@@ -59,9 +59,7 @@ function checkRateLimit(ip: string, path: string): { allowed: boolean; remaining
 if (typeof setInterval !== 'undefined') {
   setInterval(() => {
     const now = Date.now()
-    for (const [key, val] of rateStore.entries()) {
-      if (now > val.reset) rateStore.delete(key)
-    }
+    rateStore.forEach((val, key) => { if (now > val.reset) rateStore.delete(key) })
   }, 5 * 60 * 1000)
 }
 
