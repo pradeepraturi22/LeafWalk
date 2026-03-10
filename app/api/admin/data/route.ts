@@ -3,10 +3,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+function getAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+}
+const supabaseAdmin = { 
+  get auth() { return getAdmin().auth },
+  from: (...args: any[]) => (getAdmin() as any).from(...args),
+}
 
 // ── Shared auth guard ────────────────────────────────────────────────────────
 async function requireAdmin(request: NextRequest): Promise<{ userId: string; role: string } | null> {

@@ -6,10 +6,14 @@ import { sendEmail, generateBookingConfirmationEmail, generateTourOperatorBookin
 import { sendSMS, bookingConfirmationSMS, balanceReminderSMS } from '@/lib/sms-service'
 import { sendWhatsApp, bookingConfirmationWhatsApp, holdConfirmationWhatsApp, balanceReminderWhatsApp } from '@/lib/whatsapp-service'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+}
+const supabase = { from: (...args: any[]) => (getSupabase() as any).from(...args) }
 
 async function log(booking_id: string, type: string, recipient: string, status: string, content?: string) {
   try {
