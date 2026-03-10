@@ -1,18 +1,12 @@
-// lib/supabaseServer.ts
+// app/lib/supabaseServer.ts
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl     = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const serviceRoleKey  = process.env.SUPABASE_SERVICE_ROLE_KEY!
-
-if (!supabaseUrl || !serviceRoleKey) {
-  throw new Error(
-    'Missing Supabase service role env vars. Check NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local'
+export function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+    { auth: { autoRefreshToken: false, persistSession: false } }
   )
 }
 
-export const getSupabaseAdmin() = createClient(supabaseUrl, serviceRoleKey, {
-  auth: {
-    autoRefreshToken:  false,
-    persistSession:    false,
-  },
-})
+export const supabaseAdmin = getSupabaseAdmin
