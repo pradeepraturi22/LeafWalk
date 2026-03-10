@@ -2,19 +2,7 @@
 // ALL endpoints require valid admin/manager JWT — uses service role for DB ops
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabaseServer'
-import { createClient } from '@supabase/supabase-js'
 
-function getAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
-}
-const getSupabaseAdmin() = { 
-  get auth() { return getAdmin().auth },
-  from: (...args: any[]) => (getAdmin() as any).from(...args),
-}
 
 // ── Shared auth guard ────────────────────────────────────────────────────────
 async function requireAdmin(request: NextRequest): Promise<{ userId: string; role: string } | null> {
