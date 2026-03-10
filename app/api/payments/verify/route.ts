@@ -1,11 +1,13 @@
 // app/api/payments/verify/route.ts
 // Fixed: correct payment_status='fully_paid', increments promo used_count, logs to payments table
 import { NextRequest, NextResponse } from 'next/server'
+import { getSupabaseAdmin } from '@/lib/supabaseServer'
 import crypto from 'crypto'
-import { getSupabaseAdmin() as supabase } from '@/lib/supabaseServer'
+
 
 export async function POST(request: NextRequest) {
   try {
+    const supabase = getSupabaseAdmin()
     const { razorpay_payment_id, razorpay_order_id, razorpay_signature, booking_id } = await request.json()
 
     if (!razorpay_payment_id || !razorpay_order_id || !razorpay_signature || !booking_id) {

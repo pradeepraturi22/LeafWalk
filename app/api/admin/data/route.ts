@@ -1,6 +1,7 @@
 // app/api/admin/data/route.ts
 // ALL endpoints require valid admin/manager JWT — uses service role for DB ops
 import { NextRequest, NextResponse } from 'next/server'
+import { getSupabaseAdmin } from '@/lib/supabaseServer'
 import { createClient } from '@supabase/supabase-js'
 
 function getAdmin() {
