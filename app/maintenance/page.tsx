@@ -148,7 +148,7 @@ export default function MaintenancePage() {
         {/* Contact */}
         <div className="mnt-fi5">
           {[
-            { icon: '📞', label: '+91 93682 80535',              href: 'tel:+919368280535' },
+            { icon: '📞', label: '+91 93680 80535',              href: 'tel:+919368080535' },
             { icon: '✉️', label: 'info@leafwalk.in',              href: 'mailto:info@leafwalk.in' },
             { icon: '💬', label: 'WhatsApp for instant booking',  href: 'https://wa.me/918630227541' },
           ].map((c, i) => (
