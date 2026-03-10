@@ -2,7 +2,7 @@
 
 import { sendEmail, generateBookingConfirmationEmail } from './email-service'
 import { sendSMS, bookingConfirmationSMS } from './sms-service'
-import { sendWhatsAppMessage, generateWhatsAppBookingConfirmation } from './whatsapp-service'
+import { sendWhatsApp, bookingConfirmationWhatsApp } from './whatsapp-service'
 import { supabase } from './supabaseClient'
 
 export interface NotificationOptions {
