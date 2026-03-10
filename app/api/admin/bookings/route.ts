@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token)
     if (authErr || !user) return NextResponse.json({ error: 'Invalid session' }, { status: 401 })
 
-    const { data: u } = await supabaseAdmin.from('users').select('role').eq('id', user.id).single()
+    const { data: u } = await supabaseAdmin.from('users').select('role').eq('id', user.id).single() as any
     if (!u || !['admin', 'manager'].includes(u.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
