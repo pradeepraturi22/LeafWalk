@@ -13,7 +13,7 @@ interface Booking {
   guest_name: string; guest_email: string; guest_phone: string
   razorpay_payment_id: string | null; created_at: string
   special_requests: string | null
-  room: { name: string; category: string; featured_image: string; slug: string } | null
+  room?: any
 }
 
 const STATUS_STYLE: Record<string, string> = {
