@@ -25,11 +25,7 @@ export async function sendBookingNotifications(
   if (options.email && booking.guest_email) {
     try {
       const emailHtml = generateBookingConfirmationEmail(booking)
-      await sendEmail({
-        to: booking.guest_email,
-        subject: `Booking Confirmed - ${booking.invoice_number || 'Leafwalk Resort'}`,
-        html: emailHtml
-      })
+      await sendEmail(booking.guest_email, `Booking Confirmed - ${booking.invoice_number || 'Leafwalk Resort'}`, emailHtml)
       results.email = true
       await logNotification(booking.id, 'email', booking.guest_email, 'sent')
     } catch (error: any) {
