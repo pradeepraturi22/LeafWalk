@@ -1,19 +1,27 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
-let _supabaseAdmin: ReturnType<typeof createClient> | null = null
-
-export function getSupabaseAdmin() {
-  if (!_supabaseAdmin) {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-    if (!url || !key) throw new Error('Supabase admin env vars missing')
-    _supabaseAdmin = createClient(url, key)
-  }
-  return _supabaseAdmin
+function createAdminClient(): SupabaseClient {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+  return createClient(url, key, {
+    auth: { autoRefreshToken: false, persistSession: false }
+  })
 }
 
-export const supabaseAdmin = new Proxy({} as ReturnType<typeof createClient>, {
-  get(_target, prop) {
-    return (getSupabaseAdmin() as any)[prop]
+// Export a getter function — avoids top-level init crash at build time
+let _admin: SupabaseClient | null = null
+export function getSupabaseAdmin(): SupabaseClient {
+  if (!_admin) _admin = createAdminClient()
+  return _admin
+}
+
+// Named export used across codebase — works at runtime (env vars available)
+export const supabaseAdmin: SupabaseClient = (() => {
+  // Return a lazy proxy that defers real init until first use
+  const handler: ProxyHandler<object> = {
+    get(_, prop) {
+      return (getSupabaseAdmin() as any)[prop]
+    }
   }
-})
+  return new Proxy({}, handler) as SupabaseClient
+})()
