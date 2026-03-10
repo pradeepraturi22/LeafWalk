@@ -1,7 +1,7 @@
 // Unified Notification Service - FIXED VERSION
 
 import { sendEmail, generateBookingConfirmationEmail } from './email-service'
-import { sendSMS, generateBookingConfirmationSMS } from './sms-service'
+import { sendSMS, bookingConfirmationSMS } from './sms-service'
 import { sendWhatsAppMessage, generateWhatsAppBookingConfirmation } from './whatsapp-service'
 import { supabase } from './supabaseClient'
 
