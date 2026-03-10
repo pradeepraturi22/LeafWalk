@@ -338,10 +338,17 @@ function RoomsContent() {
   )
 }
 
-export default function RoomsPage() {
+function RoomsPageInner() {
   return (
     <Suspense fallback={<div className="min-h-screen flex items-center justify-center" style={{ background: '#0b0b0b' }}><div className="w-12 h-12 border-2 border-[#c9a14a] border-t-transparent rounded-full animate-spin" /></div>}>
       <RoomsContent />
+    </Suspense>
+  )
+}
+export default function RoomsPage() {
+  return (
+    <Suspense fallback={}>
+      <RoomsPageInner />
     </Suspense>
   )
 }

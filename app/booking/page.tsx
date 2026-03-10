@@ -893,7 +893,7 @@ function BookingContent() {
   )
 }
 
-export default function BookingPage() {
+function BookingPageInner() {
   return (
     <Suspense fallback={
       <div className="min-h-screen flex items-center justify-center" style={{ background: '#0b0b0b' }}>
@@ -901,6 +901,13 @@ export default function BookingPage() {
       </div>
     }>
       <BookingContent />
+    </Suspense>
+  )
+}
+export default function BookingPage() {
+  return (
+    <Suspense fallback={}>
+      <BookingPageInner />
     </Suspense>
   )
 }

@@ -475,7 +475,7 @@ function AuthContent() {
   )
 }
 
-export default function AuthPage() {
+function AuthPageInner() {
   return (
     <Suspense fallback={
       <div className="min-h-screen flex items-center justify-center" style={{ background: '#0b0b0b' }}>
@@ -483,6 +483,13 @@ export default function AuthPage() {
       </div>
     }>
       <AuthContent />
+    </Suspense>
+  )
+}
+export default function AuthPage() {
+  return (
+    <Suspense fallback={}>
+      <AuthPageInner />
     </Suspense>
   )
 }

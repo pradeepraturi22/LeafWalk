@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Navbar from '@/components/Navbar'
@@ -33,7 +33,7 @@ interface Booking {
   room: { name: string; category: string; featured_image: string }
 }
 
-export default function BookingConfirmationPage() {
+function BookingConfirmationInner() {
   const searchParams  = useSearchParams()
   const router        = useRouter()
   const [booking, setBooking]   = useState<Booking | null>(null)
@@ -128,5 +128,13 @@ function Row({ label, value, gold, green }: { label: string; value: string; gold
         {value}
       </span>
     </div>
+  )
+}
+
+export default function BookingConfirmationPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
+      <BookingConfirmationInner />
+    </Suspense>
   )
 }
