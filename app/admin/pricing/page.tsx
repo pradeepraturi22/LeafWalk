@@ -169,8 +169,8 @@ function RoomPricingTab({ rooms, reload }: { rooms: Room[]; reload: () => void }
       offer_discount_percent: form.offer_discount_percent || 0,
       offer_is_active: form.offer_is_active || false,
       offer_valid_until: form.offer_valid_until || null,
-      updated_at: new Date( as any).toISOString(),
-    }).eq('id', roomId)
+      updated_at: new Date().toISOString(),
+    } as any).eq('id', roomId)
     setSaving(false)
     if (error) { toast.error('Failed to save: ' + error.message); return }
     toast.success('Room pricing saved successfully')

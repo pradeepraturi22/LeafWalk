@@ -68,8 +68,8 @@ export async function POST(request: Request) {
         if (results.whatsapp) {
           await supabase.from('bookings').update({
             whatsapp_sent: true,
-            whatsapp_sent_at: new Date( as any).toISOString()
-          }).eq('id', booking_id)
+            whatsapp_sent_at: new Date().toISOString()
+          } as any).eq('id', booking_id)
         }
       }
 
@@ -83,10 +83,10 @@ export async function POST(request: Request) {
       // Update notification flags
       await supabase.from('bookings').update({
         email_sent: results.email,
-        email_sent_at: results.email ? new Date( as any).toISOString() : null,
+        email_sent_at: results.email ? new Date().toISOString() : null,
         sms_sent: results.sms,
         sms_sent_at: results.sms ? new Date().toISOString() : null,
-      }).eq('id', booking_id)
+      } as any).eq('id', booking_id)
     }
 
     // ── Balance Reminder ──────────────────────────────────────────────────────

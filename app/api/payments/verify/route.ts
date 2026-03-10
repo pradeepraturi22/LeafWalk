@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     // ── Verify Razorpay signature ────────────────────────────────────────────
     const generatedSig = crypto
       .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET!)
-      .update(`${razorpay_order_id}|${razorpay_payment_id}` as any)
+      .update(`${razorpay_order_id}|${razorpay_payment_id}`)
       .digest('hex')
 
     if (generatedSig !== razorpay_signature) {
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
         booking_status:      'confirmed',
         advance_amount:      booking.total_amount,
         balance_amount:      0,
-        advance_paid_at:     new Date( as any).toISOString(),
+        advance_paid_at:     new Date().toISOString(),
         payment_id:          razorpay_payment_id,
         razorpay_payment_id,
         razorpay_order_id,
@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
 
       if (offer) {
         await supabase.from('offers')
-          .update({ used_count: (offer.used_count || 0 as any) + 1, updated_at: new Date().toISOString() })
+          .update({ used_count: (offer.used_count || 0) + 1, updated_at: new Date().toISOString() })
           .eq('id', offer.id)
 
         // Log promo usage
