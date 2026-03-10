@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
 
     // Room check
     const { data: room, error: roomErr } = await supabaseAdmin
-      .from('rooms').select('id,is_active,total_rooms').eq('id', room_id).single()
+      .from('rooms').select('id,is_active,total_rooms').eq('id', room_id).single() as any
     if (roomErr || !room?.is_active) {
       return NextResponse.json({ error: 'Room not found or inactive' }, { status: 404 })
     }
@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
         booking_status:  'pending',
         payment_status:  'pending',
         special_requests: special_requests || null,
-      }).select().single()
+      }).select().single() as any
 
     if (bErr || !booking) {
       console.error('Booking insert error:', bErr)

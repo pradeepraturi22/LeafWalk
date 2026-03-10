@@ -94,7 +94,7 @@ function AuthContent() {
           window.location.href = '/admin/dashboard'; return
         }
         // Also check DB for role in case metadata not set
-        const { data: u } = await supabase.from('users').select('role').eq('id', session.user.id).single()
+        const { data: u } = await supabase.from('users').select('role').eq('id', session.user.id).single() as any
         if (u?.role === 'admin' || u?.role === 'manager') {
           window.location.href = '/admin/dashboard'; return
         }
@@ -132,7 +132,7 @@ function AuthContent() {
     // Get role — first from metadata, then from DB
     let role = data.user.user_metadata?.role as string | undefined
     if (!role) {
-      const { data: u } = await supabase.from('users').select('role,name').eq('id', data.user.id).single()
+      const { data: u } = await supabase.from('users').select('role,name').eq('id', data.user.id).single() as any
       role = u?.role
       // Update metadata for faster future logins
       if (u?.role) await supabase.auth.updateUser({ data: { role: u.role, name: u.name } })

@@ -32,7 +32,7 @@ export async function POST(req: Request) {
       .from('rooms')
       .select('id, category, is_active')
       .eq('id', roomId)
-      .single()
+      .single() as any
 
     if (roomErr || !room) {
       console.error('Room fetch error:', roomErr?.message)

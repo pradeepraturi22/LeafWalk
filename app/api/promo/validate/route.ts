@@ -23,7 +23,7 @@ export async function POST(req: Request) {
       .from('offers')
       .select('*')
       .eq('code', cleanCode)
-      .single()
+      .single() as any
 
     if (error || !offer) {
       return NextResponse.json({ valid: false, error: 'Promo code not found' }, { status: 200 })

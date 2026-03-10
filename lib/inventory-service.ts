@@ -22,7 +22,7 @@ export async function checkAvailability(
       .from('rooms')
       .select('total_rooms')
       .eq('id', roomId)
-      .single()
+      .single() as any
 
     if (!room) {
       throw new Error('Room not found')

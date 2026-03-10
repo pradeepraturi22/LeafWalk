@@ -16,7 +16,7 @@ interface Room {
 interface RoomRate {
   meal_plan: string; rate_type: string; price_per_night: number
   extra_bed_price: number; child_5_12_price: number
-  season: { id: string; start_month: number; start_day: number; end_month: number; end_day: number }
+  season?: any
 }
 interface FormErrors {
   name?: string; email?: string; phone?: string
@@ -271,7 +271,7 @@ function BookingContent() {
       if (authUser.email) setEmail(authUser.email)
       // Name and phone from users table
       const { data: u } = await supabase
-        .from('users').select('name,phone').eq('id', authUser.id).single()
+        .from('users').select('name,phone').eq('id', authUser.id).single() as any
       if (u?.name)  setName(u.name)
       if (u?.phone) {
         // Parse stored phone: +91XXXXXXXXXX -> set CC and number

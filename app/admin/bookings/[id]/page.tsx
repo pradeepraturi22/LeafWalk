@@ -64,7 +64,7 @@ export default function BookingDetailPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/admin/login'); return }
 
-    const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single()
+    const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single() as any
     if (!userData || !['admin', 'manager'].includes(userData.role)) {
       router.push('/admin/login'); return
     }

@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
       .from('bookings')
       .select('id, total_amount, promo_code, payment_status, booking_status')
       .eq('id', booking_id)
-      .single()
+      .single() as any
 
     if (fetchErr || !booking) {
       return NextResponse.json({ error: 'Booking not found' }, { status: 404 })
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
       })
       .eq('id', booking_id)
       .select()
-      .single()
+      .single() as any
 
     if (updateErr) {
       console.error('Booking update error:', updateErr)
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
         .from('offers')
         .select('id, used_count')
         .eq('code', booking.promo_code)
-        .single()
+        .single() as any
 
       if (offer) {
         await supabase.from('offers')

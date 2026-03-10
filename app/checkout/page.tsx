@@ -47,7 +47,7 @@ function CheckoutContent() {
         .from('rooms')
         .select('*')
         .eq('id', roomId)
-        .single()
+        .single() as any
 
       if (roomError || !roomData) {
         toast.error('Room not found')
@@ -64,7 +64,7 @@ function CheckoutContent() {
           .from('users')
           .select('*')
           .eq('id', authUser.id)
-          .single()
+          .single() as any
 
         if (userData) {
           setUser(userData)

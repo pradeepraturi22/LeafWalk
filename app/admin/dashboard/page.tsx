@@ -61,7 +61,7 @@ export default function AdminDashboard() {
       // Step 3: Fallback — direct DB query if API not available
       if (!verifiedRole) {
         const { data: u, error: uErr } = await supabase
-          .from('users').select('role').eq('id', session.user.id).single()
+          .from('users').select('role').eq('id', session.user.id).single() as any
         if (uErr) {
           console.error('users table query error:', uErr.message, uErr.code)
         }

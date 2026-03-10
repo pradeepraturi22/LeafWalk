@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
         room:rooms(name, category, featured_image)
       `)
       .eq('id', id)
-      .single()
+      .single() as any
 
     if (error || !data) {
       return NextResponse.json({ error: 'Booking not found' }, { status: 404 })

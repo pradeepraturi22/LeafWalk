@@ -29,7 +29,7 @@ export async function POST(request: Request) {
       .from('bookings')
       .select(`*, room:rooms(name, category), tour_operator:tour_operators(company_name, contact_person, email, phone, commission_rate)`)
       .eq('id', booking_id)
-      .single()
+      .single() as any
 
     if (error || !booking) return NextResponse.json({ error: 'Booking not found' }, { status: 404 })
 

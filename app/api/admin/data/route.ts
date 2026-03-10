@@ -14,7 +14,7 @@ async function requireAdmin(request: NextRequest): Promise<{ userId: string; rol
   if (!token) return null
   const { data: { user }, error } = await supabaseAdmin.auth.getUser(token)
   if (error || !user) return null
-  const { data: u } = await supabaseAdmin.from('users').select('role').eq('id', user.id).single()
+  const { data: u } = await supabaseAdmin.from('users').select('role').eq('id', user.id).single() as any
   if (!u || !['admin', 'manager'].includes(u.role)) return null
   return { userId: user.id, role: u.role }
 }
@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
       const { data, error } = await supabaseAdmin
         .from('bookings')
         .select(`*, room:rooms(name, category, featured_image), tour_operator:tour_operators(company_name, contact_person, email, phone)`)
-        .eq('id', id).single()
+        .eq('id', id).single() as any
       if (error) return NextResponse.json({ error: error.message }, { status: 404 })
       return NextResponse.json({ data })
     }
@@ -95,7 +95,7 @@ export async function GET(request: NextRequest) {
       if (!roomId || !checkin || !checkout) {
         return NextResponse.json({ error: 'room_id, check_in, check_out required' }, { status: 400 })
       }
-      const { data: room } = await supabaseAdmin.from('rooms').select('category').eq('id', roomId).single()
+      const { data: room } = await supabaseAdmin.from('rooms').select('category').eq('id', roomId).single() as any
       if (!room) return NextResponse.json({ error: 'Room not found' }, { status: 404 })
       const { data: rates } = await supabaseAdmin
         .from('room_rates')
@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'room_id, check_in, check_out required' }, { status: 400 })
       }
       // Direct query (no RPC needed, service role bypasses RLS)
-      const { data: room } = await supabaseAdmin.from('rooms').select('category, total_rooms').eq('id', room_id).single()
+      const { data: room } = await supabaseAdmin.from('rooms').select('category, total_rooms').eq('id', room_id).single() as any
       if (!room) return NextResponse.json({ error: 'Room not found' }, { status: 404 })
       const { data: catRooms } = await supabaseAdmin.from('rooms').select('id, total_rooms').eq('category', room.category).eq('is_active', true)
       const catTotal = catRooms?.reduce((s, r) => s + (r.total_rooms || 0), 0) || 0
@@ -148,7 +148,7 @@ export async function POST(request: NextRequest) {
       // Set created_by
       bookingData.created_by = admin.userId
       const { data, error } = await supabaseAdmin
-        .from('bookings').insert(bookingData).select('id, booking_number').single()
+        .from('bookings').insert(bookingData).select('id, booking_number').single() as any
       if (error) throw error
       if (room_items?.length && data?.id) {
         await supabaseAdmin.from('booking_room_items').insert(
