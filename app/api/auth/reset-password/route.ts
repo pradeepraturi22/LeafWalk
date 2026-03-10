@@ -19,7 +19,8 @@ export async function POST(request: NextRequest) {
     const { data: listData, error: listErr } = await supabaseAdmin.auth.admin.listUsers()
     if (listErr) return NextResponse.json({ error: 'Failed to find user' }, { status: 500 })
 
-    const authUser = listData.users.find(u => u.email?.toLowerCase() === email.toLowerCase())
+    const users = (listData as any)?.users ?? []
+    const authUser = users.find((u: any) => u.email?.toLowerCase() === email.toLowerCase())
     if (!authUser) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
     // Update password
