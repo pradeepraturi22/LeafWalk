@@ -68,7 +68,7 @@ function sanitize(s: string) { return s.replace(/[<>"'&;]/g, '').trim().slice(0,
 function validateName(n: string) {
   if (!n.trim()) return 'Full name is required'
   if (n.trim().length < 2) return 'Name must be at least 2 characters'
-  if (/[^a-zA-Z\s.\-']/u.test(n)) return 'Name contains invalid characters'
+  if (/[^a-zA-Z\s.\-']/.test(n)) return 'Name contains invalid characters'
 }
 function validateEmail(e: string) { if (e && !EMAIL_RE.test(e)) return 'Enter a valid email address' }
 function validatePhoneIntl(phone: string, cc: string) {
