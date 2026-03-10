@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
 
     await supabaseAdmin
       .from('bookings')
-      .update({ booking_status: 'cancelled', payment_status: 'failed' })
+      .update({ booking_status: 'cancelled', payment_status: 'failed' } as any)
       .eq('id', booking_id)
       .in('booking_status', ['pending']) // only cancel if still pending
 

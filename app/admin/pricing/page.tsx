@@ -169,7 +169,7 @@ function RoomPricingTab({ rooms, reload }: { rooms: Room[]; reload: () => void }
       offer_discount_percent: form.offer_discount_percent || 0,
       offer_is_active: form.offer_is_active || false,
       offer_valid_until: form.offer_valid_until || null,
-      updated_at: new Date().toISOString(),
+      updated_at: new Date( as any).toISOString(),
     }).eq('id', roomId)
     setSaving(false)
     if (error) { toast.error('Failed to save: ' + error.message); return }
@@ -305,7 +305,7 @@ function SeasonsTab({ seasons, reload }: { seasons: Season[]; reload: () => void
       is_yatra_season: form.is_yatra_season, sort_order: form.sort_order,
     }
     const { error } = editId
-      ? await supabase.from('seasons').update(payload).eq('id', editId)
+      ? await supabase.from('seasons').update(payload as any).eq('id', editId)
       : await supabase.from('seasons').insert(payload)
     setSaving(false)
     if (error) { toast.error(error.message.includes('unique') ? 'A season with this name already exists' : error.message); return }
@@ -436,7 +436,7 @@ function RateMatrixTab({ seasons, rates, reload }: { rooms: Room[]; seasons: Sea
       extra_bed_price: extraBed, child_5_12_price: child,
     }
     const { error } = existing
-      ? await supabase.from('room_rates').update({ price_per_night: price, extra_bed_price: extraBed, child_5_12_price: child }).eq('id', existing.id)
+      ? await supabase.from('room_rates').update({ price_per_night: price, extra_bed_price: extraBed, child_5_12_price: child } as any).eq('id', existing.id)
       : await supabase.from('room_rates').insert(payload)
     setSaving(false)
     if (error) { toast.error(error.message); return }
@@ -589,7 +589,7 @@ function OffersTab({ offers, rooms, reload }: { offers: Offer[]; rooms: Room[]; 
       applicable_categories: form.applicable_categories.length > 0 ? form.applicable_categories : null,
     }
     const { error } = editId
-      ? await supabase.from('offers').update(payload).eq('id', editId)
+      ? await supabase.from('offers').update(payload as any).eq('id', editId)
       : await supabase.from('offers').insert(payload)
     setSaving(false)
     if (error) { toast.error(error.message.includes('unique') ? 'This promo code already exists' : error.message); return }
@@ -598,7 +598,7 @@ function OffersTab({ offers, rooms, reload }: { offers: Offer[]; rooms: Room[]; 
   }
 
   async function toggle(id: string, current: boolean) {
-    const { error } = await supabase.from('offers').update({ is_active: !current }).eq('id', id)
+    const { error } = await supabase.from('offers').update({ is_active: !current } as any).eq('id', id)
     if (error) toast.error(error.message); else { toast.success('Updated'); reload() }
   }
 

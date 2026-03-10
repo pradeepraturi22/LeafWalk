@@ -71,7 +71,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const { error } = await supabaseAdmin
-      .from('bookings').update(safeUpdates).eq('id', booking_id)
+      .from('bookings').update(safeUpdates as any).eq('id', booking_id)
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 

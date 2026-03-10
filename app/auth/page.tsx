@@ -192,7 +192,7 @@ function AuthContent() {
     if (otp.replace(/\s/g,'').length !== 6) { toast.error('Enter the 6-digit OTP'); return }
     if (otp.replace(/\s/g,'') !== sentOtp)  { toast.error('Incorrect OTP'); return }
     setLoading(true)
-    await supabase.from('users').update({ phone_verified: true }).eq('id', pendingUserId)
+    await supabase.from('users').update({ phone_verified: true } as any).eq('id', pendingUserId)
     toast.success('Mobile verified! Account ready.')
     setTimeout(() => { window.location.href = redirectTo }, 800)
     setLoading(false)

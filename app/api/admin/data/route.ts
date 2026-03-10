@@ -200,14 +200,14 @@ export async function PATCH(request: NextRequest) {
       if (body.balance_amount  !== undefined) updateData.balance_amount  = body.balance_amount
       if (body.advance_paid_at) updateData.advance_paid_at = body.advance_paid_at
       if (body.admin_notes)     updateData.admin_notes     = body.admin_notes
-      const { error } = await supabaseAdmin.from('bookings').update(updateData).eq('id', id)
+      const { error } = await supabaseAdmin.from('bookings').update(updateData as any).eq('id', id)
       if (error) throw error
       return NextResponse.json({ success: true })
     }
 
     if (type === 'operator') {
       if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
-      const { error } = await supabaseAdmin.from('tour_operators').update(body).eq('id', id)
+      const { error } = await supabaseAdmin.from('tour_operators').update(body as any).eq('id', id)
       if (error) throw error
       return NextResponse.json({ success: true })
     }
@@ -231,7 +231,7 @@ export async function DELETE(request: NextRequest) {
     if (type === 'operator') {
       if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
       // Don't actually delete — soft deactivate
-      const { error } = await supabaseAdmin.from('tour_operators').update({ status: 'inactive' }).eq('id', id)
+      const { error } = await supabaseAdmin.from('tour_operators').update({ status: 'inactive' } as any).eq('id', id)
       if (error) throw error
       return NextResponse.json({ success: true })
     }

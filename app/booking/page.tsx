@@ -256,7 +256,7 @@ function BookingContent() {
       const target = all.find(r => r.slug === roomSlug)
       if (!target) { toast.error('Room not found'); router.push('/rooms'); return }
       setRoom(target)
-      setRates((ratesR.data || [] as any[]).filter((r: any) => r.room_category === target.category) as any)
+      setRates((ratesR.data || []).filter((r: any) => r.room_category === target.category))
       setLoading(false)
     })
   }, [roomSlug])

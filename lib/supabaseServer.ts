@@ -1,6 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
 
-// Lazy initialization — prevents build-time crash when env vars are not set
 let _supabaseAdmin: ReturnType<typeof createClient> | null = null
 
 export function getSupabaseAdmin() {
@@ -13,7 +12,6 @@ export function getSupabaseAdmin() {
   return _supabaseAdmin
 }
 
-// Keep named export for backward compatibility
 export const supabaseAdmin = new Proxy({} as ReturnType<typeof createClient>, {
   get(_target, prop) {
     return (getSupabaseAdmin() as any)[prop]

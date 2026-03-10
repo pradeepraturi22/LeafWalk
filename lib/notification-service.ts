@@ -1,4 +1,5 @@
-// lib/notification-service.ts
+// Unified Notification Service - FIXED VERSION
+
 import { sendEmail, generateBookingConfirmationEmail } from './email-service'
 import { sendSMS, bookingConfirmationSMS } from './sms-service'
 import { sendWhatsApp, bookingConfirmationWhatsApp } from './whatsapp-service'
@@ -27,6 +28,8 @@ export async function sendBookingNotifications(
       const emailHtml = generateBookingConfirmationEmail(booking)
       await sendEmail(booking.guest_email, `Booking Confirmed - ${booking.invoice_number || 'Leafwalk Resort'}`, emailHtml)
       results.email = true
+      
+      // Log notification
       await logNotification(booking.id, 'email', booking.guest_email, 'sent')
     } catch (error: any) {
       results.errors.push(`Email: ${error.message}`)
@@ -40,6 +43,8 @@ export async function sendBookingNotifications(
       const smsMessage = bookingConfirmationSMS(booking)
       await sendSMS(booking.guest_phone, smsMessage)
       results.sms = true
+      
+      // Log notification
       await logNotification(booking.id, 'sms', booking.guest_phone, 'sent')
     } catch (error: any) {
       results.errors.push(`SMS: ${error.message}`)
@@ -53,6 +58,8 @@ export async function sendBookingNotifications(
       const whatsappMessage = bookingConfirmationWhatsApp(booking)
       await sendWhatsApp(booking.guest_phone, whatsappMessage)
       results.whatsapp = true
+      
+      // Log notification
       await logNotification(booking.id, 'whatsapp', booking.guest_phone, 'sent')
     } catch (error: any) {
       results.errors.push(`WhatsApp: ${error.message}`)
@@ -73,7 +80,7 @@ async function logNotification(
   try {
     await supabase.from('notification_logs').insert({
       booking_id: bookingId,
-      type,
+      type: type,  // Changed from notification_type to type
       recipient,
       status,
       error_message: errorMessage,
