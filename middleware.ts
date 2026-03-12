@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 // ─── Maintenance Mode ─────────────────────────────────────────────────────────
 // To enable:  set NEXT_PUBLIC_MAINTENANCE_MODE=true in .env.local  → npm run build
 // To disable: set NEXT_PUBLIC_MAINTENANCE_MODE=false (or delete it) → npm run build
-const MAINTENANCE_MODE = process.env.NEXT_PUBLIC_MAINTENANCE_MODE === 'false'
+const MAINTENANCE_MODE = process.env.NEXT_PUBLIC_MAINTENANCE_MODE === 'true'
 
 // Paths that bypass maintenance mode (admin can still access)
 const MAINTENANCE_BYPASS = [
