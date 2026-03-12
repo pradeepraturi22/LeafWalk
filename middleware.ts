@@ -12,6 +12,7 @@ const MAINTENANCE_BYPASS = [
   '/admin',          // admin panel stays accessible
   '/api/admin',      // admin APIs stay accessible
   '/_next',
+  '/home',
   '/favicon.ico',
 ]
 
