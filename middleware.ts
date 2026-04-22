@@ -89,6 +89,7 @@ function applySecurityHeaders(response: NextResponse) {
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: blob: https://*.supabase.co https://checkout.razorpay.com",
+      "media-src 'self' blob:",
       "connect-src 'self' https://*.supabase.co https://api.razorpay.com https://checkout.razorpay.com https://lumberjack.razorpay.com",
       "frame-src https://api.razorpay.com https://checkout.razorpay.com",
       "object-src 'none'",

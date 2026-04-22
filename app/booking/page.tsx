@@ -753,9 +753,8 @@ function BookingContent() {
                         onChange={e => {
                           const nextCheckIn = e.target.value
                           setCheckIn(nextCheckIn)
-                          if (checkOut && nextCheckIn) {
-                            const nextMin = addDays(nextCheckIn, 1)
-                            if (checkOut <= nextCheckIn) setCheckOut(nextMin)
+                          if (nextCheckIn) {
+                            setCheckOut(addDays(nextCheckIn, 1))
                           }
                           setAvail(null); setShowCal(false); setPromoResult(null); setErrors(p => ({ ...p, checkIn: undefined, checkOut: undefined }))
                         }}

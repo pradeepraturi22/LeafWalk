@@ -125,12 +125,10 @@ export default function AvailabilityBar({
               value={checkIn}
               min={today}
               onChange={(event) => {
-                setCheckIn(event.target.value)
-                if (event.target.value) {
-                  const nextMin = addDays(event.target.value, 1)
-                  if (!checkOut || checkOut <= event.target.value) {
-                    setCheckOut(nextMin)
-                  }
+                const nextCheckIn = event.target.value
+                setCheckIn(nextCheckIn)
+                if (nextCheckIn) {
+                  setCheckOut(addDays(nextCheckIn, 1))
                 }
               }}
               className={`w-full rounded-2xl border border-white/10 bg-white/5 px-4 text-white focus:border-[#c9a14a] focus:outline-none ${compact ? 'py-2.5 text-sm' : 'py-3'}`}

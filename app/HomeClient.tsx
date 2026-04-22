@@ -187,7 +187,7 @@ export default function HomeClient({ pageName }: { pageName?: string }) {
     <>
       <div className="hero">
         <video autoPlay muted loop playsInline preload="metadata">
-          <source src="/videos/hero-demo2.mp4" type="video/mp4" />
+          <source src="/videos/Hero-Demo2.mp4" type="video/mp4" />
         </video>
         <div className="hero-overlay">
           <p className="text-[#c9a14a] text-xs uppercase tracking-[0.4em] font-semibold mb-4 opacity-90">Uttarkashi, Uttarakhand</p>
