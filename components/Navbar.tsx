@@ -1,0 +1,309 @@
+'use client'
+import Image from 'next/image'
+import Link from 'next/link'
+import { useEffect, useState } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
+import { supabase } from '@/lib/supabaseClient'
+
+const LINKS = [
+  { href: '/',            label: 'Home' },
+  { href: '/rooms',       label: 'Rooms' },
+  { href: '/gallery',     label: 'Gallery' },
+  { href: '/experiences', label: 'Experiences' },
+  { href: '/food',        label: 'Dining' },
+  { href: '/contact',     label: 'Contact' },
+]
+
+const WA_ICON = <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.890-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+const CUSTOMER_IDLE_TIMEOUT_MS = Number(process.env.NEXT_PUBLIC_CUSTOMER_IDLE_TIMEOUT_MINUTES || 120) * 60 * 1000
+
+type NavUser = {
+  id?: string
+  email?: string | null
+  name?: string | null
+  role?: string | null
+  authType?: 'customer' | 'admin'
+}
+
+export default function Navbar() {
+  const [scrolled, setScrolled]         = useState(false)
+  const [open, setOpen]                 = useState(false)
+  const [user, setUser]                 = useState<NavUser | null>(null)
+  const [userRole, setUserRole]         = useState<string>('')
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const path   = usePathname()
+  const router = useRouter()
+
+  // Scroll listener
+  useEffect(() => {
+    const fn = () => setScrolled(window.scrollY > 40)
+    window.addEventListener('scroll', fn, { passive: true })
+    return () => window.removeEventListener('scroll', fn)
+  }, [])
+
+  // Close menus on route change
+  useEffect(() => { setOpen(false); setUserMenuOpen(false) }, [path])
+
+  async function loadCustomerSession() {
+    try {
+      const response = await fetch('/api/auth/me', { cache: 'no-store' })
+      const result = await response.json()
+      if (result?.user && !result?.requires_profile_completion) {
+        setUser({
+          ...result.user,
+          authType: 'customer',
+        })
+        setUserRole(result.user.role || 'user')
+        return true
+      }
+      return false
+    } catch {
+      return false
+    }
+  }
+
+  // Auth listener: guest auth uses the custom secure cookie, while admin uses Supabase Auth.
+  useEffect(() => {
+    let mounted = true
+
+    async function hydrateSession() {
+      const hasCustomerSession = await loadCustomerSession()
+      if (!mounted || hasCustomerSession) return
+
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user) {
+        setUser({ ...session.user, authType: 'admin' })
+        fetchRole(session.user.id, session.access_token)
+      }
+    }
+
+    void hydrateSession()
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+      if (session?.user) {
+        setUser({ ...session.user, authType: 'admin' })
+        fetchRole(session.user.id, session.access_token)
+      } else {
+        void loadCustomerSession().then((hasCustomerSession) => {
+          if (!hasCustomerSession) {
+            setUser(null)
+            setUserRole('')
+          }
+        })
+      }
+    })
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadCustomerSession()
+  }, [path])
+
+  useEffect(() => {
+    if (!user) return
+    const timeoutMs = Number.isFinite(CUSTOMER_IDLE_TIMEOUT_MS) && CUSTOMER_IDLE_TIMEOUT_MS > 0
+      ? CUSTOMER_IDLE_TIMEOUT_MS
+      : 1000 * 60 * 60 * 2
+    let timer: number | undefined
+
+    const resetTimer = () => {
+      if (timer) window.clearTimeout(timer)
+      timer = window.setTimeout(() => {
+        void handleLogout()
+      }, timeoutMs)
+    }
+
+    const events = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart']
+    events.forEach((eventName) => window.addEventListener(eventName, resetTimer, { passive: true }))
+    resetTimer()
+
+    return () => {
+      if (timer) window.clearTimeout(timer)
+      events.forEach((eventName) => window.removeEventListener(eventName, resetTimer))
+    }
+  }, [user?.email])
+
+  async function fetchRole(userId: string, token?: string) {
+    // Try fast: user_metadata first
+    const meta = (await supabase.auth.getUser()).data.user?.user_metadata
+    if (meta?.role) { setUserRole(meta.role); return }
+    // Fallback: DB
+    const { data } = await supabase.from('users').select('role').eq('id', userId).single() as any
+    if (data?.role) setUserRole(data.role)
+  }
+
+  const isAdmin = ['admin', 'manager'].includes(userRole)
+  const solid   = scrolled || open
+
+  async function handleLogout() {
+    await supabase.auth.signOut()
+    await fetch('/api/auth/logout', { method: 'POST' }).catch(() => null)
+    setUserRole('')
+    setUser(null)
+    setOpen(false)
+    setUserMenuOpen(false)
+    window.location.href = '/'
+  }
+
+  return (
+    <header className={`fixed top-0 w-full z-50 transition-all duration-500 ${solid ? 'bg-black/90 backdrop-blur-xl border-b border-white/10 shadow-2xl' : 'bg-transparent'}`}>
+      <nav className="max-w-7xl mx-auto px-5 py-3 flex items-center justify-between">
+
+        {/* Logo */}
+        <Link href="/" className="flex items-center gap-3">
+          <div className={`relative rounded-full bg-white shadow overflow-hidden transition-all duration-500 ${scrolled ? 'w-10 h-10' : 'w-14 h-14'}`}>
+            <Image src="/logo/leafwalk-logo.jpeg" alt="LeafWalk Resort" fill className="object-contain p-1.5" priority />
+          </div>
+          <span className={`font-playfair text-[#c9a14a] transition-all duration-500 ${scrolled ? 'text-lg' : 'text-2xl'}`}>LeafWalk Resort</span>
+        </Link>
+
+        {/* Desktop nav links */}
+        <div className="hidden lg:flex items-center gap-7 text-xs uppercase tracking-widest">
+          {LINKS.map(l => (
+            <Link key={l.href} href={l.href}
+              className={`transition-colors pb-0.5 border-b-2 ${path === l.href ? 'text-[#c9a14a] border-[#c9a14a]' : 'text-white/75 border-transparent hover:text-[#c9a14a] hover:border-[#c9a14a]/50'}`}>
+              {l.label}
+            </Link>
+          ))}
+        </div>
+
+        {/* Desktop CTAs */}
+        <div className="hidden lg:flex items-center gap-3">
+          {/* WhatsApp */}
+          <a href="https://wa.me/919368080535" target="_blank" rel="noopener noreferrer"
+            className="flex items-center gap-1.5 px-4 py-2 bg-green-500/15 border border-green-500/30 text-green-400 rounded-full text-xs font-semibold hover:bg-green-500/25 transition-all">
+            {WA_ICON} WhatsApp
+          </a>
+
+          {/* Auth area */}
+          {user ? (
+            <div className="relative">
+              <button onClick={() => setUserMenuOpen(!userMenuOpen)}
+                className={`flex items-center gap-2 px-4 py-2 border rounded-full text-xs font-semibold transition-all ${
+                  isAdmin
+                    ? 'bg-[#c9a14a]/15 border-[#c9a14a]/40 text-[#c9a14a] hover:bg-[#c9a14a]/25'
+                    : 'bg-white/10 border-white/20 text-white hover:bg-white/15'
+                }`}>
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                {isAdmin ? '⚙️ Admin' : 'My Account'}
+                <svg className={`w-3 h-3 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {userMenuOpen && (
+                <div className="absolute right-0 mt-2 w-52 bg-black/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50">
+                  <div className="px-4 py-3 border-b border-white/10">
+                    <p className="text-xs text-white/40">Signed in as</p>
+                    <p className="text-sm text-white/80 truncate">{user.email}</p>
+                    {isAdmin && (
+                      <span className="inline-block mt-1 text-xs px-2 py-0.5 rounded-full bg-[#c9a14a]/15 text-[#c9a14a] border border-[#c9a14a]/30 capitalize">
+                        {userRole}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Admin — show admin panel link */}
+                  {isAdmin && (
+                    <Link href="/admin/dashboard" onClick={() => setUserMenuOpen(false)}
+                      className="flex items-center gap-2 px-4 py-3 text-sm text-[#c9a14a] hover:bg-[#c9a14a]/10 transition-all border-b border-white/5">
+                      <span>⚙️</span> Admin Panel
+                    </Link>
+                  )}
+
+                  {/* Customer — show my bookings */}
+                  {!isAdmin && (
+                    <Link href="/my-bookings" onClick={() => setUserMenuOpen(false)}
+                      className="block px-4 py-3 text-sm text-white/70 hover:text-white hover:bg-white/5 transition-all">
+                      📋 My Bookings
+                    </Link>
+                  )}
+
+                  <button onClick={handleLogout}
+                    className="w-full text-left px-4 py-3 text-sm text-red-400 hover:text-red-300 hover:bg-red-500/5 transition-all">
+                    🚪 Sign Out
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <Link href="/auth"
+              className="flex items-center gap-1.5 px-4 py-2 bg-white/10 border border-white/20 text-white rounded-full text-xs font-semibold hover:bg-white/15 transition-all">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+              Login
+            </Link>
+          )}
+
+          {/* Book Now */}
+          <Link href="/rooms" className="px-5 py-2.5 bg-gradient-to-r from-[#c9a14a] to-[#e6c87a] text-black rounded-full text-xs font-bold hover:opacity-90 transition-all shadow-lg shadow-[#c9a14a]/20">
+            Book Now
+          </Link>
+        </div>
+
+        {/* Mobile hamburger */}
+        <button onClick={() => setOpen(!open)} className="lg:hidden w-10 h-10 flex flex-col justify-center items-center gap-1.5" aria-label="Menu">
+          <span className={`w-6 h-0.5 bg-white block transition-all duration-300 ${open ? 'rotate-45 translate-y-2' : ''}`} />
+          <span className={`w-6 h-0.5 bg-white block transition-all duration-300 ${open ? 'opacity-0' : ''}`} />
+          <span className={`w-6 h-0.5 bg-white block transition-all duration-300 ${open ? '-rotate-45 -translate-y-2' : ''}`} />
+        </button>
+      </nav>
+
+      {/* Mobile menu */}
+      <div className={`lg:hidden overflow-hidden transition-all duration-300 ${open ? 'max-h-[600px]' : 'max-h-0'}`}>
+        <div className="px-5 pb-6 pt-2 border-t border-white/10 space-y-1">
+          {LINKS.map(l => (
+            <Link key={l.href} href={l.href}
+              className={`block py-3 px-4 rounded-xl text-sm uppercase tracking-widest transition-all ${path === l.href ? 'text-[#c9a14a] bg-[#c9a14a]/10' : 'text-white/70 hover:text-[#c9a14a] hover:bg-white/5'}`}>
+              {l.label}
+            </Link>
+          ))}
+
+          {/* Mobile auth */}
+          {user ? (
+            <>
+              <div className="px-4 py-2 text-xs text-white/40 border-t border-white/10 mt-2 pt-3">
+                Signed in: <span className="text-white/60">{user.email}</span>
+                {isAdmin && <span className="ml-2 text-[#c9a14a] capitalize">({userRole})</span>}
+              </div>
+              {isAdmin ? (
+                <Link href="/admin/dashboard"
+                  className="block py-3 px-4 rounded-xl text-sm text-[#c9a14a] bg-[#c9a14a]/10 hover:bg-[#c9a14a]/15 transition-all">
+                  ⚙️ Admin Panel
+                </Link>
+              ) : (
+                <Link href="/my-bookings"
+                  className="block py-3 px-4 rounded-xl text-sm text-white/70 hover:text-white hover:bg-white/5 transition-all">
+                  📋 My Bookings
+                </Link>
+              )}
+              <button onClick={handleLogout} className="w-full text-left py-3 px-4 rounded-xl text-sm text-red-400 hover:bg-red-500/5 transition-all">
+                🚪 Sign Out
+              </button>
+            </>
+          ) : (
+            <Link href="/auth" className="block py-3 px-4 rounded-xl text-sm text-white/70 hover:text-[#c9a14a] hover:bg-white/5 transition-all uppercase tracking-widest">
+              🔑 Login / Sign Up
+            </Link>
+          )}
+
+          <div className="pt-3 space-y-2">
+            <Link href="/rooms" className="block py-3 text-center bg-gradient-to-r from-[#c9a14a] to-[#e6c87a] text-black rounded-xl font-bold text-sm uppercase tracking-widest">
+              Book Now
+            </Link>
+            <a href="https://wa.me/919368080535" target="_blank" rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 py-3 bg-green-500/15 border border-green-500/30 text-green-400 rounded-xl text-sm font-semibold">
+              {WA_ICON} WhatsApp Us
+            </a>
+          </div>
+        </div>
+      </div>
+    </header>
+  )
+}

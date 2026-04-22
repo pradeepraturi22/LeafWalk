@@ -1,0 +1,978 @@
+// app/api/admin/data/route.ts
+// ALL endpoints require valid admin/manager JWT — uses service role for DB ops
+import { NextRequest, NextResponse } from 'next/server'
+import { getSupabaseAdmin } from '@/lib/supabaseServer'
+import { sendTourOperatorWelcomeEmail } from '@/lib/tour-operator-notifications'
+import { sendBookingLifecycleEmails } from '@/lib/booking-email-triggers'
+import { buildBookingNumber, buildHoldBookingNumber } from '@/lib/reference-numbers'
+import { logDebug, logError } from '@/lib/logger'
+import { sanitizeEmail, sanitizePhone, sanitizeString, sanitizeUnknown } from '@/lib/security'
+import { validateBookingStatusChange } from '@/lib/booking-status'
+import { z } from 'zod'
+import { isLocalTestMode } from '@/lib/runtime-mode'
+type RoomInventoryRow = {
+  id: string
+  category: string
+  total_rooms: number | string | null
+  is_active?: boolean | null
+}
+
+
+// ── Shared auth guard ────────────────────────────────────────────────────────
+function getJwtSubjectForLocalFallback(token: string) {
+  try {
+    const payload = token.split('.')[1]
+    if (!payload) return null
+    const decoded = Buffer.from(payload.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8')
+    const parsed = JSON.parse(decoded)
+    return typeof parsed.sub === 'string' ? parsed.sub : null
+  } catch {
+    return null
+  }
+}
+
+async function requireAdmin(request: NextRequest): Promise<{ userId: string; role: string } | null> {
+  const token = request.headers.get('authorization')?.replace('Bearer ', '').trim()
+  if (!token) return null
+
+  let userId: string | null = null
+  try {
+    const { data: { user }, error } = await getSupabaseAdmin().auth.getUser(token)
+    if (error || !user) return null
+    userId = user.id
+  } catch (error) {
+    if (!isLocalTestMode()) return null
+    userId = getJwtSubjectForLocalFallback(token)
+    logError('LOCAL TEST MODE admin auth.getUser failed; using local JWT subject fallback', error)
+  }
+
+  if (!userId) return null
+  const { data: u } = await getSupabaseAdmin().from('users').select('role').eq('id', userId).single() as any
+  if (!u || !['admin', 'manager'].includes(u.role)) return null
+  return { userId, role: u.role }
+}
+
+const UNAUTH = NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+const emptyToNull = (value: unknown) => {
+  if (value == null) return null
+  const normalized = String(value).trim()
+  return normalized ? normalized : null
+}
+
+const normalizePaymentStatus = (value: unknown) => {
+  const normalized = String(value || 'pending').trim().toLowerCase()
+  if (normalized === 'paid') return 'fully_paid'
+  if (normalized === 'advance_paid') return 'payment_processing'
+  if (['pending', 'payment_processing', 'fully_paid', 'failed', 'refunded'].includes(normalized)) return normalized
+  return 'pending'
+}
+
+const operatorSchema = z.object({
+  company_name: z.string().trim().min(2).max(200),
+  contact_person: z.string().trim().min(2).max(200),
+  email: z.string().trim().email().max(254),
+  phone: z.string().trim().min(7).max(20),
+  pan_number: z.preprocess(emptyToNull, z.string().max(30).nullable().optional()),
+  gst_number: z.preprocess(emptyToNull, z.string().max(30).nullable().optional()),
+  address: z.string().trim().min(5).max(500),
+  city: z.string().trim().min(2).max(100),
+  state: z.string().trim().min(2).max(100),
+  commission_rate: z.preprocess(
+    (value) => {
+      if (value === '' || value == null) return undefined
+      const parsed = Number(value)
+      return Number.isFinite(parsed) ? parsed : undefined
+    },
+    z.number().min(0).max(100).optional()
+  ),
+  status: z.enum(['active', 'inactive']).default('active'),
+})
+
+function normalizeOperatorPayload(body: any) {
+  return {
+    ...body,
+    company_name: sanitizeString(String(body.company_name || ''), 200),
+    contact_person: sanitizeString(String(body.contact_person || ''), 200),
+    email: sanitizeEmail(String(body.email || '')),
+    phone: sanitizePhone(String(body.phone || '')),
+    pan_number: emptyToNull(body.pan_number),
+    gst_number: emptyToNull(body.gst_number),
+    address: sanitizeString(String(body.address || ''), 500),
+    city: sanitizeString(String(body.city || ''), 100),
+    state: sanitizeString(String(body.state || ''), 100),
+    commission_rate:
+      body.commission_rate === '' || body.commission_rate == null || Number.isNaN(Number(body.commission_rate))
+        ? undefined
+        : Number(body.commission_rate),
+    status: body.status === 'inactive' ? 'inactive' : 'active',
+  }
+}
+
+async function hasWelcomeEmailAlreadyBeenSent(email: string, companyName: string) {
+  const { data } = await getSupabaseAdmin()
+    .from('notification_logs')
+    .select('id')
+    .eq('type', 'email')
+    .eq('recipient', email)
+    .eq('status', 'sent')
+    .like('content', `tour_operator_welcome:${companyName}`)
+    .limit(1)
+
+  return Boolean(data?.length)
+}
+
+async function getCategoryAvailability(
+  roomIds: string[],
+  checkIn: string,
+  checkOut: string,
+  excludeBookingId?: string | null
+) {
+  const supabase = getSupabaseAdmin()
+  const { data: selectedRooms, error: selectedRoomsError } = await supabase
+    .from('rooms')
+    .select('id, category, total_rooms, is_active')
+    .in('id', roomIds) as { data: RoomInventoryRow[] | null; error: Error | null }
+
+  if (selectedRoomsError || !selectedRooms?.length) {
+    throw new Error('Selected rooms not found')
+  }
+
+  const inactiveRoom = selectedRooms.find((room) => !room.is_active)
+  if (inactiveRoom) {
+    throw new Error('One or more selected rooms are inactive')
+  }
+
+  const categories: string[] = Array.from(
+    selectedRooms.reduce((set: Set<string>, room: any) => set.add(room.category), new Set<string>())
+  )
+  const { data: categoryRooms, error: categoryRoomsError } = await supabase
+    .from('rooms')
+    .select('id, category, total_rooms')
+    .in('category', categories)
+    .eq('is_active', true) as { data: RoomInventoryRow[] | null; error: Error | null }
+
+  if (categoryRoomsError || !categoryRooms?.length) {
+    throw new Error('Could not load category inventory')
+  }
+
+  const roomIdsByCategory = new Map<string, string[]>()
+  const totalByCategory = new Map<string, number>()
+  for (const room of categoryRooms) {
+    roomIdsByCategory.set(room.category, [...(roomIdsByCategory.get(room.category) || []), room.id])
+    totalByCategory.set(room.category, (totalByCategory.get(room.category) || 0) + (Number(room.total_rooms) || 0))
+  }
+
+  const overlappingByCategory = new Map<string, number>()
+  for (const category of categories) {
+    const catRoomIds = roomIdsByCategory.get(category) || []
+
+    if (!catRoomIds.length) {
+      overlappingByCategory.set(category, 0)
+      continue
+    }
+
+    let overlapQuery = supabase
+      .from('bookings')
+      .select('rooms_booked')
+      .in('room_id', catRoomIds)
+      .in('booking_status', ['pending', 'confirmed', 'hold', 'checked_in'])
+      .lt('check_in', checkOut)
+      .gt('check_out', checkIn)
+
+    if (excludeBookingId) {
+      overlapQuery = overlapQuery.neq('id', excludeBookingId)
+    }
+
+    const { data: overlapping, error: overlapError } = await overlapQuery as any
+
+    if (overlapError) {
+      logError('Admin booking availability overlap query failed:', {
+        category,
+        catRoomIds,
+        checkIn,
+        checkOut,
+        excludeBookingId,
+        error: overlapError,
+      })
+      throw new Error('Could not validate room availability')
+    }
+
+    overlappingByCategory.set(
+      category,
+      (overlapping || []).reduce((sum: number, booking: any) => sum + (Number(booking.rooms_booked) || 1), 0)
+    )
+  }
+
+  return { selectedRooms, totalByCategory, overlappingByCategory }
+}
+
+function getIstNow() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Calcutta',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(new Date())
+
+  const map = Object.fromEntries(parts.filter((part) => part.type !== 'literal').map((part) => [part.type, part.value]))
+  return {
+    date: `${map.year}-${map.month}-${map.day}`,
+    hour: Number(map.hour || 0),
+    minute: Number(map.minute || 0),
+  }
+}
+
+function canCheckInToday(checkInDate: string) {
+  const now = getIstNow()
+  return now.date === checkInDate && (now.hour > 15 || (now.hour === 15 && now.minute >= 0))
+}
+
+// ── GET ──────────────────────────────────────────────────────────────────────
+export async function GET(request: NextRequest) {
+  if (!await requireAdmin(request)) return UNAUTH
+
+  const { searchParams } = new URL(request.url)
+  const type = searchParams.get('type')
+
+  try {
+    if (type === 'dashboard') {
+      const { data: allBookings } = await getSupabaseAdmin().from('bookings').select('*')
+      const { data: rooms } = await getSupabaseAdmin().from('rooms').select('*')
+      const { data: recent } = await getSupabaseAdmin()
+        .from('bookings').select(`*, room:rooms(name)`)
+        .order('created_at', { ascending: false }).limit(10)
+      return NextResponse.json({ allBookings, rooms, recent })
+    }
+
+    if (type === 'bookings') {
+      const { data, error } = await getSupabaseAdmin()
+        .from('bookings').select(`*, room:rooms(name, category)`)
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      return NextResponse.json({ data })
+    }
+
+    if (type === 'booking-detail') {
+      const id = searchParams.get('id')
+      if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
+      const { data, error } = await getSupabaseAdmin()
+        .from('bookings')
+        .select(`*, room:rooms(name, category, featured_image), tour_operator:tour_operators(company_name, contact_person, email, phone)`)
+        .eq('id', id).single() as any
+      if (error) return NextResponse.json({ error: error.message }, { status: 404 })
+      return NextResponse.json({ data })
+    }
+
+    if (type === 'rooms') {
+      const { data, error } = await getSupabaseAdmin()
+        .from('rooms').select('*').eq('is_active', true)
+      if (error) throw error
+      return NextResponse.json({ data })
+    }
+
+    if (type === 'operators' || type === 'active-operators') {
+      let query = getSupabaseAdmin()
+        .from('tour_operators')
+        .select('*')
+        .order('created_at', { ascending: false })
+      if (type === 'active-operators') {
+        query = query.eq('status', 'active')
+      }
+      const { data: operators, error } = await query
+      if (error) throw error
+      if (!operators?.length) return NextResponse.json({ data: [] })
+
+      const { data: allBookings } = await getSupabaseAdmin()
+        .from('bookings')
+        .select('tour_operator_id, total_amount')
+        .not('tour_operator_id', 'is', null)
+        .in('booking_status', ['confirmed', 'checked_in', 'checked_out'])
+
+      const data = operators.map((op) => {
+        const opBookings = allBookings?.filter(b => b.tour_operator_id === op.id) || []
+        return {
+          ...op,
+          total_bookings: opBookings.length,
+          total_revenue: opBookings.reduce((sum, b) => sum + (Number(b.total_amount) || 0), 0)
+        }
+      })
+      return NextResponse.json({ data })
+    }
+
+    if (type === 'rates') {
+      const roomId = searchParams.get('room_id')
+      const checkin = searchParams.get('check_in')
+      const checkout = searchParams.get('check_out')
+      if (!roomId || !checkin || !checkout) {
+        return NextResponse.json({ error: 'room_id, check_in, check_out required' }, { status: 400 })
+      }
+      const { data: room } = await getSupabaseAdmin().from('rooms').select('category').eq('id', roomId).single() as any
+      if (!room) return NextResponse.json({ error: 'Room not found' }, { status: 404 })
+      const { data: rates } = await getSupabaseAdmin()
+        .from('room_rates')
+        .select('*, season:seasons(*)')
+        .eq('room_category', room.category)
+      return NextResponse.json({ data: rates || [] })
+    }
+
+    // Guest lookup by phone (no auth required for lookup, but route is admin-guarded)
+    if (type === 'guest-by-phone') {
+      const phone = searchParams.get('phone')
+      if (!phone) return NextResponse.json({ found: false })
+      const { data } = await getSupabaseAdmin()
+        .from('bookings')
+        .select('guest_name, guest_email, guest_phone, guest_id_type, guest_id_number, guest_country, guest_state, guest_district, guest_address')
+        .eq('guest_phone', phone)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single() as any
+      if (!data) return NextResponse.json({ found: false })
+      return NextResponse.json({ found: true, guest: data })
+    }
+
+    // Rate lookup by category + date + meal_plan + rate_type
+    if (type === 'rate') {
+      const category   = searchParams.get('category')
+      const check_in   = searchParams.get('check_in')
+      const meal_plan  = searchParams.get('meal_plan')
+      const rate_type  = searchParams.get('rate_type') || 'lwweb'
+      if (!category || !check_in) return NextResponse.json({ found: false })
+
+      const d = new Date(check_in)
+      const month = d.getMonth() + 1
+      const day   = d.getDate()
+
+      const { data: seasons } = await getSupabaseAdmin().from('seasons').select('*') as any
+      let matchedSeason = null
+      for (const s of (seasons || [])) {
+        const start = s.start_month * 100 + s.start_day
+        const end   = s.end_month   * 100 + s.end_day
+        const cur   = month * 100 + day
+        if (start <= end ? (cur >= start && cur <= end) : (cur >= start || cur <= end)) {
+          matchedSeason = s; break
+        }
+      }
+      if (!matchedSeason) return NextResponse.json({ found: false, error: 'No season matched' })
+
+      const query = getSupabaseAdmin()
+        .from('room_rates')
+        .select('*')
+        .eq('room_category', category)
+        .eq('season_id', matchedSeason.id)
+        .eq('meal_plan', meal_plan)
+
+      if (rate_type === 'all') {
+        const { data: matchedRates } = await query.in('rate_type', ['lwweb', 'b2b', 'b2c']) as any
+        if (!matchedRates?.length) return NextResponse.json({ found: false, error: 'Rate not found' })
+        const ratesByType = matchedRates.reduce((acc: Record<string, any>, rate: any) => {
+          acc[rate.rate_type] = {
+            price_per_night: rate.price_per_night,
+            extra_bed_price: rate.extra_bed_price,
+            child_5_12_price: rate.child_5_12_price || 0,
+          }
+          return acc
+        }, {})
+        return NextResponse.json({
+          found: true,
+          season_id: matchedSeason.id,
+          season_label: `${matchedSeason.start_month}/${matchedSeason.start_day} – ${matchedSeason.end_month}/${matchedSeason.end_day}`,
+          rates: ratesByType,
+        })
+      }
+
+      const { data: rate } = await query.eq('rate_type', rate_type).single() as any
+
+      if (!rate) return NextResponse.json({ found: false, error: 'Rate not found' })
+      return NextResponse.json({
+        found: true, season_id: matchedSeason.id,
+        season_label: `${matchedSeason.start_month}/${matchedSeason.start_day} – ${matchedSeason.end_month}/${matchedSeason.end_day}`,
+        price_per_night: rate.price_per_night,
+        extra_bed_price: rate.extra_bed_price,
+        child_5_12_price: rate.child_5_12_price || 0,
+      })
+    }
+
+    // Daily pricing for date range
+    if (type === 'daily-pricing') {
+      const start = searchParams.get('start')
+      const end   = searchParams.get('end')
+      if (!start || !end) return NextResponse.json({ data: [] })
+      const { data, error } = await getSupabaseAdmin()
+        .from('daily_pricing')
+        .select('*')
+        .gte('date', start)
+        .lte('date', end)
+        .order('date')
+      if (error) throw error
+      return NextResponse.json({ data: data || [] })
+    }
+
+    // OTA pricing for date range
+    if (type === 'ota-pricing') {
+      const start = searchParams.get('start')
+      const end   = searchParams.get('end')
+      if (!start || !end) return NextResponse.json({ data: [] })
+      const { data, error } = await getSupabaseAdmin()
+        .from('ota_pricing')
+        .select('*')
+        .gte('date', start)
+        .lte('date', end)
+        .order('date')
+      if (error) throw error
+      return NextResponse.json({ data: data || [] })
+    }
+
+    // Payment ledger for a booking
+    if (type === 'payment-ledger') {
+      const booking_id = searchParams.get('booking_id')
+      if (!booking_id) return NextResponse.json({ data: [] })
+      const { data, error } = await getSupabaseAdmin()
+        .from('booking_payments')
+        .select('*')
+        .eq('booking_id', booking_id)
+        .order('created_at', { ascending: true })
+      if (error) throw error
+      return NextResponse.json({ data: data || [] })
+    }
+
+    if (type === 'inquiries') {
+      const { data, error } = await getSupabaseAdmin()
+        .from('inquiries')
+        .select('*')
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      return NextResponse.json({ data: data || [] })
+    }
+
+    if (type === 'reviews') {
+      const { data, error } = await getSupabaseAdmin()
+        .from('reviews')
+        .select('*, room:rooms(name)')
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      return NextResponse.json({ data: data || [] })
+    }
+
+    if (type === 'gallery-images') {
+      const { data, error } = await getSupabaseAdmin()
+        .from('gallery_images')
+        .select('*')
+        .order('is_featured', { ascending: false })
+        .order('display_order', { ascending: true })
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      return NextResponse.json({ data: data || [] })
+    }
+
+    return NextResponse.json({ error: 'Invalid type' }, { status: 400 })
+  } catch (error: any) {
+    logError('admin/data GET error:', error)
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+}
+
+// ── POST ─────────────────────────────────────────────────────────────────────
+export async function POST(request: NextRequest) {
+  const admin = await requireAdmin(request)
+  if (!admin) return UNAUTH
+
+  const { searchParams } = new URL(request.url)
+  const type = searchParams.get('type')
+  let body: any
+
+  try {
+    body = sanitizeUnknown(await request.json())
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
+
+  try {
+    if (type === 'availability') {
+      const { room_id, check_in, check_out, rooms_needed = 1 } = body
+      if (!room_id || !check_in || !check_out) {
+        return NextResponse.json({ error: 'room_id, check_in, check_out required' }, { status: 400 })
+      }
+      const availability = await getCategoryAvailability([String(room_id)], String(check_in), String(check_out))
+      const room = availability.selectedRooms.find((entry) => entry.id === String(room_id))
+      const category = room?.category || ''
+      const total = availability.totalByCategory.get(category) || 0
+      const booked = availability.overlappingByCategory.get(category) || 0
+      const available = Math.max(0, total - booked)
+      return NextResponse.json({
+        available,
+        available_rooms: available,
+        total_rooms: total,
+        booked_rooms: booked,
+        is_available: available >= Number(rooms_needed || 1),
+      })
+    }
+
+    if (type === 'booking') {
+      // Admin-created booking (walk-in, tour operator)
+      const { room_items, ...bookingData } = body
+      const primaryRoomId = bookingData.room_id
+      const bookingLines = room_items?.length
+        ? room_items.map((item: any) => ({ room_id: item.room_id, rooms_booked: Number(item.rooms_booked || 1) }))
+        : [{ room_id: primaryRoomId, rooms_booked: Number(bookingData.rooms_booked || 1) }]
+
+      if (!primaryRoomId || !bookingData.check_in || !bookingData.check_out) {
+        return NextResponse.json({ error: 'room_id, check_in and check_out are required' }, { status: 400 })
+      }
+
+      const uniqueRoomIds: string[] = Array.from(
+        bookingLines.reduce((set: Set<string>, line: any) => {
+          if (line.room_id) set.add(line.room_id)
+          return set
+        }, new Set<string>())
+      )
+      const { selectedRooms, totalByCategory, overlappingByCategory } = await getCategoryAvailability(
+        uniqueRoomIds,
+        bookingData.check_in,
+        bookingData.check_out
+      )
+
+      const categoryByRoomId = new Map<string, string>(
+        selectedRooms.map((room) => [room.id, room.category] as [string, string])
+      )
+      const requestedByCategory = new Map<string, number>()
+      for (const line of bookingLines) {
+        const category = categoryByRoomId.get(line.room_id)
+        if (!category) {
+          return NextResponse.json({ error: 'Selected room type is invalid' }, { status: 400 })
+        }
+        requestedByCategory.set(category, (requestedByCategory.get(category) || 0) + Number(line.rooms_booked || 1))
+      }
+
+      for (const [category, requested] of Array.from(requestedByCategory.entries())) {
+        const total = totalByCategory.get(category) || 0
+        const alreadyBooked = overlappingByCategory.get(category) || 0
+        const available = Math.max(0, total - alreadyBooked)
+        if (available < requested) {
+          return NextResponse.json({
+            error: `Only ${available} ${category} room(s) available for selected dates`,
+          }, { status: 409 })
+        }
+      }
+
+      // Sanitize: remove any computed/generated fields
+      delete bookingData.guests
+      bookingData.payment_status = normalizePaymentStatus(bookingData.payment_status)
+      // Set created_by
+      bookingData.created_by = admin.userId
+      if (bookingData.booking_source === 'tour_operator') {
+        if (bookingData.booking_status === 'confirmed' && Number(bookingData.advance_amount || 0) <= 0) {
+          return NextResponse.json({ error: 'Advance payment is required before final confirmation' }, { status: 400 })
+        }
+      }
+      const { data, error } = await getSupabaseAdmin()
+        .from('bookings').insert(bookingData).select('id, booking_number').single() as any
+      if (error) throw error
+      if (data?.id && !data?.booking_number) {
+        const referenceNumber = bookingData.booking_status === 'hold'
+          ? buildHoldBookingNumber({ id: data.id, createdAt: new Date().toISOString() })
+          : buildBookingNumber({ id: data.id, createdAt: new Date().toISOString() })
+        await getSupabaseAdmin().from('bookings').update({ booking_number: referenceNumber }).eq('id', data.id)
+        data.booking_number = referenceNumber
+      }
+      if (room_items?.length && data?.id) {
+        await getSupabaseAdmin().from('booking_room_items').insert(
+          room_items.map((item: any) => ({ ...item, booking_id: data.id }))
+        )
+      }
+      if (data?.id) {
+        if (isLocalTestMode()) {
+          logDebug('LOCAL TEST MODE admin booking created; evaluating email triggers', {
+            booking_id: data.id,
+            booking_source: bookingData.booking_source || 'unknown',
+            booking_status: bookingData.booking_status || 'unknown',
+          })
+        }
+        try {
+          await sendBookingLifecycleEmails(data.id, 'admin_booking_created')
+        } catch (emailError) {
+          logError('Admin booking created but lifecycle email trigger failed:', {
+            booking_id: data.id,
+            booking_source: bookingData.booking_source || 'unknown',
+            booking_status: bookingData.booking_status || 'unknown',
+            payment_status: bookingData.payment_status || 'unknown',
+            error: emailError,
+          })
+        }
+      }
+      return NextResponse.json({ success: true, ...data })
+    }
+
+    if (type === 'operator') {
+      const parsedOperator = operatorSchema.safeParse(normalizeOperatorPayload(body))
+
+      if (!parsedOperator.success) {
+        return NextResponse.json({ error: 'Invalid operator payload', details: parsedOperator.error.flatten() }, { status: 400 })
+      }
+
+      const { data, error } = await getSupabaseAdmin().from('tour_operators').insert(parsedOperator.data).select('*').single() as any
+      if (error) throw error
+
+      let welcomeEmailSent = false
+      let welcomeEmailSkipped = false
+      if (data?.email) {
+        try {
+          const alreadySent = await hasWelcomeEmailAlreadyBeenSent(data.email, data.company_name || '')
+          if (!alreadySent) {
+            welcomeEmailSent = await sendTourOperatorWelcomeEmail(data)
+          } else {
+            welcomeEmailSkipped = true
+          }
+        } catch (emailError) {
+          logError('tour operator welcome email failed:', emailError)
+        }
+      }
+      return NextResponse.json({
+        success: true,
+        welcome_email_sent: welcomeEmailSent,
+        welcome_email_skipped: welcomeEmailSkipped,
+      })
+    }
+
+    if (type === 'gallery-image') {
+      const payload = {
+        title: body.title || null,
+        description: body.description || null,
+        image_url: body.image_url,
+        category: body.category || null,
+        is_featured: Boolean(body.is_featured),
+        display_order: Number(body.display_order || 0),
+      }
+      if (!payload.image_url) {
+        return NextResponse.json({ error: 'image_url required' }, { status: 400 })
+      }
+      const { error } = await getSupabaseAdmin().from('gallery_images').insert(payload as any)
+      if (error) throw error
+      return NextResponse.json({ success: true })
+    }
+
+    // Save daily price override (upsert)
+    if (type === 'daily-pricing') {
+      const { date, room_category, base_price, adjustment, notes } = body
+      if (!date || !room_category || base_price == null) {
+        return NextResponse.json({ error: 'date, room_category, base_price required' }, { status: 400 })
+      }
+      const { error } = await getSupabaseAdmin()
+        .from('daily_pricing')
+        .upsert({
+          date, room_category,
+          base_price: Number(base_price),
+          adjustment: Number(adjustment || 0),
+          notes: notes || null,
+          created_by: admin.userId,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'date,room_category' })
+      if (error) throw error
+      return NextResponse.json({ success: true })
+    }
+
+    // Save OTA price override (upsert)
+    if (type === 'ota-pricing') {
+      const entries = body.entries // [{ota_name, price}]
+      const { date, room_category } = body
+      if (!date || !room_category || !entries?.length) {
+        return NextResponse.json({ error: 'date, room_category, entries required' }, { status: 400 })
+      }
+      const rows = entries.map((e: any) => ({
+        date, room_category,
+        ota_name: e.ota_name,
+        price: Number(e.price),
+        notes: e.notes || null,
+        created_by: admin.userId,
+      }))
+      const { error } = await getSupabaseAdmin()
+        .from('ota_pricing')
+        .upsert(rows, { onConflict: 'date,room_category,ota_name' })
+      if (error) throw error
+      return NextResponse.json({ success: true })
+    }
+
+    // Record a payment in the ledger
+    if (type === 'payment-ledger') {
+      const { booking_id, booking_number, payment_type, amount, payment_method,
+              payment_ref, payment_date, payment_due_date, notes } = body
+      if (!booking_id || !payment_type || !amount) {
+        return NextResponse.json({ error: 'booking_id, payment_type, amount required' }, { status: 400 })
+      }
+      const { data: pData, error: pErr } = await getSupabaseAdmin()
+        .from('booking_payments')
+        .insert({
+          booking_id,
+          booking_number: booking_number || null,
+          payment_type,
+          amount: Number(amount),
+          payment_method: payment_method || null,
+          payment_ref: payment_ref || null,
+          payment_date: payment_date || new Date().toISOString().split('T')[0],
+          payment_due_date: payment_due_date || null,
+          notes: notes || null,
+          recorded_by: admin.userId,
+        })
+        .select('id')
+        .single() as any
+      if (pErr) throw pErr
+      // Also update payment_due_date on bookings table if provided
+      if (payment_due_date) {
+        await getSupabaseAdmin()
+          .from('bookings')
+          .update({ payment_due_date })
+          .eq('id', booking_id)
+      }
+      return NextResponse.json({ success: true, id: pData?.id })
+    }
+
+    return NextResponse.json({ error: 'Invalid type' }, { status: 400 })
+  } catch (error: any) {
+    logError('admin/data POST error:', error)
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+}
+
+// ── PATCH ────────────────────────────────────────────────────────────────────
+export async function PATCH(request: NextRequest) {
+  const admin = await requireAdmin(request)
+  if (!admin) return UNAUTH
+
+  const { searchParams } = new URL(request.url)
+  const type = searchParams.get('type')
+  const id   = searchParams.get('id')
+  let body: any
+
+  try {
+    body = sanitizeUnknown(await request.json())
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
+
+  try {
+    if (type === 'booking-status') {
+      if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
+      const { data: existingBooking } = await getSupabaseAdmin()
+        .from('bookings')
+        .select('id, booking_number, booking_status, total_amount, advance_amount, balance_amount, tour_operator_id, room_id, rooms_booked, check_in, check_out')
+        .eq('id', id)
+        .single() as any
+      if (!existingBooking) return NextResponse.json({ error: 'Booking not found' }, { status: 404 })
+      const updateData: Record<string, any> = {
+        last_modified_by: admin.userId,
+        last_status_change: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }
+      if (body.status)            updateData.booking_status = String(body.status).trim().toLowerCase()
+      if (body.checked_in_at)  updateData.checked_in_at  = body.checked_in_at
+      if (body.checked_out_at) updateData.checked_out_at = body.checked_out_at
+      if (body.confirmed_at)   updateData.confirmed_at   = body.confirmed_at
+      if (body.cancellation_reason) updateData.cancellation_reason = sanitizeString(String(body.cancellation_reason), 500)
+      if (body.payment_method)  updateData.payment_method  = body.payment_method
+      if (body.payment_status)  updateData.payment_status  = normalizePaymentStatus(body.payment_status)
+      if (body.advance_amount  !== undefined) updateData.advance_amount  = Number(body.advance_amount)
+      if (body.balance_amount  !== undefined) updateData.balance_amount  = Number(body.balance_amount)
+      if (body.advance_paid_at) updateData.advance_paid_at = body.advance_paid_at
+      if (body.admin_notes !== undefined)     updateData.admin_notes     = body.admin_notes
+      if (body.transaction_number !== undefined) updateData.transaction_number = body.transaction_number
+      if (body.payment_date !== undefined)       updateData.payment_date = body.payment_date
+      if (body.payment_notes !== undefined)      updateData.payment_notes = body.payment_notes
+      if (body.payment_due_date !== undefined)   updateData.payment_due_date = body.payment_due_date
+      if (body.hold_notes !== undefined)         updateData.hold_notes = body.hold_notes
+      if (body.held_at !== undefined)            updateData.held_at = body.held_at
+      if (body.check_in !== undefined)           updateData.check_in = body.check_in
+      if (body.check_out !== undefined)          updateData.check_out = body.check_out
+      if (body.nights !== undefined)             updateData.nights = body.nights
+
+      const nextStatus = String(updateData.booking_status || existingBooking?.booking_status || '')
+      const transitionCheck = validateBookingStatusChange({
+        currentStatus: existingBooking.booking_status,
+        nextStatus,
+        bookingTotal: existingBooking.total_amount,
+        advanceAmount: updateData.advance_amount ?? existingBooking.advance_amount,
+        balanceAmount: updateData.balance_amount ?? existingBooking.balance_amount,
+        checkedInAt: updateData.checked_in_at || null,
+        checkedOutAt: updateData.checked_out_at || null,
+        cancellationReason: updateData.cancellation_reason || null,
+      })
+      if (!transitionCheck.valid) {
+        return NextResponse.json({ error: transitionCheck.error }, { status: 400 })
+      }
+      if (nextStatus === 'checked_in' && !canCheckInToday(String(existingBooking?.check_in || ''))) {
+        return NextResponse.json({ error: 'Check-in is allowed only on the arrival date after 3:00 PM' }, { status: 400 })
+      }
+
+      if (updateData.check_in || updateData.check_out) {
+        const nextCheckIn = String(updateData.check_in || existingBooking?.check_in || '')
+        const nextCheckOut = String(updateData.check_out || existingBooking?.check_out || '')
+        if (!nextCheckIn || !nextCheckOut || nextCheckOut <= nextCheckIn) {
+          return NextResponse.json({ error: 'Check-out must be after check-in' }, { status: 400 })
+        }
+        const availability = await getCategoryAvailability(
+          [String(existingBooking?.room_id)],
+          nextCheckIn,
+          nextCheckOut,
+          id
+        )
+        const selectedRoom = availability.selectedRooms.find((room) => room.id === String(existingBooking?.room_id))
+        const category = selectedRoom?.category || ''
+        const total = availability.totalByCategory.get(category) || 0
+        const alreadyBooked = availability.overlappingByCategory.get(category) || 0
+        const available = Math.max(0, total - alreadyBooked)
+        if (available < Number(existingBooking?.rooms_booked || 1)) {
+          return NextResponse.json({ error: `Only ${available} room(s) available for the shifted dates` }, { status: 409 })
+        }
+        updateData.nights = Math.max(1, Math.ceil((new Date(nextCheckOut).getTime() - new Date(nextCheckIn).getTime()) / 86400000))
+      }
+
+      if (nextStatus === 'confirmed' && ['hold', 'pending'].includes(String(existingBooking?.booking_status || ''))) {
+        updateData.booking_number = buildBookingNumber({ id, createdAt: new Date().toISOString() })
+      }
+      const { error } = await getSupabaseAdmin().from('bookings').update(updateData as any).eq('id', id)
+      if (error) throw error
+      if (updateData.booking_status || updateData.payment_status) {
+        try {
+          await sendBookingLifecycleEmails(id, 'admin_status_changed')
+        } catch (emailError) {
+          logError('Booking status/payment updated but lifecycle email trigger failed:', {
+            booking_id: id,
+            booking_status: updateData.booking_status || existingBooking.booking_status,
+            payment_status: updateData.payment_status || null,
+            error: emailError,
+          })
+        }
+      }
+      return NextResponse.json({ success: true })
+    }
+
+    if (type === 'operator') {
+      if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
+      const parsedOperator = operatorSchema.partial().safeParse(normalizeOperatorPayload(body))
+      if (!parsedOperator.success) {
+        return NextResponse.json({ error: 'Invalid operator payload', details: parsedOperator.error.flatten() }, { status: 400 })
+      }
+      const { error } = await getSupabaseAdmin().from('tour_operators').update(parsedOperator.data as any).eq('id', id)
+      if (error) throw error
+      return NextResponse.json({ success: true })
+    }
+
+    if (type === 'room') {
+      if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
+      const allowed = ['name', 'total_rooms', 'max_guests', 'max_extra_beds', 'display_price_from', 'is_active']
+      const safe: Record<string, any> = {}
+      for (const k of allowed) if (k in body) safe[k] = body[k]
+      safe.updated_at = new Date().toISOString()
+      const { error } = await getSupabaseAdmin().from('rooms').update(safe as any).eq('id', id)
+      if (error) throw error
+      return NextResponse.json({ success: true })
+    }
+
+    if (type === 'room-rate') {
+      // id = existing rate id (for update) or 'new' (for insert)
+      const { room_category, season_id, meal_plan, rate_type, price_per_night, extra_bed_price, child_5_12_price } = body
+      if (id && id !== 'new') {
+        const { error } = await getSupabaseAdmin().from('room_rates').update({
+          price_per_night, extra_bed_price: extra_bed_price || 0,
+          child_5_12_price: child_5_12_price || 0,
+        } as any).eq('id', id)
+        if (error) throw error
+      } else {
+        const { error } = await getSupabaseAdmin().from('room_rates').insert({
+          room_category, season_id, meal_plan, rate_type,
+          price_per_night, extra_bed_price: extra_bed_price || 0,
+          child_5_12_price: child_5_12_price || 0,
+        } as any)
+        if (error) throw error
+      }
+      return NextResponse.json({ success: true })
+    }
+
+    if (type === 'inquiry') {
+      if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
+      const safe: Record<string, any> = {}
+      if (body.status !== undefined) safe.status = body.status
+      if (body.admin_notes !== undefined) safe.admin_notes = body.admin_notes
+      if (body.subject !== undefined) safe.subject = body.subject
+      if (body.message !== undefined) safe.message = body.message
+      safe.updated_at = new Date().toISOString()
+      const { error } = await getSupabaseAdmin().from('inquiries').update(safe as any).eq('id', id)
+      if (error) throw error
+      return NextResponse.json({ success: true })
+    }
+
+    if (type === 'review') {
+      if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
+      const safe: Record<string, any> = {}
+      if (body.is_approved !== undefined) safe.is_approved = body.is_approved
+      if (body.title !== undefined) safe.title = body.title
+      if (body.comment !== undefined) safe.comment = body.comment
+      safe.updated_at = new Date().toISOString()
+      const { error } = await getSupabaseAdmin().from('reviews').update(safe as any).eq('id', id)
+      if (error) throw error
+      return NextResponse.json({ success: true })
+    }
+
+    if (type === 'gallery-image') {
+      if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
+      const safe: Record<string, any> = {}
+      const allowed = ['title', 'description', 'image_url', 'category', 'is_featured', 'display_order']
+      for (const key of allowed) if (key in body) safe[key] = body[key]
+      const { error } = await getSupabaseAdmin().from('gallery_images').update(safe as any).eq('id', id)
+      if (error) throw error
+      return NextResponse.json({ success: true })
+    }
+
+    return NextResponse.json({ error: 'Invalid type' }, { status: 400 })
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+}
+
+// ── DELETE ───────────────────────────────────────────────────────────────────
+export async function DELETE(request: NextRequest) {
+  const admin = await requireAdmin(request)
+  if (!admin) return UNAUTH
+
+  const { searchParams } = new URL(request.url)
+  const type = searchParams.get('type')
+  const id   = searchParams.get('id')
+
+  try {
+    if (type === 'daily-pricing') {
+      const date = searchParams.get('date')
+      const room_category = searchParams.get('room_category')
+      if (!date || !room_category) {
+        return NextResponse.json({ error: 'date, room_category required' }, { status: 400 })
+      }
+      const { error } = await getSupabaseAdmin()
+        .from('daily_pricing')
+        .delete()
+        .eq('date', date)
+        .eq('room_category', room_category)
+      if (error) throw error
+      return NextResponse.json({ success: true })
+    }
+
+    if (type === 'operator') {
+      if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
+      // Don't actually delete — soft deactivate
+      const { error } = await getSupabaseAdmin().from('tour_operators').update({ status: 'inactive' } as any).eq('id', id)
+      if (error) throw error
+      return NextResponse.json({ success: true })
+    }
+
+    if (type === 'gallery-image') {
+      if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
+      const { error } = await getSupabaseAdmin().from('gallery_images').delete().eq('id', id)
+      if (error) throw error
+      return NextResponse.json({ success: true })
+    }
+
+    return NextResponse.json({ error: 'Invalid type' }, { status: 400 })
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+}
