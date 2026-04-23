@@ -56,8 +56,13 @@ export async function GET(request: NextRequest) {
   const nextPath = getSafeNextPath(url.searchParams.get('next'))
   const grantSecret = getGrantSecret()
   const signingSecret = getSigningSecret()
+  const providedSecret = url.searchParams.get('secret') || request.headers.get('x-preview-secret') || ''
 
   if (url.searchParams.get('debug') === '1') {
+    if (!grantSecret || !providedSecret || !safeEquals(providedSecret, grantSecret)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     return NextResponse.json({
       previewAccessSecretConfigured: Boolean(process.env.PREVIEW_ACCESS_SECRET),
       internalApiSecretConfigured: Boolean(process.env.INTERNAL_API_SECRET),
@@ -65,6 +70,7 @@ export async function GET(request: NextRequest) {
       authSessionSecretConfigured: Boolean(process.env.AUTH_SESSION_SECRET),
       grantSecretConfigured: Boolean(grantSecret),
       signingSecretConfigured: Boolean(signingSecret),
+      maintenanceModeConfigured: process.env.MAINTENANCE_MODE === 'true' || process.env.NEXT_PUBLIC_MAINTENANCE_MODE === 'true',
       nodeEnv: process.env.NODE_ENV || null,
       vercelEnv: process.env.VERCEL_ENV || null,
     })
@@ -83,8 +89,6 @@ export async function GET(request: NextRequest) {
     })
     return response
   }
-
-  const providedSecret = url.searchParams.get('secret') || request.headers.get('x-preview-secret') || ''
 
   if (!grantSecret || !signingSecret) {
     return NextResponse.json({ error: 'Preview access is not configured' }, { status: 500 })

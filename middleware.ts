@@ -5,7 +5,6 @@ import { logDebug } from '@/lib/logger'
 
 const ADMIN_SESSION_COOKIE = 'lw_admin_session'
 const PREVIEW_ACCESS_COOKIE = 'lw_preview_access'
-const MAINTENANCE_MODE = process.env.MAINTENANCE_MODE === 'true' || process.env.NEXT_PUBLIC_MAINTENANCE_MODE === 'true'
 
 const MAINTENANCE_BYPASS = [
   '/maintenance',
@@ -21,6 +20,10 @@ function hasInternalSecretHeader(request: NextRequest) {
   if (!expected) return false
   const provided = request.headers.get('x-internal-secret') || request.headers.get('x-cron-secret') || ''
   return Boolean(provided && provided === expected)
+}
+
+function isMaintenanceMode() {
+  return process.env.MAINTENANCE_MODE === 'true' || process.env.NEXT_PUBLIC_MAINTENANCE_MODE === 'true'
 }
 
 function base64UrlToBytes(value: string) {
@@ -137,7 +140,7 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
   const response = applySecurityHeaders(NextResponse.next())
 
-  if (MAINTENANCE_MODE) {
+  if (isMaintenanceMode()) {
     const isBypassed = MAINTENANCE_BYPASS.some((path) => pathname.startsWith(path))
     const hasPreviewAccess = await verifyPreviewAccessCookie(request.cookies.get(PREVIEW_ACCESS_COOKIE)?.value)
     if (!isBypassed && !hasPreviewAccess && pathname !== '/maintenance') {
