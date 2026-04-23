@@ -40,7 +40,13 @@ const structuredDataHash = crypto.createHash('sha256').update(structuredDataJson
 
 // LOCAL TEST MODE ONLY
 // REMOVE / DISABLE FOR PRODUCTION
-const scriptDirectives = ["'self'", `'sha256-${structuredDataHash}'`, 'https://checkout.razorpay.com', 'https://api.razorpay.com']
+const scriptDirectives = [
+  "'self'",
+  `'sha256-${structuredDataHash}'`,
+  "'sha256-Q+8tPsjVtiDsjF/Cv8FMOpg2Yg91oKFKDAJat1PPb2g='",
+  'https://checkout.razorpay.com',
+  'https://api.razorpay.com',
+]
 if (isDevelopment || allowLocalInlineScripts) {
   scriptDirectives.splice(2, 0, "'unsafe-inline'")
 }

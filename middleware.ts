@@ -146,7 +146,13 @@ async function getStructuredDataHash() {
 }
 
 async function applySecurityHeaders(response: NextResponse) {
-  const scriptDirectives = ["'self'", `'sha256-${await getStructuredDataHash()}'`, 'https://checkout.razorpay.com', 'https://api.razorpay.com']
+  const scriptDirectives = [
+    "'self'",
+    `'sha256-${await getStructuredDataHash()}'`,
+    "'sha256-Q+8tPsjVtiDsjF/Cv8FMOpg2Yg91oKFKDAJat1PPb2g='",
+    'https://checkout.razorpay.com',
+    'https://api.razorpay.com',
+  ]
   if (allowLocalInlineScripts()) {
     scriptDirectives.splice(2, 0, "'unsafe-inline'")
   }
