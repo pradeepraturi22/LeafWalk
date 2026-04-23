@@ -1,6 +1,7 @@
 import './globals.css'
 import type { ReactNode } from 'react'
 import type { Metadata, Viewport } from 'next'
+import { headers } from 'next/headers'
 import { Playfair_Display, Jost } from 'next/font/google'
 import ConditionalLayout from '@/components/ConditionalLayout'
 import { BookingProvider } from '@/context/BookingContext'
@@ -92,10 +93,12 @@ const structuredData = {
 const structuredDataJson = JSON.stringify(structuredData)
 
 export default function RootLayout({ children }: { children: ReactNode }) {
+  const nonce = headers().get('x-nonce') || undefined
+
   return (
     <html lang="en" className={`${playfair.variable} ${jost.variable}`}>
       <head>
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: structuredDataJson }} />
+        <script nonce={nonce} type="application/ld+json" dangerouslySetInnerHTML={{ __html: structuredDataJson }} />
       </head>
       <body className="antialiased" style={{ fontFamily: 'var(--font-jost), sans-serif' }}>
         <BookingProvider>

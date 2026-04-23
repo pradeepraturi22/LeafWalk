@@ -5,39 +5,6 @@ import { logDebug } from '@/lib/logger'
 
 const ADMIN_SESSION_COOKIE = 'lw_admin_session'
 const PREVIEW_ACCESS_COOKIE = 'lw_preview_access'
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://leafwalk.in'
-const SITE_NAME = 'LeafWalk Resort'
-const structuredDataJson = JSON.stringify({
-  '@context': 'https://schema.org',
-  '@type': 'Hotel',
-  name: SITE_NAME,
-  description: 'Nature resort in Uttarkashi, Uttarakhand offering deluxe rooms and premium cottages with Himalayan forest views.',
-  url: SITE_URL,
-  telephone: ['+91-9368080535', '+91-8630227541'],
-  email: 'info@leafwalk.in',
-  address: {
-    '@type': 'PostalAddress',
-    streetAddress: 'Vill- Banas, Narad Chatti, Hanuman Chatti, Yamunotri Road',
-    addressLocality: 'Uttarkashi',
-    addressRegion: 'Uttarakhand',
-    postalCode: '249193',
-    addressCountry: 'IN',
-  },
-  geo: { '@type': 'GeoCoordinates', latitude: '30.8513', longitude: '78.4534' },
-  image: `${SITE_URL}/og-image.jpg`,
-  priceRange: 'INR',
-  checkinTime: '15:00',
-  checkoutTime: '11:00',
-  currenciesAccepted: 'INR',
-  paymentAccepted: 'Cash, Credit Card, UPI, Bank Transfer, Razorpay',
-  amenityFeature: [
-    { '@type': 'LocationFeatureSpecification', name: 'Mountain View', value: true },
-    { '@type': 'LocationFeatureSpecification', name: 'Restaurant', value: true },
-    { '@type': 'LocationFeatureSpecification', name: 'Free WiFi', value: true },
-    { '@type': 'LocationFeatureSpecification', name: 'Parking', value: true },
-  ],
-})
-let structuredDataHashPromise: Promise<string> | null = null
 
 const MAINTENANCE_BYPASS = [
   '/maintenance',
@@ -68,11 +35,6 @@ function base64UrlToBytes(value: string) {
 function bytesToBase64Url(bytes: ArrayBuffer) {
   const binary = String.fromCharCode.apply(null, Array.from(new Uint8Array(bytes)))
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
-}
-
-function bytesToBase64(bytes: ArrayBuffer) {
-  const binary = String.fromCharCode.apply(null, Array.from(new Uint8Array(bytes)))
-  return btoa(binary)
 }
 
 async function verifyAdminSessionCookie(value?: string) {
@@ -136,23 +98,14 @@ async function verifyPreviewAccessCookie(value?: string) {
   }
 }
 
-async function getStructuredDataHash() {
-  if (!structuredDataHashPromise) {
-    structuredDataHashPromise = crypto.subtle
-      .digest('SHA-256', new TextEncoder().encode(structuredDataJson))
-      .then((digest) => bytesToBase64(digest))
-  }
-  return structuredDataHashPromise
+function createNonce() {
+  const bytes = new Uint8Array(16)
+  crypto.getRandomValues(bytes)
+  return btoa(String.fromCharCode(...Array.from(bytes)))
 }
 
-async function applySecurityHeaders(response: NextResponse) {
-  const scriptDirectives = [
-    "'self'",
-    `'sha256-${await getStructuredDataHash()}'`,
-    "'sha256-Q+8tPsjVtiDsjF/Cv8FMOpg2Yg91oKFKDAJat1PPb2g='",
-    'https://checkout.razorpay.com',
-    'https://api.razorpay.com',
-  ]
+function applySecurityHeaders(response: NextResponse, nonce: string) {
+  const scriptDirectives = ["'self'", `'nonce-${nonce}'`, 'https://checkout.razorpay.com', 'https://api.razorpay.com']
   if (allowLocalInlineScripts()) {
     scriptDirectives.splice(2, 0, "'unsafe-inline'")
   }
@@ -195,7 +148,18 @@ async function applySecurityHeaders(response: NextResponse) {
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
-  const response = await applySecurityHeaders(NextResponse.next())
+  const nonce = createNonce()
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-nonce', nonce)
+  const response = applySecurityHeaders(
+    NextResponse.next({
+      request: {
+        headers: requestHeaders,
+      },
+    }),
+    nonce
+  )
+  response.headers.set('x-nonce', nonce)
 
   if (isMaintenanceMode()) {
     const isBypassed = MAINTENANCE_BYPASS.some((path) => pathname.startsWith(path))
