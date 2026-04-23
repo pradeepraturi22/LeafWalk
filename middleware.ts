@@ -26,6 +26,16 @@ function isMaintenanceMode() {
   return process.env.MAINTENANCE_MODE === 'true' || process.env.NEXT_PUBLIC_MAINTENANCE_MODE === 'true'
 }
 
+function shouldFailClosedOnRateLimitError(pathname: string, method: string) {
+  if (pathname.startsWith('/api/admin/')) return true
+  if (pathname === '/api/auth/send-otp' || pathname === '/api/auth/verify-otp') return true
+  if (pathname.startsWith('/api/payments/')) return true
+  if (pathname === '/api/bookings/create' || pathname === '/api/cancel') return true
+  if (pathname === '/api/inquiries') return true
+  if (pathname === '/api/check-availability') return method !== 'GET'
+  return method !== 'GET'
+}
+
 function base64UrlToBytes(value: string) {
   const normalized = value.replace(/-/g, '+').replace(/_/g, '/')
   const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=')
@@ -245,7 +255,7 @@ export async function middleware(request: NextRequest) {
         )
       }
     } catch {
-      if (process.env.NODE_ENV === 'production') {
+      if (process.env.NODE_ENV === 'production' && shouldFailClosedOnRateLimitError(pathname, request.method)) {
         return NextResponse.json({ error: 'Rate limit service unavailable' }, { status: 503, headers: response.headers })
       }
     }
