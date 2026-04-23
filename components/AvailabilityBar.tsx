@@ -90,6 +90,14 @@ export default function AvailabilityBar({
     input.click()
   }
 
+  function handleCheckInChange(nextCheckIn: string) {
+    setCheckIn(nextCheckIn)
+    if (nextCheckIn) {
+      setCheckOut(addDays(nextCheckIn, 1))
+    }
+    setError('')
+  }
+
   return (
     <div
       className={`overflow-hidden rounded-[30px] border border-[#c9a14a]/15 bg-[#111111]/95 shadow-[0_20px_80px_rgba(0,0,0,0.35)] backdrop-blur ${
@@ -124,13 +132,8 @@ export default function AvailabilityBar({
               type="date"
               value={checkIn}
               min={today}
-              onChange={(event) => {
-                const nextCheckIn = event.target.value
-                setCheckIn(nextCheckIn)
-                if (nextCheckIn) {
-                  setCheckOut(addDays(nextCheckIn, 1))
-                }
-              }}
+              onInput={(event) => handleCheckInChange((event.target as HTMLInputElement).value)}
+              onChange={(event) => handleCheckInChange(event.target.value)}
               className={`w-full rounded-2xl border border-white/10 bg-white/5 px-4 text-white focus:border-[#c9a14a] focus:outline-none ${compact ? 'py-2.5 text-sm' : 'py-3'}`}
             />
           </label>

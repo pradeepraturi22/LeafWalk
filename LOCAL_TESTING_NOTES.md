@@ -59,6 +59,15 @@
 4. Set `LOCAL_NOTIFICATION_MODE=real`
 5. Redeploy
 
+## Private Live Preview During Maintenance
+
+- Use `NEXT_PUBLIC_MAINTENANCE_MODE=true` to keep public visitors on `/maintenance`.
+- Set `PREVIEW_ACCESS_SECRET` to a long random secret in production.
+- Visit `/api/preview-access?secret=YOUR_SECRET&next=/` to unlock the live site for your browser only.
+- The preview access cookie is httpOnly, signed, and expires automatically after 12 hours.
+- Use `/api/preview-access?clear=1` to remove preview access from your browser.
+- Do not share the preview access URL publicly.
+
 ## Local Testing Example
 
 ```env

@@ -4,10 +4,12 @@ import { allowLocalEvalScripts, allowLocalInlineScripts, allowLocalInternalBypas
 import { logDebug } from '@/lib/logger'
 
 const ADMIN_SESSION_COOKIE = 'lw_admin_session'
-const MAINTENANCE_MODE = process.env.NEXT_PUBLIC_MAINTENANCE_MODE === 'true'
+const PREVIEW_ACCESS_COOKIE = 'lw_preview_access'
+const MAINTENANCE_MODE = process.env.MAINTENANCE_MODE === 'true' || process.env.NEXT_PUBLIC_MAINTENANCE_MODE === 'true'
 
 const MAINTENANCE_BYPASS = [
   '/maintenance',
+  '/api/preview-access',
   '/admin',
   '/api/admin',
   '/_next',
@@ -54,6 +56,36 @@ async function verifyAdminSessionCookie(value?: string) {
     const session = JSON.parse(new TextDecoder().decode(base64UrlToBytes(payload)))
     const ageMs = Date.now() - Number(session.ts || 0)
     return Boolean(session.userId && ['admin', 'manager'].includes(session.role) && ageMs >= 0 && ageMs <= 8 * 60 * 60 * 1000)
+  } catch {
+    return false
+  }
+}
+
+async function verifyPreviewAccessCookie(value?: string) {
+  if (!value) return false
+  const [payload, signature] = value.split('.')
+  if (!payload || !signature) return false
+
+  const secret =
+    process.env.PREVIEW_ACCESS_SECRET ||
+    process.env.CUSTOM_AUTH_SECRET ||
+    process.env.AUTH_SESSION_SECRET ||
+    process.env.INTERNAL_API_SECRET
+  if (!secret) return false
+
+  try {
+    const key = await crypto.subtle.importKey(
+      'raw',
+      new TextEncoder().encode(secret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign']
+    )
+    const expected = bytesToBase64Url(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(payload)))
+    if (expected !== signature) return false
+
+    const session = JSON.parse(new TextDecoder().decode(base64UrlToBytes(payload)))
+    return Boolean(session.scope === 'preview' && Number(session.exp || 0) > Date.now())
   } catch {
     return false
   }
@@ -107,7 +139,8 @@ export async function middleware(request: NextRequest) {
 
   if (MAINTENANCE_MODE) {
     const isBypassed = MAINTENANCE_BYPASS.some((path) => pathname.startsWith(path))
-    if (!isBypassed && pathname !== '/maintenance') {
+    const hasPreviewAccess = await verifyPreviewAccessCookie(request.cookies.get(PREVIEW_ACCESS_COOKIE)?.value)
+    if (!isBypassed && !hasPreviewAccess && pathname !== '/maintenance') {
       return NextResponse.redirect(new URL('/maintenance', request.url))
     }
   }

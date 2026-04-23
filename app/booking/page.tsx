@@ -492,6 +492,17 @@ function BookingContent() {
     }
   }
 
+  function handleCheckInChange(nextCheckIn: string) {
+    setCheckIn(nextCheckIn)
+    if (nextCheckIn) {
+      setCheckOut(addDays(nextCheckIn, 1))
+    }
+    setAvail(null)
+    setShowCal(false)
+    setPromoResult(null)
+    setErrors(p => ({ ...p, checkIn: undefined, checkOut: undefined }))
+  }
+
   function handleProceed() {
     if (!checkIn || !checkOut)    { toast.error('Please select dates'); return }
     if (nights > MAX_ONLINE_STAY_NIGHTS) { toast.error(`Online booking is available for up to ${MAX_ONLINE_STAY_NIGHTS} nights only`); return }
@@ -750,14 +761,8 @@ function BookingContent() {
                       </label>
                       <input ref={checkInInputRef} type="date" value={checkIn} min={today}
                         style={{ ...BI, colorScheme: 'dark' }} className={ic('checkIn')}
-                        onChange={e => {
-                          const nextCheckIn = e.target.value
-                          setCheckIn(nextCheckIn)
-                          if (nextCheckIn) {
-                            setCheckOut(addDays(nextCheckIn, 1))
-                          }
-                          setAvail(null); setShowCal(false); setPromoResult(null); setErrors(p => ({ ...p, checkIn: undefined, checkOut: undefined }))
-                        }}
+                        onInput={e => handleCheckInChange((e.target as HTMLInputElement).value)}
+                        onChange={e => handleCheckInChange(e.target.value)}
                         onBlur={() => { touch('checkIn'); if (!checkIn) setErrors(p => ({ ...p, checkIn: 'Required' })) }} />
                       <FE field="checkIn" />
                     </div>
