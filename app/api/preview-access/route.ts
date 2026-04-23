@@ -5,6 +5,7 @@ const PREVIEW_ACCESS_COOKIE = 'lw_preview_access'
 const PREVIEW_ACCESS_TTL_SECONDS = 12 * 60 * 60
 
 export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
 function getGrantSecret() {
   return process.env.PREVIEW_ACCESS_SECRET || process.env.INTERNAL_API_SECRET || ''
@@ -53,6 +54,21 @@ function getSafeNextPath(value: string | null) {
 export async function GET(request: NextRequest) {
   const url = new URL(request.url)
   const nextPath = getSafeNextPath(url.searchParams.get('next'))
+  const grantSecret = getGrantSecret()
+  const signingSecret = getSigningSecret()
+
+  if (url.searchParams.get('debug') === '1') {
+    return NextResponse.json({
+      previewAccessSecretConfigured: Boolean(process.env.PREVIEW_ACCESS_SECRET),
+      internalApiSecretConfigured: Boolean(process.env.INTERNAL_API_SECRET),
+      customAuthSecretConfigured: Boolean(process.env.CUSTOM_AUTH_SECRET),
+      authSessionSecretConfigured: Boolean(process.env.AUTH_SESSION_SECRET),
+      grantSecretConfigured: Boolean(grantSecret),
+      signingSecretConfigured: Boolean(signingSecret),
+      nodeEnv: process.env.NODE_ENV || null,
+      vercelEnv: process.env.VERCEL_ENV || null,
+    })
+  }
 
   if (url.searchParams.get('clear') === '1') {
     const response = NextResponse.redirect(new URL('/maintenance', request.url))
@@ -68,8 +84,6 @@ export async function GET(request: NextRequest) {
     return response
   }
 
-  const grantSecret = getGrantSecret()
-  const signingSecret = getSigningSecret()
   const providedSecret = url.searchParams.get('secret') || request.headers.get('x-preview-secret') || ''
 
   if (!grantSecret || !signingSecret) {
