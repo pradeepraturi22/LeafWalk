@@ -51,12 +51,21 @@ function getSafeNextPath(value: string | null) {
   return value
 }
 
+function getPreviewCookieDomain(request: NextRequest) {
+  const hostname = request.nextUrl.hostname.toLowerCase()
+  if (hostname === 'leafwalk.in' || hostname === 'www.leafwalk.in') {
+    return '.leafwalk.in'
+  }
+  return undefined
+}
+
 export async function GET(request: NextRequest) {
   const url = new URL(request.url)
   const nextPath = getSafeNextPath(url.searchParams.get('next'))
   const grantSecret = getGrantSecret()
   const signingSecret = getSigningSecret()
   const providedSecret = url.searchParams.get('secret') || request.headers.get('x-preview-secret') || ''
+  const cookieDomain = getPreviewCookieDomain(request)
 
   if (url.searchParams.get('debug') === '1') {
     if (!grantSecret || !providedSecret || !safeEquals(providedSecret, grantSecret)) {
@@ -86,6 +95,7 @@ export async function GET(request: NextRequest) {
       secure: process.env.NODE_ENV === 'production',
       path: '/',
       maxAge: 0,
+      domain: cookieDomain,
     })
     return response
   }
@@ -107,6 +117,7 @@ export async function GET(request: NextRequest) {
     secure: process.env.NODE_ENV === 'production',
     path: '/',
     maxAge: PREVIEW_ACCESS_TTL_SECONDS,
+    domain: cookieDomain,
   })
 
   return response
