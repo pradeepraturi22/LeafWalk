@@ -261,7 +261,7 @@ export default function HomeClient({ pageName }: { pageName?: string }) {
               title="Check Availability"
               subtitle="Select your stay dates to reveal live pricing for your chosen dates."
               autoApplyDefaultDates
-              onChecked={() => requestAnimationFrame(scrollToStaySection)}
+              onChecked={() => window.setTimeout(scrollToStaySection, 80)}
             />
           </div>
           <div id="choose-your-perfect-stay" ref={stayRef} className="scroll-mt-28 text-center mb-14">

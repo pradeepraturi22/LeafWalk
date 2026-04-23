@@ -64,8 +64,7 @@ export default function AvailabilityBar({
   }, [checkIn, checkOut])
   const isLongStay = selectedNights > MAX_STAY_NIGHTS
 
-  function handleSubmit(event: React.FormEvent) {
-    event.preventDefault()
+  function handleSubmit() {
     setError('')
 
     if (!checkIn || !checkOut) {
@@ -137,7 +136,7 @@ export default function AvailabilityBar({
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className={`grid gap-3 md:grid-cols-[1.25fr_1.25fr_auto] md:items-end ${compact ? 'lg:grid-cols-[1fr_1fr_auto]' : ''}`}>
+        <div className={`grid gap-3 md:grid-cols-[1.25fr_1.25fr_auto] md:items-end ${compact ? 'lg:grid-cols-[1fr_1fr_auto]' : ''}`}>
           <label
             className="block cursor-pointer"
             onClick={() => openDatePicker(checkInInputRef.current)}
@@ -171,12 +170,13 @@ export default function AvailabilityBar({
           </label>
 
           <button
-            type="submit"
+            type="button"
+            onClick={handleSubmit}
             className={`rounded-2xl bg-gradient-to-r from-[#c9a14a] to-[#e6c87a] px-6 text-sm font-bold text-black transition-all hover:opacity-90 ${compact ? 'py-3' : 'py-3.5'}`}
           >
             Check Availability
           </button>
-        </form>
+        </div>
 
         {error ? (
           <p className="text-sm text-red-400">{error}</p>
