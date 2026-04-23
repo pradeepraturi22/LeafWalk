@@ -42,7 +42,11 @@ async function verifyAdminSessionCookie(value?: string) {
   const [payload, signature] = value.split('.')
   if (!payload || !signature) return false
 
-  const secret = process.env.CUSTOM_AUTH_SECRET || process.env.AUTH_SESSION_SECRET || process.env.INTERNAL_API_SECRET
+  const secret =
+    process.env.ADMIN_SESSION_SECRET ||
+    process.env.CUSTOM_AUTH_SECRET ||
+    process.env.AUTH_SESSION_SECRET ||
+    process.env.INTERNAL_API_SECRET
   if (!secret) return false
 
   try {
@@ -123,10 +127,10 @@ function applySecurityHeaders(response: NextResponse) {
       scriptSrc,
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
-      "img-src 'self' data: blob: https://*.supabase.co https://checkout.razorpay.com",
+      "img-src 'self' data: blob: https://*.supabase.co https://checkout.razorpay.com https://www.google.com https://maps.gstatic.com",
       "media-src 'self' blob:",
       "connect-src 'self' https://*.supabase.co https://api.razorpay.com https://checkout.razorpay.com https://lumberjack.razorpay.com",
-      "frame-src https://api.razorpay.com https://checkout.razorpay.com",
+      "frame-src https://api.razorpay.com https://checkout.razorpay.com https://www.google.com https://maps.google.com",
       "object-src 'none'",
       "upgrade-insecure-requests",
     ].join('; ')

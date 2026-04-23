@@ -3,7 +3,6 @@ import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import { Toaster } from 'react-hot-toast'
-import { supabase } from '@/lib/supabaseClient'
 import AvailabilityBar from '@/components/AvailabilityBar'
 import RoomCard from '@/components/RoomCard'
 import { useBookingDates } from '@/context/BookingContext'
@@ -189,17 +188,18 @@ function RoomsContent() {
   useEffect(() => {
     const cat = searchParams.get('category')
     if (cat === 'deluxe' || cat === 'premium') setCategory(cat)
-    Promise.all([
-      supabase
-        .from('rooms')
-        .select('id,name,slug,category,description,max_guests,max_extra_beds,total_rooms,amenities,images,featured_image,is_active,display_price_from,offer_label,offer_badge_text,offer_discount_percent,offer_is_active,offer_valid_until')
-        .eq('is_active', true)
-        .order('category')
-        .order('display_price_from', { ascending: true }),
-    ]).then(([roomsResult]) => {
-      setRooms((roomsResult.data || []) as Room[])
-      setLoading(false)
-    })
+    fetch('/api/rooms', { cache: 'no-store' })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('Failed to load rooms')
+        return response.json()
+      })
+      .then((payload) => {
+        setRooms((payload.rooms || []) as Room[])
+      })
+      .catch(() => {
+        setRooms([])
+      })
+      .finally(() => setLoading(false))
   }, [searchParams])
 
   useEffect(() => {

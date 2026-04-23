@@ -48,6 +48,12 @@ export default function AvailabilityBar({
     }
   }, [autoApplyDefaultDates, checkInDate, checkOutDate, defaultCheckOut, setDates, today])
 
+  useEffect(() => {
+    if (!checkInDate || !checkOutDate) return
+    setCheckIn(checkInDate)
+    setCheckOut(checkOutDate > checkInDate ? checkOutDate : addDays(checkInDate, 1))
+  }, [checkInDate, checkOutDate])
+
   const minCheckOut = useMemo(() => {
     if (!checkIn) return addDays(today, 1)
     return addDays(checkIn, 1)
@@ -93,7 +99,17 @@ export default function AvailabilityBar({
   function handleCheckInChange(nextCheckIn: string) {
     setCheckIn(nextCheckIn)
     if (nextCheckIn) {
-      setCheckOut(addDays(nextCheckIn, 1))
+      const nextCheckOut = addDays(nextCheckIn, 1)
+      setCheckOut(nextCheckOut)
+      setDates({ checkInDate: nextCheckIn, checkOutDate: nextCheckOut })
+    }
+    setError('')
+  }
+
+  function handleCheckOutChange(nextCheckOut: string) {
+    setCheckOut(nextCheckOut)
+    if (checkIn && nextCheckOut && nextCheckOut > checkIn) {
+      setDates({ checkInDate: checkIn, checkOutDate: nextCheckOut })
     }
     setError('')
   }
@@ -148,7 +164,8 @@ export default function AvailabilityBar({
               type="date"
               value={checkOut}
               min={minCheckOut}
-              onChange={(event) => setCheckOut(event.target.value)}
+              onInput={(event) => handleCheckOutChange((event.target as HTMLInputElement).value)}
+              onChange={(event) => handleCheckOutChange(event.target.value)}
               className={`w-full rounded-2xl border border-white/10 bg-white/5 px-4 text-white focus:border-[#c9a14a] focus:outline-none ${compact ? 'py-2.5 text-sm' : 'py-3'}`}
             />
           </label>

@@ -1,7 +1,6 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { supabase } from '@/lib/supabaseClient'
 import AvailabilityBar from '@/components/AvailabilityBar'
 import RoomCard from '@/components/RoomCard'
 import { useBookingDates } from '@/context/BookingContext'
@@ -83,15 +82,18 @@ export default function HomeClient({ pageName }: { pageName?: string }) {
   const [reviews, setReviews] = useState<ReviewCard[]>(FALLBACK_REVIEWS)
 
   useEffect(() => {
-    supabase
-      .from('rooms')
-      .select('id,name,slug,category,description,max_guests,featured_image,images,display_price_from')
-      .eq('is_active', true)
-      .order('category')
-      .order('display_price_from', { ascending: true })
-      .then((roomsResult) => {
-      if (roomsResult.data) setRooms(roomsResult.data as HomeRoom[])
-    })
+    fetch('/api/rooms', { cache: 'no-store' })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('Failed to load rooms')
+        return response.json()
+      })
+      .then((payload) => {
+        setRooms((payload.rooms || []) as HomeRoom[])
+      })
+      .catch((error) => {
+        console.error(error)
+        setRooms([])
+      })
 
     fetch('/api/reviews')
       .then(async (res) => {
@@ -107,6 +109,13 @@ export default function HomeClient({ pageName }: { pageName?: string }) {
         console.error(error)
       })
   }, [])
+
+  function scrollToStaySection() {
+    const target = document.getElementById('choose-your-perfect-stay')
+    if (!target) return
+    const top = target.getBoundingClientRect().top + window.scrollY - 110
+    window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' })
+  }
 
   useEffect(() => {
     if (!pricingReady || rooms.length === 0) {
@@ -252,10 +261,10 @@ export default function HomeClient({ pageName }: { pageName?: string }) {
               title="Check Availability"
               subtitle="Select your stay dates to reveal live pricing for your chosen dates."
               autoApplyDefaultDates
-              onChecked={() => stayRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+              onChecked={() => requestAnimationFrame(scrollToStaySection)}
             />
           </div>
-          <div ref={stayRef} className="text-center mb-14">
+          <div id="choose-your-perfect-stay" ref={stayRef} className="scroll-mt-28 text-center mb-14">
             <p className="text-[#c9a14a] text-xs uppercase tracking-[0.35em] font-semibold mb-3">Accommodations</p>
             <h2 className="font-playfair text-4xl md:text-5xl text-[#c9a14a] mb-4">Choose Your Perfect Stay</h2>
             <p className="text-white/50 max-w-xl mx-auto">Thoughtfully designed stays across our deluxe rooms and premium cottages, each crafted for comfort with Himalayan views</p>

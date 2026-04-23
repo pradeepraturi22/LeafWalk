@@ -1,7 +1,5 @@
 'use client'
 
-import Image from 'next/image'
-
 type CtaConfig = {
   label: string
   onClick?: () => void
@@ -78,12 +76,12 @@ export default function RoomCard({
     >
       <div className="relative h-56 flex-shrink-0 overflow-hidden">
         {image ? (
-          <Image
+          <img
             src={image}
             alt={imageAlt}
-            fill
-            className={`object-cover transition-transform duration-500 ${onImageClick ? 'cursor-pointer' : ''} group-hover:scale-105`}
+            className={`absolute inset-0 h-full w-full object-cover transition-transform duration-500 ${onImageClick ? 'cursor-pointer' : ''} group-hover:scale-105`}
             onClick={onImageClick}
+            loading="lazy"
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-white/5 text-6xl">{isPremium ? 'P' : 'D'}</div>
@@ -132,7 +130,7 @@ export default function RoomCard({
                   onClick={() => onGalleryImageClick?.(index)}
                   className="relative h-10 w-12 flex-shrink-0 overflow-hidden rounded-xl border border-white/15 transition hover:scale-105 hover:border-[#c9a14a]/70"
                 >
-                  <Image src={galleryImage} alt={`${imageAlt} ${index + 1}`} fill className="object-cover" />
+                  <img src={galleryImage} alt={`${imageAlt} ${index + 1}`} className="h-full w-full object-cover" loading="lazy" />
                 </button>
               ))}
               {galleryImages.length > 4 ? (
