@@ -4,7 +4,6 @@ import type { Metadata, Viewport } from 'next'
 import { Playfair_Display, Jost } from 'next/font/google'
 import ConditionalLayout from '@/components/ConditionalLayout'
 import { BookingProvider } from '@/context/BookingContext'
-import Script from 'next/script'
 
 const playfair = Playfair_Display({ subsets: ['latin'], variable: '--font-playfair', display: 'swap' })
 const jost = Jost({ subsets: ['latin'], weight: ['300', '400', '500', '600', '700'], variable: '--font-jost', display: 'swap' })
@@ -90,11 +89,13 @@ const structuredData = {
   ],
 }
 
+const structuredDataJson = JSON.stringify(structuredData)
+
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={`${playfair.variable} ${jost.variable}`}>
       <head>
-        <Script id="schema-org" type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: structuredDataJson }} />
       </head>
       <body className="antialiased" style={{ fontFamily: 'var(--font-jost), sans-serif' }}>
         <BookingProvider>
