@@ -4,7 +4,7 @@ import Link from 'next/link'
 import AvailabilityBar from '@/components/AvailabilityBar'
 import RoomCard from '@/components/RoomCard'
 import { useBookingDates } from '@/context/BookingContext'
-import { toLocalDateString } from '@/lib/utils'
+import { normalizeRoomImageUrl, toLocalDateString } from '@/lib/utils'
 
 type ReviewCard = {
   id: string
@@ -179,7 +179,7 @@ export default function HomeClient({ pageName }: { pageName?: string }) {
 
   function getRoomImage(room: HomeRoom | null) {
     if (!room) return null
-    return room.featured_image || room.images?.[0] || null
+    return normalizeRoomImageUrl(room.featured_image || room.images?.[0] || null, room.category)
   }
 
   const deluxeRoom = getCategoryRoom('deluxe')

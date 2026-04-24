@@ -6,7 +6,7 @@ import { Toaster } from 'react-hot-toast'
 import AvailabilityBar from '@/components/AvailabilityBar'
 import RoomCard from '@/components/RoomCard'
 import { useBookingDates } from '@/context/BookingContext'
-import { formatDate } from '@/lib/utils'
+import { formatDate, normalizeRoomImageUrl } from '@/lib/utils'
 
 interface Room {
   id: string
@@ -361,7 +361,9 @@ function RoomsContent() {
           {filtered.map(({ key, cat, room, price, nights }) => {
             const isPremium = cat === 'premium'
             const hasOffer = isOfferActive(room)
-            const allImages = [room.featured_image, ...(room.images || [])].filter(Boolean) as string[]
+            const allImages = [room.featured_image, ...(room.images || [])]
+              .filter(Boolean)
+              .map((image) => normalizeRoomImageUrl(image, room.category))
             const availability = availabilityQuotes[room.id]
             const isAvailable = !hasDates ? false : (availability?.availableRooms || 0) > 0
             const availabilityMessage = !hasDates
@@ -392,7 +394,7 @@ function RoomsContent() {
                 title={room.name}
                 subtitle="Room Only"
                 description={room.description}
-                image={room.featured_image}
+                image={normalizeRoomImageUrl(room.featured_image, room.category)}
                 galleryImages={allImages}
                 imageAlt={room.name}
                 badge={isPremium ? 'Premium' : 'Deluxe'}

@@ -55,3 +55,22 @@ export function isValidPhone(phone: string): boolean {
   const phoneRegex = /^[6-9]\d{9}$/
   return phoneRegex.test(phone.replace(/\D/g, ''))
 }
+
+export function getDefaultRoomImage(category?: 'deluxe' | 'premium' | string | null): string {
+  return category === 'premium' ? '/rooms/cottage.jpg' : '/rooms/deluxe-room.jpg'
+}
+
+export function normalizeRoomImageUrl(
+  value?: string | null,
+  category?: 'deluxe' | 'premium' | string | null
+): string {
+  const fallback = getDefaultRoomImage(category)
+  if (!value) return fallback
+
+  const trimmed = value.trim()
+  if (!trimmed) return fallback
+  if (/^(https?:|data:|blob:)/i.test(trimmed)) return trimmed
+  if (trimmed.startsWith('/')) return trimmed
+  if (trimmed.includes('/')) return `/${trimmed.replace(/^\/+/, '')}`
+  return `/rooms/${trimmed}`
+}

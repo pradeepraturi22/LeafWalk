@@ -208,7 +208,7 @@ export async function sendTourOperatorWelcomeEmail(operator: TourOperatorLike) {
     undefined,
     {
       emailType: 'general',
-      fromEmail: process.env.FROM_EMAIL_PARTNERS || process.env.FROM_EMAIL_AUTH || 'no-reply@leafwalk.in',
+      fromEmail: process.env.FROM_EMAIL_PARTNERS || process.env.FROM_EMAIL_BOOKINGS || process.env.FROM_EMAIL || 'no-reply@leafwalk.in',
       fromName: 'LeafWalk Partner Desk',
     }
   )
@@ -258,7 +258,11 @@ export async function sendTourOperatorBookingStatusEmail(
     subjectMap[statusType],
     buildStatusHtml(booking, operator, statusType),
     attachments,
-    { emailType: 'booking_confirmation' }
+    {
+      emailType: 'booking_confirmation',
+      fromEmail: process.env.FROM_EMAIL_BOOKINGS || process.env.FROM_EMAIL || 'no-reply@leafwalk.in',
+      fromName: 'LeafWalk Reservations',
+    }
   )
 
   await logNotification(booking.id, operator.email, sent ? 'sent' : 'failed', `tour_operator_${statusType}_${booking.payment_status || 'unknown'}:${booking.booking_number || booking.id}`)

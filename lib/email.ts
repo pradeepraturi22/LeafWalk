@@ -56,6 +56,8 @@ export type EmailProviderResult = {
   error?: string
 }
 
+type ProviderName = 'smtp' | 'resend' | 'sendgrid'
+
 const INLINE_LOGO_CID = 'leafwalk-logo'
 
 function getFromEmail(emailType: SendEmailInput['emailType'] = 'general') {
@@ -288,13 +290,45 @@ export async function sendTransactionalEmail(input: SendEmailInput): Promise<Ema
       }
     }
 
-    if (process.env.RESEND_API_KEY) {
-      return await sendWithResend(input)
+    const preferredProvider = String(process.env.EMAIL_PROVIDER || '').trim().toLowerCase()
+    const providers: ProviderName[] =
+      preferredProvider === 'smtp'
+        ? ['smtp', 'resend', 'sendgrid']
+        : preferredProvider === 'resend'
+          ? ['resend', 'smtp', 'sendgrid']
+          : preferredProvider === 'sendgrid'
+            ? ['sendgrid', 'smtp', 'resend']
+            : ['smtp', 'resend', 'sendgrid']
+
+    const errors: string[] = []
+
+    for (const provider of providers) {
+      const result =
+        provider === 'smtp'
+          ? await sendWithSmtp(input)
+          : provider === 'resend'
+            ? await sendWithResend(input)
+            : await sendWithSendGrid(input)
+
+      if (result.success) {
+        if (errors.length) {
+          logInfo('Email delivered after provider fallback', {
+            provider: result.provider,
+            subject: input.subject,
+            emailType: input.emailType || 'general',
+            previousErrors: errors,
+          })
+        }
+        return result
+      }
+
+      errors.push(`${provider}: ${result.error || 'Unknown provider error'}`)
     }
-    if (process.env.SENDGRID_API_KEY) {
-      return await sendWithSendGrid(input)
+
+    return {
+      success: false,
+      error: errors.join(' | ') || 'Email send failed',
     }
-    return await sendWithSmtp(input)
   } catch (error: any) {
     return {
       success: false,
