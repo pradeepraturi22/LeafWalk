@@ -434,7 +434,13 @@ export default function BookingDetailPage() {
                   {booking.hold_notes && <p className="text-white/50 text-xs bg-black/20 rounded-lg px-3 py-2">📝 {booking.hold_notes}</p>}
                   <button
                     onClick={() => {
-                      setConfirmPayment({ method: 'bank_transfer', advance: 0, transaction_number: '', payment_date: '', payment_notes: '' })
+                      setConfirmPayment({
+                        method: 'bank_transfer',
+                        advance: 0,
+                        transaction_number: '',
+                        payment_date: new Date().toISOString().split('T')[0],
+                        payment_notes: '',
+                      })
                       setDueDate('')
                       setShowConfirmModal(true)
                     }}
