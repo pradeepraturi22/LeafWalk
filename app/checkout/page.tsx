@@ -20,8 +20,12 @@ type BookingSummary = {
   check_out: Date
   nights: number
   rooms: number
+  adults: number
   meal_plan: string
-  pricePerRoom: number
+  roomPricePerNight: number
+  roomSubtotal: number
+  mealAddonAmount: number
+  mealAddonLabel: string | null
   subtotal: number
   cgst: number
   sgst: number
@@ -56,6 +60,7 @@ function CheckoutContent() {
       const checkIn = searchParams.get('checkIn')
       const checkOut = searchParams.get('checkOut')
       const qty = searchParams.get('qty')
+      const adultsParam = searchParams.get('adults')
       const meal = searchParams.get('meal') || 'CP'
 
       if (!roomId || !checkIn || !checkOut) {
@@ -99,6 +104,7 @@ function CheckoutContent() {
       const checkOutDate = new Date(checkOut)
       const nights = calculateNights(checkInDate, checkOutDate)
       const roomsBooked = parseInt(qty || '1', 10)
+      const adults = Math.max(1, Math.min(Number(adultsParam || '2'), roomsBooked * 3))
 
       const pricingResponse = await fetch('/api/get-room-pricing', {
         method: 'POST',
@@ -108,16 +114,21 @@ function CheckoutContent() {
           room_category: roomData.category,
           checkInDate: toLocalDateString(checkInDate),
           checkOutDate: toLocalDateString(checkOutDate),
+          adults,
         }),
       })
       const pricingPayload = await pricingResponse.json()
-      if (!pricingResponse.ok || !pricingPayload.total?.[meal]) {
+      if (!pricingResponse.ok || !pricingPayload.total?.EP) {
         throw new Error(pricingPayload.error || 'No website tariff found for the selected dates')
       }
 
-      const subtotalPerRoom = Number(pricingPayload.total[meal] || 0)
-      const pricePerRoom = nights > 0 ? Math.round((subtotalPerRoom / nights) * 100) / 100 : 0
-      const subtotal = Math.round(subtotalPerRoom * roomsBooked * 100) / 100
+      const roomSubtotalPerRoom = Number(pricingPayload.total.EP || 0)
+      const roomPricePerNight = nights > 0 ? Math.round((roomSubtotalPerRoom / nights) * 100) / 100 : 0
+      const roomSubtotal = Math.round(roomSubtotalPerRoom * roomsBooked * 100) / 100
+      const mealAddonPerAdult = meal === 'CP' ? Number(pricingPayload.meal_unit_totals?.breakfast || 0) : 0
+      const mealAddonAmount = Math.round(mealAddonPerAdult * adults * 100) / 100
+      const mealAddonLabel = meal === 'CP' ? `Breakfast for ${adults} adult${adults > 1 ? 's' : ''}` : null
+      const subtotal = Math.round((roomSubtotal + mealAddonAmount) * 100) / 100
       const cgst = Math.round(subtotal * 0.025 * 100) / 100
       const sgst = Math.round(subtotal * 0.025 * 100) / 100
       const gst = cgst + sgst
@@ -129,8 +140,12 @@ function CheckoutContent() {
         check_out: checkOutDate,
         nights,
         rooms: roomsBooked,
+        adults,
         meal_plan: meal,
-        pricePerRoom,
+        roomPricePerNight,
+        roomSubtotal,
+        mealAddonAmount,
+        mealAddonLabel,
         subtotal,
         cgst,
         sgst,
@@ -199,7 +214,7 @@ function CheckoutContent() {
             check_out: toLocalDateString(bookingData.check_out),
             nights: bookingData.nights,
             rooms_booked: bookingData.rooms,
-            adults: 2,
+            adults: bookingData.adults,
             children_below_5: 0,
             children_5_to_12: 0,
             children_above_12: 0,
@@ -381,13 +396,23 @@ function CheckoutContent() {
                     <p className="text-sm text-white/50">Rooms</p>
                     <p className="text-white">{bookingData.rooms}</p>
                   </div>
+                  <div>
+                    <p className="text-sm text-white/50">Adults</p>
+                    <p className="text-white">{bookingData.adults}</p>
+                  </div>
                 </div>
 
                 <div className="space-y-2 border-t border-white/10 pt-4">
                   <div className="flex justify-between text-white/70">
-                    <span>₹{bookingData.pricePerRoom.toLocaleString()} × {bookingData.nights}N × {bookingData.rooms}R</span>
-                    <span>{formatPaymentAmount(bookingData.total)}</span>
+                    <span>₹{bookingData.roomPricePerNight.toLocaleString()} × {bookingData.nights}N × {bookingData.rooms}R</span>
+                    <span>{formatPaymentAmount(bookingData.roomSubtotal)}</span>
                   </div>
+                  {bookingData.mealAddonAmount > 0 && (
+                    <div className="flex justify-between text-xs text-white/50">
+                      <span>{bookingData.mealAddonLabel}</span>
+                      <span>{formatPaymentAmount(bookingData.mealAddonAmount)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-xs text-white/50">
                     <span>Subtotal (excl. GST 5%)</span>
                     <span>{formatPaymentAmount(bookingData.subtotal)}</span>

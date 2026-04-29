@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import Razorpay from 'razorpay'
 import { z } from 'zod'
 import { getAuthenticatedCustomer } from '@/lib/customer-auth'
+import { logPaymentAudit } from '@/lib/payment-audit'
 import { getSupabaseAdmin } from '@/lib/supabaseServer'
 import { logDebug, logError, logInfo } from '@/lib/logger'
 import { parseJsonBody, sanitizeString } from '@/lib/security'
@@ -55,6 +56,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const { booking_id, booking, amount, receipt, notes } = parsed.data
+    const requestId = crypto.randomUUID()
     const supabase = getSupabaseAdmin()
     if (isLocalTestMode()) {
       logDebug('LOCAL TEST MODE create-order request', { booking_id })
@@ -98,8 +100,36 @@ export async function POST(request: NextRequest) {
         } as any)
 
       if (draftError) {
+        await logPaymentAudit({
+          eventType: 'order_create_failed',
+          status: 'failed',
+          source: 'website',
+          orderId: order.id,
+          amount: preparedDraft.totalAmount,
+          currency: 'INR',
+          requestId,
+          message: 'Draft persistence failed after order creation',
+        })
         return NextResponse.json({ error: 'Failed to prepare booking payment' }, { status: 500 })
       }
+
+      await logPaymentAudit({
+        eventType: 'order_created',
+        status: 'success',
+        source: 'website',
+        orderId: order.id,
+        amount: preparedDraft.totalAmount,
+        currency: 'INR',
+        requestId,
+        payload: {
+          room_id: booking.room_id,
+          check_in: booking.check_in,
+          check_out: booking.check_out,
+          adults: booking.adults,
+          rooms_booked: booking.rooms_booked,
+          meal_plan: booking.meal_plan,
+        },
+      })
 
       return NextResponse.json({
         success: true,
@@ -201,8 +231,30 @@ export async function POST(request: NextRequest) {
       .eq('id', existingBookingId)
 
     if (updateError) {
+      await logPaymentAudit({
+        eventType: 'order_create_failed',
+        status: 'failed',
+        source: 'existing_booking',
+        bookingId: existingBookingId,
+        orderId: order.id,
+        amount: trustedAmount,
+        currency: 'INR',
+        requestId,
+        message: 'Failed to link order to booking',
+      })
       return NextResponse.json({ error: 'Failed to link payment order to booking' }, { status: 500 })
     }
+
+    await logPaymentAudit({
+      eventType: 'order_created',
+      status: 'success',
+      source: 'existing_booking',
+      bookingId: existingBookingId,
+      orderId: order.id,
+      amount: trustedAmount,
+      currency: 'INR',
+      requestId,
+    })
 
     return NextResponse.json({
       success: true,

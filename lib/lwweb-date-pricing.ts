@@ -42,6 +42,12 @@ export type PricingMatrix = {
   total: PricingMatrixTotals
 }
 
+export type MealUnitTotals = {
+  breakfast: number
+  lunch: number
+  dinner: number
+}
+
 export function getDateRange(checkIn: string, checkOut: string) {
   const dates: string[] = []
   if (!checkIn || !checkOut || checkOut <= checkIn) return dates
@@ -73,12 +79,15 @@ export function buildLwwebPricingMatrix({
   checkOut,
   roomRates,
   mealPrices,
+  adultCount = 1,
 }: {
   checkIn: string
   checkOut: string
   roomRates: DateWiseRoomRate[]
   mealPrices: MealPriceRow[]
+  adultCount?: number
 }): PricingMatrix {
+  void adultCount
   const dates = getDateRange(checkIn, checkOut)
   const nights = dates.map((date) => {
     const roomRate = roomRates.find((rate) => rate.rate_date === date)
@@ -113,4 +122,25 @@ export function buildLwwebPricingMatrix({
   )
 
   return { nights, total }
+}
+
+export function buildMealUnitTotals({
+  checkIn,
+  checkOut,
+  mealPrices,
+}: {
+  checkIn: string
+  checkOut: string
+  mealPrices: MealPriceRow[]
+}): MealUnitTotals {
+  const dates = getDateRange(checkIn, checkOut)
+
+  return dates.reduce<MealUnitTotals>(
+    (sum, date) => ({
+      breakfast: sum.breakfast + mealPriceForDate(mealPrices, 'breakfast', date),
+      lunch: sum.lunch + mealPriceForDate(mealPrices, 'lunch', date),
+      dinner: sum.dinner + mealPriceForDate(mealPrices, 'dinner', date),
+    }),
+    { breakfast: 0, lunch: 0, dinner: 0 }
+  )
 }

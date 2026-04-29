@@ -8,7 +8,7 @@ import { getAuthenticatedCustomer } from '@/lib/customer-auth'
 import { getSupabaseAdmin } from '@/lib/supabaseServer'
 import { sendBookingLifecycleEmails } from '@/lib/booking-email-triggers'
 import { getCategoryAvailabilityForRoom } from '@/lib/server-availability'
-import { buildLwwebPricingMatrix, type DateWiseRoomRate, type MealPriceRow } from '@/lib/lwweb-date-pricing'
+import { buildLwwebPricingMatrix, buildMealUnitTotals, type DateWiseRoomRate, type MealPriceRow } from '@/lib/lwweb-date-pricing'
 import { buildBookingNumber } from '@/lib/reference-numbers'
 import { logDebug, logError } from '@/lib/logger'
 import { isLocalTestMode } from '@/lib/runtime-mode'
@@ -39,6 +39,14 @@ const bookingCreateSchema = z.object({
   discount_amount: z.coerce.number().min(0).max(100000).default(0),
   discount_percent: z.coerce.number().min(0).max(100).default(0),
   discount_reason: z.string().max(120).optional().nullable(),
+}).superRefine((value, ctx) => {
+  if (Number(value.adults || 0) > Number(value.rooms_booked || 1) * 3) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Maximum 3 adults are allowed per room',
+      path: ['adults'],
+    })
+  }
 })
 
 function round2(value: number) {
@@ -128,6 +136,7 @@ export async function POST(request: NextRequest) {
     }
 
     let pricingMatrix
+    let mealUnitTotals
     try {
       pricingMatrix = buildLwwebPricingMatrix({
         checkIn: String(check_in),
@@ -147,12 +156,22 @@ export async function POST(request: NextRequest) {
           applicable_to: meal.applicable_to,
         })) as MealPriceRow[],
       })
+      mealUnitTotals = buildMealUnitTotals({
+        checkIn: String(check_in),
+        checkOut: String(check_out),
+        mealPrices: ((mealRows || []) as any[]).map((meal) => ({
+          meal_type: meal.meal_type,
+          price: Number(meal.price || 0),
+          applicable_from: meal.applicable_from,
+          applicable_to: meal.applicable_to,
+        })) as MealPriceRow[],
+      })
     } catch (pricingError: any) {
       return NextResponse.json({ error: pricingError.message || 'No website tariff found for the selected dates' }, { status: 400 })
     }
 
     const stayNights = pricingMatrix.nights.map((night) => ({
-      room_price: night[selectedMealPlan as 'EP' | 'CP' | 'MAP' | 'AP'],
+      room_price: night.EP,
       extra_bed_price: night.extra_bed_price,
       child_price: night.child_price,
     }))
@@ -162,7 +181,9 @@ export async function POST(request: NextRequest) {
     const nr       = numRooms
     const xbCount  = Number(extra_beds || 0)
     const childCount = Number(children_5_to_12 || 0)
-    const roomSubtotalPerRoom = round2(pricingMatrix.total[selectedMealPlan as 'EP' | 'CP' | 'MAP' | 'AP'])
+    const roomSubtotalPerRoom = round2(pricingMatrix.total.EP)
+    const mealAddonPerAdult = selectedMealPlan === 'CP' ? round2(Number(mealUnitTotals?.breakfast || 0)) : 0
+    const mealAddonAmount = round2(mealAddonPerAdult * Number(adults || 1))
     const averageRoomRate = n > 0 ? round2(roomSubtotalPerRoom / n) : 0
     const extraBedSubtotalPerBed = round2(stayNights.reduce((sum, night) => sum + night.extra_bed_price, 0))
     const averageExtraBedRate = n > 0 ? round2(extraBedSubtotalPerBed / n) : 0
@@ -171,7 +192,7 @@ export async function POST(request: NextRequest) {
     const base     = roomSubtotalPerRoom * nr
     const xbAmt    = extraBedSubtotalPerBed * xbCount
     const childAmt = childSubtotalPerChild * childCount
-    const sub      = base + xbAmt + childAmt
+    const sub      = base + mealAddonAmount + xbAmt + childAmt
     const disc     = Number(discount_amount || 0)
     const afterDisc = Math.max(0, sub - disc)
     const subtotalExGst = round2(afterDisc)

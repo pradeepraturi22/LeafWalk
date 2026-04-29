@@ -6,6 +6,7 @@ import {
   verifyRazorpayPaymentSignature,
 } from '@/lib/payment-recovery'
 import { logDebug } from '@/lib/logger'
+import { logPaymentAudit } from '@/lib/payment-audit'
 import { parseJsonBody } from '@/lib/security'
 import { isLocalTestMode } from '@/lib/runtime-mode'
 
@@ -23,6 +24,7 @@ export async function POST(request: NextRequest) {
   }
 
   const { razorpay_payment_id, razorpay_order_id, razorpay_signature, booking_id } = parsed.data
+  const requestId = crypto.randomUUID()
 
   if (isLocalTestMode()) {
     logDebug('LOCAL TEST MODE payment verify request', {
@@ -33,6 +35,16 @@ export async function POST(request: NextRequest) {
   }
 
   if (!verifyRazorpayPaymentSignature(razorpay_order_id, razorpay_payment_id, razorpay_signature)) {
+    await logPaymentAudit({
+      eventType: 'verify_rejected',
+      status: 'failed',
+      source: 'verify_api',
+      bookingId: booking_id || null,
+      orderId: razorpay_order_id,
+      paymentId: razorpay_payment_id,
+      requestId,
+      message: 'Invalid payment signature',
+    })
     return NextResponse.json({
       success: false,
       error: { code: 'INVALID_SIGNATURE', message: 'Invalid payment signature' },
@@ -40,11 +52,30 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    await logPaymentAudit({
+      eventType: 'verify_requested',
+      status: 'info',
+      source: 'verify_api',
+      bookingId: booking_id || null,
+      orderId: razorpay_order_id,
+      paymentId: razorpay_payment_id,
+      requestId,
+    })
     const razorpay = getPaymentGatewayClient()
     const payment = await razorpay.payments.fetch(razorpay_payment_id)
     const order = await razorpay.orders.fetch(razorpay_order_id)
 
     if (!payment || payment.order_id !== razorpay_order_id) {
+      await logPaymentAudit({
+        eventType: 'verify_failed',
+        status: 'failed',
+        source: 'verify_api',
+        bookingId: booking_id || null,
+        orderId: razorpay_order_id,
+        paymentId: razorpay_payment_id,
+        requestId,
+        message: 'Payment not found at gateway',
+      })
       return NextResponse.json({
         success: false,
         error: { code: 'PAYMENT_NOT_FOUND', message: 'Payment not found at gateway' },
@@ -52,6 +83,16 @@ export async function POST(request: NextRequest) {
     }
 
     if (!order || order.id !== razorpay_order_id) {
+      await logPaymentAudit({
+        eventType: 'verify_failed',
+        status: 'failed',
+        source: 'verify_api',
+        bookingId: booking_id || null,
+        orderId: razorpay_order_id,
+        paymentId: razorpay_payment_id,
+        requestId,
+        message: 'Order not found at gateway',
+      })
       return NextResponse.json({
         success: false,
         error: { code: 'ORDER_NOT_FOUND', message: 'Order not found at gateway' },
@@ -59,6 +100,18 @@ export async function POST(request: NextRequest) {
     }
 
     if (!['authorized', 'captured'].includes(String(payment.status || '').toLowerCase())) {
+      await logPaymentAudit({
+        eventType: 'verify_pending',
+        status: 'warning',
+        source: 'verify_api',
+        bookingId: booking_id || null,
+        orderId: razorpay_order_id,
+        paymentId: razorpay_payment_id,
+        amount: Number(payment.amount || 0) / 100,
+        currency: String(payment.currency || 'INR'),
+        requestId,
+        message: `Gateway status: ${payment.status || 'unknown'}`,
+      })
       return NextResponse.json({
         success: false,
         error: { code: 'PAYMENT_NOT_CAPTURED', message: 'Payment is still being processed. Please do not pay again immediately if money was deducted.' },
@@ -76,6 +129,18 @@ export async function POST(request: NextRequest) {
     })
 
     if (result.ok) {
+      await logPaymentAudit({
+        eventType: 'verify_succeeded',
+        status: 'success',
+        source: 'verify_api',
+        bookingId: result.booking?.id || booking_id || null,
+        orderId: razorpay_order_id,
+        paymentId: razorpay_payment_id,
+        amount: Number(payment.amount || 0) / 100,
+        currency: String(payment.currency || 'INR'),
+        requestId,
+        message: result.message,
+      })
       return NextResponse.json({
         success: true,
         booking: result.booking,
@@ -93,6 +158,20 @@ export async function POST(request: NextRequest) {
       result.code === 'conflict' ? 409 :
       400
 
+    await logPaymentAudit({
+      eventType: 'verify_failed',
+      status: 'failed',
+      source: 'verify_api',
+      bookingId: result.booking?.id || booking_id || null,
+      orderId: razorpay_order_id,
+      paymentId: razorpay_payment_id,
+      amount: Number(payment.amount || 0) / 100,
+      currency: String(payment.currency || 'INR'),
+      requestId,
+      message: result.message,
+      payload: { code: result.code },
+    })
+
     return NextResponse.json({
       success: false,
       booking: result.booking || null,
@@ -102,6 +181,16 @@ export async function POST(request: NextRequest) {
       },
     }, { status })
   } catch (error: any) {
+    await logPaymentAudit({
+      eventType: 'verify_failed',
+      status: 'failed',
+      source: 'verify_api',
+      bookingId: booking_id || null,
+      orderId: razorpay_order_id,
+      paymentId: razorpay_payment_id,
+      requestId,
+      message: error?.message || 'Verification failed',
+    })
     return NextResponse.json({
       success: false,
       error: { code: 'VERIFY_FAILED', message: 'Verification failed' },

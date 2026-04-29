@@ -5,6 +5,7 @@ import {
   reconcileSuccessfulPayment,
   verifyRazorpayWebhookSignature,
 } from '@/lib/payment-recovery'
+import { logPaymentAudit } from '@/lib/payment-audit'
 
 function getBookingIdFromPayload(payload: any) {
   return (
@@ -45,11 +46,22 @@ export async function POST(request: NextRequest) {
   const orderId = getOrderIdFromPayload(body?.payload || {})
   const paymentId = getPaymentIdFromPayload(body?.payload || {})
   const bookingId = getBookingIdFromPayload(body?.payload || {})
+  const requestId = crypto.randomUUID()
   const eventKey =
     request.headers.get('x-razorpay-event-id') ||
     `${eventType}:${paymentId || 'no-payment'}:${orderId || 'no-order'}:${body?.created_at || 'no-created-at'}`
 
   try {
+    await logPaymentAudit({
+      eventType: 'webhook_received',
+      status: 'info',
+      source: 'webhook',
+      bookingId,
+      orderId,
+      paymentId,
+      requestId,
+      message: eventType,
+    })
     const reservation = await claimWebhookEvent({
       eventKey,
       eventType,
@@ -63,6 +75,16 @@ export async function POST(request: NextRequest) {
     })
 
     if (!reservation.claimed) {
+      await logPaymentAudit({
+        eventType: 'webhook_duplicate',
+        status: 'warning',
+        source: 'webhook',
+        bookingId,
+        orderId,
+        paymentId,
+        requestId,
+        message: eventType,
+      })
       return NextResponse.json({ ok: true, duplicate: true })
     }
 
@@ -88,6 +110,20 @@ export async function POST(request: NextRequest) {
         gatewayPayment: paymentEntity,
       })
 
+      await logPaymentAudit({
+        eventType: 'webhook_processed',
+        status: result.ok ? 'success' : 'failed',
+        source: 'webhook',
+        bookingId: result.booking?.id || bookingId,
+        orderId: orderEntity.id,
+        paymentId: paymentEntity.id,
+        amount: Number(paymentEntity.amount || 0) / 100,
+        currency: String(paymentEntity.currency || 'INR'),
+        requestId,
+        message: result.message,
+        payload: { eventType, code: result.code },
+      })
+
       return NextResponse.json({ ok: true, result })
     }
 
@@ -102,11 +138,36 @@ export async function POST(request: NextRequest) {
         gatewayPayment: paymentEntity,
       })
 
+      await logPaymentAudit({
+        eventType: 'webhook_processed',
+        status: result.ok ? 'success' : 'failed',
+        source: 'webhook',
+        bookingId: result.booking?.id || bookingId,
+        orderId: paymentEntity?.order_id || orderId,
+        paymentId: paymentEntity?.id || paymentId,
+        amount: Number(paymentEntity?.amount || 0) / 100,
+        currency: String(paymentEntity?.currency || 'INR'),
+        requestId,
+        message: result.message,
+        payload: { eventType, code: result.code },
+      })
+
       return NextResponse.json({ ok: true, result })
     }
 
     return NextResponse.json({ ok: true, ignored: true, event: eventType })
   } catch (error: any) {
+    await logPaymentAudit({
+      eventType: 'webhook_failed',
+      status: 'failed',
+      source: 'webhook',
+      bookingId,
+      orderId,
+      paymentId,
+      requestId,
+      message: error?.message || 'Webhook processing failed',
+      payload: { eventType },
+    })
     return NextResponse.json({ error: 'Webhook processing failed' }, { status: 500 })
   }
 }

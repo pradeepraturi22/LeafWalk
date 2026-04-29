@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabaseServer'
-import { buildLwwebPricingMatrix, getDateRange, type DateWiseRoomRate, type MealPriceRow } from '@/lib/lwweb-date-pricing'
+import { buildLwwebPricingMatrix, buildMealUnitTotals, getDateRange, type DateWiseRoomRate, type MealPriceRow } from '@/lib/lwweb-date-pricing'
 import { getStayTariffBreakdown, normalizeTariffRate, PUBLIC_WEB_RATE_TYPE } from '@/lib/public-tariff'
 
 type PricingInput = {
@@ -8,6 +8,7 @@ type PricingInput = {
   room_id?: string
   checkInDate?: string
   checkOutDate?: string
+  adults?: number
 }
 
 function getApplicableMealRows(rows: MealPriceRow[], mealType: 'breakfast' | 'lunch' | 'dinner', date: string) {
@@ -161,6 +162,11 @@ async function buildPricingResponse(input: PricingInput) {
         applicable_from: row.applicable_from,
         applicable_to: row.applicable_to,
       })) as MealPriceRow[]
+  const mealUnitTotals = buildMealUnitTotals({
+    checkIn: checkInDate,
+    checkOut: checkOutDate,
+    mealPrices: normalizedMealPriceRows,
+  })
 
   try {
     if (roomRatesError) {
@@ -190,6 +196,7 @@ async function buildPricingResponse(input: PricingInput) {
       check_out: checkOutDate,
       nights: pricing.nights,
       total: pricing.total,
+      meal_unit_totals: mealUnitTotals,
     })
   } catch (error: any) {
     const { data: legacyRateRows, error: legacyRateError } = await supabase
@@ -224,6 +231,7 @@ async function buildPricingResponse(input: PricingInput) {
       check_out: checkOutDate,
       nights: fallbackPricing.nights,
       total: fallbackPricing.total,
+      meal_unit_totals: mealUnitTotals,
       source: 'seasonal-fallback',
     })
   }
@@ -236,5 +244,6 @@ export async function POST(request: NextRequest) {
     room_category: body.room_category,
     checkInDate: body.checkInDate,
     checkOutDate: body.checkOutDate,
+    adults: body.adults,
   })
 }

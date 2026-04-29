@@ -4,6 +4,7 @@ import { sendBookingLifecycleEmails } from '@/lib/booking-email-triggers'
 import { ensureCustomerAccount } from '@/lib/customer-auth'
 import { validateBookingStatusChange } from '@/lib/booking-status'
 import { logError, logInfo } from '@/lib/logger'
+import { logPaymentAudit } from '@/lib/payment-audit'
 import { buildBookingNumber, buildInvoiceNumber } from '@/lib/reference-numbers'
 import { isLocalTestMode, isProduction, isRazorpayTestKey } from '@/lib/runtime-mode'
 import { getSupabaseAdmin } from '@/lib/supabaseServer'
@@ -297,6 +298,16 @@ async function createBookingFromStoredDraft(input: ReconcileSuccessInput): Promi
   const draftTotalAmount = Number(preparedDraft.totalAmount || bookingPayload.total_amount || 0)
   const expectedAmountPaise = Math.round(draftTotalAmount * 100)
   if (Number(input.gatewayPayment.amount) !== expectedAmountPaise || Number(input.gatewayOrder.amount) !== expectedAmountPaise) {
+    await logPaymentAudit({
+      eventType: 'booking_create_blocked',
+      status: 'failed',
+      source: input.source,
+      orderId: input.orderId,
+      paymentId: input.paymentId,
+      amount: Number(input.gatewayPayment.amount || 0) / 100,
+      currency: String(input.gatewayPayment.currency || input.gatewayOrder.currency || 'INR'),
+      message: 'Gateway amount does not match booking total',
+    })
     return { ok: false, code: 'amount_mismatch', message: 'Gateway amount does not match booking total' }
   }
 
@@ -386,6 +397,18 @@ async function createBookingFromStoredDraft(input: ReconcileSuccessInput): Promi
     throw new Error(insertError.message || 'Failed to create booking after payment')
   }
 
+  await logPaymentAudit({
+    eventType: 'booking_created_after_payment',
+    status: 'success',
+    source: input.source,
+    bookingId: insertedBooking.id,
+    orderId: input.orderId,
+    paymentId: input.paymentId,
+    amount: Number(insertedBooking.total_amount || 0),
+    currency: String(input.gatewayPayment.currency || input.gatewayOrder.currency || 'INR'),
+    message: 'Booking created from stored draft after successful payment',
+  })
+
   const bookingNumber = buildBookingNumber({
     id: insertedBooking.id,
     createdAt: insertedBooking.created_at || nowIso,
@@ -474,11 +497,33 @@ export async function reconcileSuccessfulPayment(input: ReconcileSuccessInput): 
   }
 
   if (!booking.razorpay_order_id || booking.razorpay_order_id !== input.orderId || input.gatewayOrder.id !== input.orderId) {
+    await logPaymentAudit({
+      eventType: 'reconcile_failed',
+      status: 'failed',
+      source: input.source,
+      bookingId: booking.id,
+      orderId: input.orderId,
+      paymentId: input.paymentId,
+      amount: Number(input.gatewayPayment.amount || 0) / 100,
+      currency: String(input.gatewayPayment.currency || input.gatewayOrder.currency || 'INR'),
+      message: 'Payment order does not match booking',
+    })
     return { ok: false, code: 'order_mismatch', message: 'Payment order does not match booking', booking }
   }
 
   const expectedAmountPaise = Math.round(Number(booking.total_amount || 0) * 100)
   if (Number(input.gatewayPayment.amount) !== expectedAmountPaise || Number(input.gatewayOrder.amount) !== expectedAmountPaise) {
+    await logPaymentAudit({
+      eventType: 'reconcile_failed',
+      status: 'failed',
+      source: input.source,
+      bookingId: booking.id,
+      orderId: input.orderId,
+      paymentId: input.paymentId,
+      amount: Number(input.gatewayPayment.amount || 0) / 100,
+      currency: String(input.gatewayPayment.currency || input.gatewayOrder.currency || 'INR'),
+      message: 'Gateway amount does not match booking total',
+    })
     return { ok: false, code: 'amount_mismatch', message: 'Gateway amount does not match booking total', booking }
   }
 
@@ -638,6 +683,18 @@ export async function reconcileSuccessfulPayment(input: ReconcileSuccessInput): 
     await sendBookingLifecycleEmails(updatedBooking.id, 'payment_verified')
   }
 
+  await logPaymentAudit({
+    eventType: 'reconcile_succeeded',
+    status: 'success',
+    source: input.source,
+    bookingId: updatedBooking.id,
+    orderId: input.orderId,
+    paymentId: input.paymentId,
+    amount: Number(updatedBooking.total_amount || 0),
+    currency: String(input.gatewayPayment.currency || input.gatewayOrder.currency || 'INR'),
+    message: 'Payment verified successfully',
+  })
+
   return {
     ok: true,
     code: 'processed',
@@ -682,6 +739,18 @@ export async function reconcileFailedPayment(input: ReconcileFailureInput): Prom
     .neq('payment_status', 'fully_paid')
     .select('id, booking_number, booking_status, payment_status, check_in, check_out')
     .single() as any
+
+  await logPaymentAudit({
+    eventType: 'reconcile_failed_payment',
+    status: 'failed',
+    source: input.source,
+    bookingId: booking.id,
+    orderId: input.orderId,
+    paymentId: input.paymentId || null,
+    amount: Number(booking.total_amount || 0),
+    currency: String(input.gatewayPayment?.currency || 'INR'),
+    message: input.reason || 'Payment failed',
+  })
 
   return {
     ok: false,

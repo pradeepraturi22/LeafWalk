@@ -30,6 +30,11 @@ interface PricingMatrixNight {
   MAP: number
   AP: number
 }
+interface PricingMealUnitTotals {
+  breakfast: number
+  lunch: number
+  dinner: number
+}
 interface FormErrors {
   name?: string; email?: string; phone?: string
   checkIn?: string; checkOut?: string
@@ -242,7 +247,7 @@ function BookingContent() {
 
   const [allRooms, setAllRooms]   = useState<Room[]>([])
   const [room, setRoom]           = useState<Room | null>(null)
-  const [pricing,     setPricing]     = useState<{ nights: PricingMatrixNight[]; total: Record<PricingMealPlan, number> } | null>(null)
+  const [pricing,     setPricing]     = useState<{ nights: PricingMatrixNight[]; total: Record<PricingMealPlan, number>; meal_unit_totals?: PricingMealUnitTotals } | null>(null)
   const [loading, setLoading]     = useState(true)
   const [step, setStep]           = useState<1 | 2>(1)
   const [userId, setUserId]       = useState<string | null>(null)
@@ -332,6 +337,7 @@ function BookingContent() {
         room_id: room.id,
         checkInDate: checkIn,
         checkOutDate: checkOut,
+        adults,
       }),
     })
       .then(async (response) => {
@@ -342,7 +348,7 @@ function BookingContent() {
       .catch(() => {
         setPricing(null)
       })
-  }, [room, checkIn, checkOut])
+  }, [room, checkIn, checkOut, adults])
 
   // ── Pre-fill user ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -373,8 +379,12 @@ function BookingContent() {
   useEffect(() => { if (adults > maxAdults) setAdults(maxAdults) }, [numRooms])
 
   // ── Season / rate helpers ─────────────────────────────────────────────────
-  function getMealStayTotal(meal: PricingMealPlan) {
-    return pricing?.total?.[meal] || 0
+  function getMealStayTotal(meal: PublicMealPlan) {
+    const roomOnlyTotal = Number(pricing?.total?.EP || 0)
+    if (meal === 'CP') {
+      return roomOnlyTotal + (Number(pricing?.meal_unit_totals?.breakfast || 0) * adults)
+    }
+    return roomOnlyTotal
   }
 
   const nights  = checkIn && checkOut
@@ -383,22 +393,25 @@ function BookingContent() {
     ? {
         nights: pricing.nights.map((night) => ({
           date: night.date,
-          room_price: night[mealPlan],
+          room_price: night.EP,
           extra_bed_price: night.extra_bed_price,
           child_price: night.child_price,
         })),
-        roomSubtotalPerRoom: pricing.total[mealPlan],
+        roomSubtotalPerRoom: pricing.total.EP,
       }
     : { nights: [], roomSubtotalPerRoom: 0 }
   const roomOnlySubtotalPerRoom = pricing?.total?.EP || stayTariff.roomSubtotalPerRoom
-  const breakfastAddonPerRoom = mealPlan === 'CP'
-    ? Math.max(0, (pricing?.total?.CP || 0) - roomOnlySubtotalPerRoom)
+  const breakfastAddonPerAdult = mealPlan === 'CP'
+    ? Math.max(0, Number(pricing?.meal_unit_totals?.breakfast || 0))
     : 0
-  const breakfastAddonAmount = breakfastAddonPerRoom * numRooms
+  const breakfastAddonAmount = breakfastAddonPerAdult * adults
+  const breakfastAddonLabel = mealPlan === 'CP'
+    ? `Breakfast for ${adults} adult${adults > 1 ? 's' : ''}`
+    : 'Meal add-on'
   const xbRate  = nights > 0 ? Math.round((stayTariff.nights.reduce((sum, night) => sum + (night.extra_bed_price || 0), 0) / nights) * 100) / 100 : 0
   const base    = stayTariff.roomSubtotalPerRoom * numRooms
   const xbAmt   = stayTariff.nights.reduce((sum, night) => sum + (night.extra_bed_price || 0), 0) * autoXbeds
-  const subtotal = base + xbAmt
+  const subtotal = base + breakfastAddonAmount + xbAmt
   const promoDiscount = promoResult?.valid ? (promoResult.discount_amount || 0) : 0
   const discounted = Math.max(0, subtotal - promoDiscount)
   const subtotalExGst = Math.round(discounted * 100) / 100
@@ -1007,7 +1020,7 @@ function BookingContent() {
               roomSubtotalPerRoom={stayTariff.roomSubtotalPerRoom}
               baseRoomSubtotalPerRoom={roomOnlySubtotalPerRoom}
               mealAddonAmount={breakfastAddonAmount}
-              mealAddonLabel="Breakfast add-on"
+              mealAddonLabel={breakfastAddonLabel}
               extraBedAmount={xbAmt}
               promoCode={promoResult?.valid ? promoCode : undefined}
               promoDiscount={promoResult?.valid ? promoDiscount : 0}

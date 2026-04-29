@@ -1,4 +1,4 @@
-'use client'
+ 'use client'
 
 import Image from 'next/image'
 import type { StayTariffNight } from '@/lib/public-tariff'
@@ -84,10 +84,10 @@ export default function BookingSummary({
         )}
 
         {[
-          ['Nights', nights || '—'],
+          ['Nights', nights || '-'],
           ['Rooms', numRooms],
           ['Adults', adults],
-          ['Meal Plan', `${mealPlan} — ${mealLabel}`],
+          ['Meal Plan', `${mealPlan} - ${mealLabel}`],
           ...(autoXbeds > 0 ? [[`Extra Bed${autoXbeds > 1 ? 's' : ''} (auto)`, autoXbeds]] : []),
         ].map(([label, value]) => (
           <div key={String(label)} className="flex justify-between">
@@ -107,54 +107,54 @@ export default function BookingSummary({
                   <span style={{ color: 'rgba(255,255,255,0.55)' }}>
                     {formatDate(`${night.date}T12:00:00`)}
                   </span>
-                  <span className="text-white">₹{night.room_price.toLocaleString()}</span>
+                  <span className="text-white">Rs {night.room_price.toLocaleString()}</span>
                 </div>
               ))}
             </div>
           </div>
 
           <div className="flex justify-between" style={{ color: 'rgba(255,255,255,0.5)' }}>
-            <span>Only Room tariff × {numRooms} room{numRooms > 1 ? 's' : ''}</span>
-            <span>₹{roomSubtotal.toLocaleString()}</span>
+            <span>Only Room tariff x {numRooms} room{numRooms > 1 ? 's' : ''}</span>
+            <span>Rs {roomSubtotal.toLocaleString()}</span>
           </div>
 
           <div className="hidden" style={{ color: 'rgba(255,255,255,0.5)' }}>
-            <span>Room tariff × {numRooms} room{numRooms > 1 ? 's' : ''}</span>
-            <span>₹{roomSubtotal.toLocaleString()}</span>
+            <span>Room tariff x {numRooms} room{numRooms > 1 ? 's' : ''}</span>
+            <span>Rs {roomSubtotal.toLocaleString()}</span>
           </div>
 
           {!!mealAddonAmount && mealAddonAmount > 0 && (
             <div className="flex justify-between" style={{ color: 'rgba(255,255,255,0.5)' }}>
-              <span>{mealAddonLabel || 'Meal add-on'} × {numRooms} room{numRooms > 1 ? 's' : ''}</span>
-              <span>₹{mealAddonAmount.toLocaleString()}</span>
+              <span>{mealAddonLabel || 'Meal add-on'}</span>
+              <span>Rs {mealAddonAmount.toLocaleString()}</span>
             </div>
           )}
 
           {autoXbeds > 0 && (
             <div className="flex justify-between text-amber-400/80">
               <span>Extra bed{autoXbeds > 1 ? 's' : ''}</span>
-              <span>₹{extraBedAmount.toLocaleString()}</span>
+              <span>Rs {extraBedAmount.toLocaleString()}</span>
             </div>
           )}
 
           {!!promoDiscount && promoDiscount > 0 && (
             <div className="flex justify-between font-medium text-green-400">
               <span>Promo{promoCode ? ` (${promoCode})` : ''}</span>
-              <span>−₹{promoDiscount.toLocaleString()}</span>
+              <span>-Rs {promoDiscount.toLocaleString()}</span>
             </div>
           )}
 
           <div className="flex justify-between" style={{ color: 'rgba(255,255,255,0.5)' }}>
             <span>CGST @ 2.5%</span>
-            <span>₹{cgst.toLocaleString()}</span>
+            <span>Rs {cgst.toLocaleString()}</span>
           </div>
           <div className="flex justify-between" style={{ color: 'rgba(255,255,255,0.5)' }}>
             <span>SGST @ 2.5%</span>
-            <span>₹{sgst.toLocaleString()}</span>
+            <span>Rs {sgst.toLocaleString()}</span>
           </div>
           <div className="flex justify-between pt-3 text-lg font-bold text-[#c9a14a]" style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}>
             <span>Total</span>
-            <span>₹{total.toLocaleString()}</span>
+            <span>Rs {total.toLocaleString()}</span>
           </div>
         </div>
       ) : (
