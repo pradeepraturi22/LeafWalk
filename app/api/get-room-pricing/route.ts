@@ -187,17 +187,24 @@ async function buildPricingResponse(input: PricingInput) {
       mealPrices: normalizedMealPriceRows,
     })
 
-    return NextResponse.json({
-      success: true,
-      room_id: room?.id || null,
-      room_name: room?.name || null,
-      room_category: roomCategory,
-      check_in: checkInDate,
-      check_out: checkOutDate,
-      nights: pricing.nights,
-      total: pricing.total,
-      meal_unit_totals: mealUnitTotals,
-    })
+    return NextResponse.json(
+      {
+        success: true,
+        room_id: room?.id || null,
+        room_name: room?.name || null,
+        room_category: roomCategory,
+        check_in: checkInDate,
+        check_out: checkOutDate,
+        nights: pricing.nights,
+        total: pricing.total,
+        meal_unit_totals: mealUnitTotals,
+      },
+      {
+        headers: {
+          'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+        },
+      }
+    )
   } catch (error: any) {
     const { data: legacyRateRows, error: legacyRateError } = await supabase
       .from('room_rates')
@@ -222,18 +229,25 @@ async function buildPricingResponse(input: PricingInput) {
       return NextResponse.json({ error: error.message || 'Price not available' }, { status: 404 })
     }
 
-    return NextResponse.json({
-      success: true,
-      room_id: room?.id || null,
-      room_name: room?.name || null,
-      room_category: roomCategory,
-      check_in: checkInDate,
-      check_out: checkOutDate,
-      nights: fallbackPricing.nights,
-      total: fallbackPricing.total,
-      meal_unit_totals: mealUnitTotals,
-      source: 'seasonal-fallback',
-    })
+    return NextResponse.json(
+      {
+        success: true,
+        room_id: room?.id || null,
+        room_name: room?.name || null,
+        room_category: roomCategory,
+        check_in: checkInDate,
+        check_out: checkOutDate,
+        nights: fallbackPricing.nights,
+        total: fallbackPricing.total,
+        meal_unit_totals: mealUnitTotals,
+        source: 'seasonal-fallback',
+      },
+      {
+        headers: {
+          'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+        },
+      }
+    )
   }
 }
 

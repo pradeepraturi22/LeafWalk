@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getSupabaseAdmin, hasSupabaseServerEnv } from '@/lib/supabaseServer'
 
+export const revalidate = 300
+
 export async function GET() {
   try {
     if (!hasSupabaseServerEnv()) {
@@ -28,7 +30,14 @@ export async function GET() {
       created_at: review.created_at,
     }))
 
-    return NextResponse.json({ reviews })
+    return NextResponse.json(
+      { reviews },
+      {
+        headers: {
+          'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
+        },
+      }
+    )
   } catch (error: any) {
     console.error('Reviews fetch error:', error)
     return NextResponse.json({ error: 'Failed to load reviews' }, { status: 500 })

@@ -42,6 +42,23 @@ function expectsJsonBody(pathname: string) {
   return true
 }
 
+function shouldSkipDurableRateLimit(pathname: string, method: string) {
+  if (method === 'GET') {
+    return (
+      pathname === '/api/rooms' ||
+      pathname === '/api/reviews' ||
+      pathname === '/api/menu' ||
+      pathname === '/api/gallery-images'
+    )
+  }
+
+  return (
+    pathname === '/api/get-room-pricing' ||
+    pathname === '/api/check-availability' ||
+    pathname === '/api/check-availability/calendar'
+  )
+}
+
 function base64UrlToBytes(value: string) {
   const normalized = value.replace(/-/g, '+').replace(/_/g, '/')
   const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=')
@@ -242,19 +259,21 @@ export async function middleware(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403, headers: response.headers })
     }
 
-    try {
-      const result = await consumeRateLimit(request)
-      applyRateLimitHeaders(response, result)
+    if (!shouldSkipDurableRateLimit(pathname, request.method)) {
+      try {
+        const result = await consumeRateLimit(request)
+        applyRateLimitHeaders(response, result)
 
-      if (!result.allowed) {
-        return NextResponse.json(
-          { error: 'Too many requests. Please try again later.', retry_after: result.retryAfter },
-          { status: 429, headers: response.headers }
-        )
-      }
-    } catch {
-      if (process.env.NODE_ENV === 'production' && shouldFailClosedOnRateLimitError(pathname, request.method)) {
-        return NextResponse.json({ error: 'Rate limit service unavailable' }, { status: 503, headers: response.headers })
+        if (!result.allowed) {
+          return NextResponse.json(
+            { error: 'Too many requests. Please try again later.', retry_after: result.retryAfter },
+            { status: 429, headers: response.headers }
+          )
+        }
+      } catch {
+        if (process.env.NODE_ENV === 'production' && shouldFailClosedOnRateLimitError(pathname, request.method)) {
+          return NextResponse.json({ error: 'Rate limit service unavailable' }, { status: 503, headers: response.headers })
+        }
       }
     }
   }

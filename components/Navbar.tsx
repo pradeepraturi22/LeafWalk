@@ -99,10 +99,6 @@ export default function Navbar() {
   }, [])
 
   useEffect(() => {
-    void loadCustomerSession()
-  }, [path])
-
-  useEffect(() => {
     if (!user) return
     const timeoutMs = Number.isFinite(CUSTOMER_IDLE_TIMEOUT_MS) && CUSTOMER_IDLE_TIMEOUT_MS > 0
       ? CUSTOMER_IDLE_TIMEOUT_MS

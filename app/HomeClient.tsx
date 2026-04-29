@@ -82,31 +82,22 @@ export default function HomeClient({ pageName }: { pageName?: string }) {
   const [reviews, setReviews] = useState<ReviewCard[]>(FALLBACK_REVIEWS)
 
   useEffect(() => {
-    fetch('/api/rooms', { cache: 'no-store' })
-      .then(async (response) => {
-        if (!response.ok) throw new Error('Failed to load rooms')
-        return response.json()
-      })
-      .then((payload) => {
-        setRooms((payload.rooms || []) as HomeRoom[])
-      })
-      .catch((error) => {
-        console.error(error)
-        setRooms([])
-      })
+    Promise.all([
+      fetch('/api/rooms'),
+      fetch('/api/reviews'),
+    ])
+      .then(async ([roomsResponse, reviewsResponse]) => {
+        const roomsPayload = roomsResponse.ok ? await roomsResponse.json() : { rooms: [] }
+        const reviewsPayload = reviewsResponse.ok ? await reviewsResponse.json() : { reviews: [] }
 
-    fetch('/api/reviews')
-      .then(async (res) => {
-        if (!res.ok) throw new Error('Failed to load reviews')
-        return res.json()
-      })
-      .then((payload) => {
-        if (payload.reviews?.length) {
-          setReviews(payload.reviews.slice(0, 3))
+        setRooms((roomsPayload.rooms || []) as HomeRoom[])
+        if (reviewsPayload.reviews?.length) {
+          setReviews(reviewsPayload.reviews.slice(0, 3))
         }
       })
       .catch((error) => {
         console.error(error)
+        setRooms([])
       })
   }, [])
 

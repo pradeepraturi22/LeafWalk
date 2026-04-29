@@ -3,6 +3,7 @@ import { getSupabaseAdmin, hasSupabaseServerEnv } from '@/lib/supabaseServer'
 import { logError } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
+export const revalidate = 300
 
 export async function GET() {
   try {
@@ -21,7 +22,14 @@ export async function GET() {
       throw error
     }
 
-    return NextResponse.json({ rooms: data || [] })
+    return NextResponse.json(
+      { rooms: data || [] },
+      {
+        headers: {
+          'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
+        },
+      }
+    )
   } catch (error) {
     logError('Public rooms fetch failed:', error)
     return NextResponse.json({ error: 'Could not load rooms' }, { status: 500 })
