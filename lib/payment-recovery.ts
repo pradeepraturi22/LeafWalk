@@ -5,7 +5,7 @@ import { ensureCustomerAccount } from '@/lib/customer-auth'
 import { validateBookingStatusChange } from '@/lib/booking-status'
 import { logError, logInfo } from '@/lib/logger'
 import { logPaymentAudit } from '@/lib/payment-audit'
-import { buildBookingNumber, buildInvoiceNumber } from '@/lib/reference-numbers'
+import { buildBookingNumber, reserveNextInvoiceNumber } from '@/lib/reference-numbers'
 import { isLocalTestMode, isProduction, isRazorpayTestKey } from '@/lib/runtime-mode'
 import { getSupabaseAdmin } from '@/lib/supabaseServer'
 
@@ -413,8 +413,7 @@ async function createBookingFromStoredDraft(input: ReconcileSuccessInput): Promi
     id: insertedBooking.id,
     createdAt: insertedBooking.created_at || nowIso,
   })
-  const invoiceNumber = buildInvoiceNumber({
-    id: insertedBooking.id,
+  const invoiceNumber = await reserveNextInvoiceNumber({
     paidAt: nowIso,
   })
 
@@ -573,8 +572,7 @@ export async function reconcileSuccessfulPayment(input: ReconcileSuccessInput): 
     id: booking.id,
     createdAt: booking.created_at || nowIso,
   })
-  const invoiceNumber = booking.invoice_number || buildInvoiceNumber({
-    id: booking.id,
+  const invoiceNumber = booking.invoice_number || await reserveNextInvoiceNumber({
     paidAt: nowIso,
   })
 

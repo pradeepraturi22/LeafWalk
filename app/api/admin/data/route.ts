@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabaseServer'
 import { sendTourOperatorWelcomeEmail } from '@/lib/tour-operator-notifications'
 import { sendBookingLifecycleEmails } from '@/lib/booking-email-triggers'
-import { buildBookingNumber, buildHoldBookingNumber } from '@/lib/reference-numbers'
+import { buildBookingNumber, buildHoldBookingNumber, reserveNextInvoiceNumber } from '@/lib/reference-numbers'
 import { logDebug, logError } from '@/lib/logger'
 import { sanitizeEmail, sanitizePhone, sanitizeString, sanitizeUnknown } from '@/lib/security'
 import { validateBookingStatusChange } from '@/lib/booking-status'
@@ -621,7 +621,7 @@ export async function POST(request: NextRequest) {
         }
       }
       const { data, error } = await getSupabaseAdmin()
-        .from('bookings').insert(bookingData).select('id, booking_number').single() as any
+        .from('bookings').insert(bookingData).select('id, booking_number, invoice_number').single() as any
       if (error) throw error
       if (data?.id && !data?.booking_number) {
         const referenceNumber = bookingData.booking_status === 'hold'
@@ -629,6 +629,13 @@ export async function POST(request: NextRequest) {
           : buildBookingNumber({ id: data.id, createdAt: new Date().toISOString() })
         await getSupabaseAdmin().from('bookings').update({ booking_number: referenceNumber }).eq('id', data.id)
         data.booking_number = referenceNumber
+      }
+      if (data?.id && bookingData.payment_status === 'fully_paid' && !data?.invoice_number) {
+        const invoiceNumber = await reserveNextInvoiceNumber({
+          paidAt: bookingData.payment_date || bookingData.advance_paid_at || new Date().toISOString(),
+        })
+        await getSupabaseAdmin().from('bookings').update({ invoice_number: invoiceNumber }).eq('id', data.id)
+        data.invoice_number = invoiceNumber
       }
       if (room_items?.length && data?.id) {
         await getSupabaseAdmin().from('booking_room_items').insert(
@@ -809,7 +816,7 @@ export async function PATCH(request: NextRequest) {
       if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
       const { data: existingBooking } = await getSupabaseAdmin()
         .from('bookings')
-        .select('id, booking_number, booking_status, total_amount, advance_amount, balance_amount, tour_operator_id, room_id, rooms_booked, check_in, check_out')
+        .select('id, booking_number, invoice_number, booking_status, payment_status, total_amount, advance_amount, balance_amount, tour_operator_id, room_id, rooms_booked, check_in, check_out')
         .eq('id', id)
         .single() as any
       if (!existingBooking) return NextResponse.json({ error: 'Booking not found' }, { status: 404 })
@@ -882,6 +889,12 @@ export async function PATCH(request: NextRequest) {
 
       if (nextStatus === 'confirmed' && ['hold', 'pending'].includes(String(existingBooking?.booking_status || ''))) {
         updateData.booking_number = buildBookingNumber({ id, createdAt: new Date().toISOString() })
+      }
+      const nextPaymentStatus = String(updateData.payment_status || existingBooking?.payment_status || '')
+      if (nextPaymentStatus === 'fully_paid' && !existingBooking?.invoice_number) {
+        updateData.invoice_number = await reserveNextInvoiceNumber({
+          paidAt: updateData.payment_date || updateData.advance_paid_at || new Date().toISOString(),
+        })
       }
       const { error } = await getSupabaseAdmin().from('bookings').update(updateData as any).eq('id', id)
       if (error) throw error

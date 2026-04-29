@@ -1,3 +1,5 @@
+import { getSupabaseAdmin } from '@/lib/supabaseServer'
+
 function getFiscalYearParts(date: Date) {
   const year = date.getFullYear()
   const month = date.getMonth() + 1
@@ -32,4 +34,34 @@ export function buildInvoiceNumber(input: { id: string; paidAt?: string | Date |
   const { fiscalYear } = getFiscalYearParts(date)
   const token = sanitizeToken(input.id, 8)
   return `INV/${fiscalYear}/${token}`
+}
+
+export function formatSequentialInvoiceNumber(input: { paidAt?: string | Date | null; sequence: number }) {
+  const date = input.paidAt ? new Date(input.paidAt) : new Date()
+  const { fiscalYear } = getFiscalYearParts(date)
+  const sequence = Math.max(1, Math.trunc(Number(input.sequence || 1)))
+  return `INV/${fiscalYear}/${String(sequence).padStart(4, '0')}`
+}
+
+export async function reserveNextInvoiceNumber(input?: { paidAt?: string | Date | null }) {
+  const date = input?.paidAt ? new Date(input.paidAt) : new Date()
+  const { fiscalYear } = getFiscalYearParts(date)
+
+  const { data, error } = await getSupabaseAdmin().rpc('next_invoice_sequence', {
+    p_fiscal_year: fiscalYear,
+  } as any)
+
+  if (error) {
+    throw new Error(error.message || 'Could not reserve invoice number')
+  }
+
+  const sequence = Array.isArray(data) ? Number(data[0]) : Number(data)
+  if (!Number.isFinite(sequence) || sequence <= 0) {
+    throw new Error('Invalid invoice sequence returned by database')
+  }
+
+  return formatSequentialInvoiceNumber({
+    paidAt: date,
+    sequence,
+  })
 }
