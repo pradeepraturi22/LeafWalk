@@ -35,10 +35,16 @@ function SearchSelect({ options, value, onChange, placeholder, disabled = false 
   const [q, setQ] = useState('')
   const ref = useRef<HTMLDivElement>(null)
   const btnRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
   const [rect, setRect] = useState<DOMRect | null>(null)
 
   useEffect(() => {
-    const fn = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false) }
+    const fn = (e: MouseEvent) => {
+      const target = e.target as Node
+      if (ref.current?.contains(target)) return
+      if (menuRef.current?.contains(target)) return
+      setOpen(false)
+    }
     document.addEventListener('mousedown', fn)
     return () => document.removeEventListener('mousedown', fn)
   }, [])
@@ -74,6 +80,7 @@ function SearchSelect({ options, value, onChange, placeholder, disabled = false 
 
       {open && !disabled && rect && createPortal((
         <div
+          ref={menuRef}
           style={{
             position: 'fixed',
             top: rect.bottom + 4,
