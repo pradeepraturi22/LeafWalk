@@ -32,9 +32,7 @@ function SearchSelect({ options, value, onChange, placeholder, disabled = false 
 }) {
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState('')
-  const ref    = useRef<HTMLDivElement>(null)
-  const btnRef = useRef<HTMLButtonElement>(null)
-  const [rect, setRect] = useState<DOMRect | null>(null)
+  const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const fn = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false) }
@@ -44,37 +42,20 @@ function SearchSelect({ options, value, onChange, placeholder, disabled = false 
 
   const filtered = options.filter(o => o.toLowerCase().includes(q.toLowerCase()))
 
-  function handleOpen() {
-    if (disabled) return
-    if (btnRef.current) setRect(btnRef.current.getBoundingClientRect())
-    setOpen(v => !v)
-  }
-
-  // Recalc position on scroll so dropdown follows button
-  useEffect(() => {
-    if (!open) return
-    const update = () => { if (btnRef.current) setRect(btnRef.current.getBoundingClientRect()) }
-    window.addEventListener('scroll', update, true)
-    return () => window.removeEventListener('scroll', update, true)
-  }, [open])
-
   return (
-    <div ref={ref} className="relative">
-      <button type="button" disabled={disabled} ref={btnRef}
-        onClick={handleOpen}
+    <div ref={ref} className={`relative ${open ? 'z-[120]' : 'z-10'}`}>
+      <button type="button" disabled={disabled}
+        onClick={() => {
+          if (disabled) return
+          setOpen(v => !v)
+        }}
         className={`${S} flex justify-between items-center cursor-pointer text-left ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}>
         <span className={value ? 'text-white' : 'text-white/30'}>{value || placeholder || 'Select…'}</span>
         <span className="text-white/30 text-[10px] ml-2">{open ? '▲' : '▼'}</span>
       </button>
 
-      {open && !disabled && rect && (
-        <div style={{
-          position: 'fixed',
-          top: rect.bottom + 4,
-          left: rect.left,
-          width: rect.width,
-          zIndex: 9999,
-        }} className="bg-[#161616] border border-white/15 rounded-xl shadow-2xl overflow-hidden">
+      {open && !disabled && (
+        <div className="absolute left-0 right-0 top-full mt-1 z-[130] bg-[#161616] border border-white/15 rounded-xl shadow-2xl overflow-hidden">
           <div className="p-2 border-b border-white/10">
             <input autoFocus value={q} onChange={e => setQ(e.target.value)}
               placeholder="Search…"
@@ -104,6 +85,7 @@ function NumInput({ value, onChange, min = 0, max, className = '', disabled = fa
   return (
     <input type="number" min={min} max={max} value={value}
       onFocus={e => e.currentTarget.select()}
+      onClick={e => e.currentTarget.select()}
       onWheel={e => e.currentTarget.blur()}
       onChange={e => {
         const parsed = parseInt(e.target.value) || 0
