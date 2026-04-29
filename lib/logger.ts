@@ -7,15 +7,11 @@ export function logInfo(...args: unknown[]) {
 }
 
 export function logWarn(...args: unknown[]) {
-  if (!isProduction() || isLocalTestMode()) {
-    console.warn(...args)
-  }
+  console.warn(...args)
 }
 
 export function logError(...args: unknown[]) {
-  if (!isProduction() || isLocalTestMode()) {
-    console.error(...args)
-  }
+  console.error(...args)
 }
 
 export function logDebug(...args: unknown[]) {

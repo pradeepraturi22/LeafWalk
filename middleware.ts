@@ -113,7 +113,7 @@ function createNonce() {
 }
 
 function applySecurityHeaders(response: NextResponse, nonce: string) {
-  const scriptDirectives = ["'self'", `'nonce-${nonce}'`, 'https://checkout.razorpay.com', 'https://api.razorpay.com']
+  const scriptDirectives = ["'self'", `'nonce-${nonce}'`, 'https://checkout.razorpay.com', 'https://api.razorpay.com', 'https://cdn.razorpay.com']
   if (allowLocalInlineScripts()) {
     scriptDirectives.splice(2, 0, "'unsafe-inline'")
   }
@@ -141,10 +141,10 @@ function applySecurityHeaders(response: NextResponse, nonce: string) {
       scriptSrc,
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
-      "img-src 'self' data: blob: https://*.supabase.co https://checkout.razorpay.com https://www.google.com https://maps.gstatic.com",
+      "img-src 'self' data: blob: https://*.supabase.co https://checkout.razorpay.com https://cdn.razorpay.com https://www.google.com https://maps.gstatic.com",
       "media-src 'self' blob:",
-      "connect-src 'self' https://*.supabase.co https://api.razorpay.com https://checkout.razorpay.com https://lumberjack.razorpay.com",
-      "frame-src https://api.razorpay.com https://checkout.razorpay.com https://www.google.com https://maps.google.com",
+      "connect-src 'self' https://*.supabase.co https://api.razorpay.com https://checkout.razorpay.com https://cdn.razorpay.com https://lumberjack.razorpay.com",
+      "frame-src https://api.razorpay.com https://checkout.razorpay.com https://cdn.razorpay.com https://www.google.com https://maps.google.com",
       "object-src 'none'",
       "upgrade-insecure-requests",
     ].join('; ')
