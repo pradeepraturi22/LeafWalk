@@ -1,5 +1,6 @@
 'use client'
 import React, { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { supabase } from '@/lib/supabaseClient'
 import Link from 'next/link'
 import toast, { Toaster } from 'react-hot-toast'
@@ -33,6 +34,8 @@ function SearchSelect({ options, value, onChange, placeholder, disabled = false 
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState('')
   const ref = useRef<HTMLDivElement>(null)
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const [rect, setRect] = useState<DOMRect | null>(null)
 
   useEffect(() => {
     const fn = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false) }
@@ -40,13 +43,28 @@ function SearchSelect({ options, value, onChange, placeholder, disabled = false 
     return () => document.removeEventListener('mousedown', fn)
   }, [])
 
+  useEffect(() => {
+    if (!open) return
+    const update = () => {
+      if (btnRef.current) setRect(btnRef.current.getBoundingClientRect())
+    }
+    update()
+    window.addEventListener('resize', update)
+    window.addEventListener('scroll', update, true)
+    return () => {
+      window.removeEventListener('resize', update)
+      window.removeEventListener('scroll', update, true)
+    }
+  }, [open])
+
   const filtered = options.filter(o => o.toLowerCase().includes(q.toLowerCase()))
 
   return (
-    <div ref={ref} className={`relative ${open ? 'z-[120]' : 'z-10'}`}>
-      <button type="button" disabled={disabled}
+    <div ref={ref} className="relative">
+      <button type="button" disabled={disabled} ref={btnRef}
         onClick={() => {
           if (disabled) return
+          if (btnRef.current) setRect(btnRef.current.getBoundingClientRect())
           setOpen(v => !v)
         }}
         className={`${S} flex justify-between items-center cursor-pointer text-left ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}>
@@ -54,8 +72,17 @@ function SearchSelect({ options, value, onChange, placeholder, disabled = false 
         <span className="text-white/30 text-[10px] ml-2">{open ? '▲' : '▼'}</span>
       </button>
 
-      {open && !disabled && (
-        <div className="absolute left-0 right-0 top-full mt-1 z-[130] bg-[#161616] border border-white/15 rounded-xl shadow-2xl overflow-hidden">
+      {open && !disabled && rect && createPortal((
+        <div
+          style={{
+            position: 'fixed',
+            top: rect.bottom + 4,
+            left: rect.left,
+            width: rect.width,
+            zIndex: 2147483647,
+          }}
+          className="bg-[#161616] border border-white/15 rounded-xl shadow-2xl overflow-hidden"
+        >
           <div className="p-2 border-b border-white/10">
             <input autoFocus value={q} onChange={e => setQ(e.target.value)}
               placeholder="Search…"
@@ -72,7 +99,7 @@ function SearchSelect({ options, value, onChange, placeholder, disabled = false 
             {filtered.length === 0 && <div className="px-4 py-3 text-white/30 text-sm">No results</div>}
           </div>
         </div>
-      )}
+      ), document.body)}
     </div>
   )
 }
