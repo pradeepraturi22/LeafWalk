@@ -191,7 +191,6 @@ function CheckoutContent() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          amount: bookingData.total,
           receipt: `lwweb_${Date.now()}`,
           notes: { room_name: room.name },
           booking: {

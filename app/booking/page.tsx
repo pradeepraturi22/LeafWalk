@@ -541,7 +541,6 @@ function BookingContent() {
       const orderRes = await fetch('/api/payments/create-order', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          amount: total,
           receipt: `lwweb_${Date.now()}`,
           notes: { guest: sName, room_name: room!.name },
           booking: {

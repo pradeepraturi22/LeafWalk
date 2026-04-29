@@ -68,10 +68,6 @@ export async function POST(request: NextRequest) {
         email: auth?.user?.email || null,
       })
 
-      if (amount && Math.abs(Number(amount) - preparedDraft.totalAmount) > 0.01) {
-        return NextResponse.json({ error: 'Amount does not match booking total' }, { status: 409 })
-      }
-
       const safeReceipt = sanitizeString(receipt || `lwweb_${Date.now()}`, 40)
       const safeNotes = Object.fromEntries(
         Object.entries(notes || {}).map(([key, value]) => [sanitizeString(key, 50), sanitizeString(value, 100)])
