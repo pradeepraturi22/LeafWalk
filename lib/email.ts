@@ -29,6 +29,10 @@ type BookingLike = {
   booking_number?: string | null
   invoice_number?: string | null
   guest_name: string
+  gst_invoice_requested?: boolean | null
+  gst_company_name?: string | null
+  gst_number?: string | null
+  gst_state?: string | null
   guest_email?: string | null
   guest_phone?: string | null
   room?: { name?: string | null; category?: string | null }

@@ -15,6 +15,10 @@ type BookingEmailContext = {
   payment_status?: string | null
   payment_method?: string | null
   guest_name?: string | null
+  gst_invoice_requested?: boolean | null
+  gst_company_name?: string | null
+  gst_number?: string | null
+  gst_state?: string | null
   guest_email?: string | null
   guest_phone?: string | null
   guest_phone_country?: string | null
@@ -51,7 +55,7 @@ type BookingEmailTrigger =
 
 const BOOKING_EMAIL_SELECT = `
   id, created_at, booking_number, invoice_number, booking_source, booking_type, booking_status, payment_status, payment_method,
-  guest_name, guest_email, guest_phone, guest_phone_country,
+  guest_name, gst_invoice_requested, gst_company_name, gst_number, gst_state, guest_email, guest_phone, guest_phone_country,
   check_in, check_out, nights, rooms_booked, adults, meal_plan,
   total_amount, subtotal, cgst, sgst, gst_total, advance_amount, balance_amount, payment_due_date, razorpay_payment_id, tour_operator_id,
   room:rooms(name, category, featured_image),

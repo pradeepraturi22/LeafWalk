@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf'
 import { readFileSync } from 'fs'
 import { join } from 'path'
+import { getInvoicePartyMeta } from '@/lib/invoice-party'
 import { formatDate } from '@/lib/utils'
 
 type ReceiptBooking = {
@@ -8,6 +9,10 @@ type ReceiptBooking = {
   booking_number?: string | null
   invoice_number?: string | null
   guest_name?: string | null
+  gst_invoice_requested?: boolean | null
+  gst_company_name?: string | null
+  gst_number?: string | null
+  gst_state?: string | null
   guest_email?: string | null
   guest_phone?: string | null
   guest_phone_country?: string | null
@@ -214,6 +219,7 @@ export function createStyledBookingReceiptPdf(booking: ReceiptBooking) {
   const paymentMode = String(booking.payment_method || (isFullyPaid ? 'razorpay' : '-')).replace(/_/g, ' ').toUpperCase()
   const roomName = booking.room?.name || booking.room?.category || 'Room'
   const phone = `${booking.guest_phone_country || ''}${booking.guest_phone || ''}`.trim()
+  const invoiceParty = getInvoicePartyMeta(booking)
   const address = [
     booking.guest_address,
     booking.guest_district,
@@ -287,7 +293,7 @@ export function createStyledBookingReceiptPdf(booking: ReceiptBooking) {
   setDraw(doc, COLORS.border)
   doc.roundedRect(16, 83, 82, 38, 3, 3)
   doc.roundedRect(106, 83, 88, 38, 3, 3)
-  labelValue(doc, 'Guest Name', clean(booking.guest_name), 21, 92, 68)
+  labelValue(doc, isFullyPaid && booking.gst_invoice_requested ? 'Invoice To' : 'Guest Name', clean(invoiceParty.name), 21, 92, 68)
   labelValue(doc, 'Email', clean(booking.guest_email), 21, 104, 68)
   labelValue(doc, 'Phone', clean(phone), 21, 116, 68)
   labelValue(doc, 'Check-in', checkIn, 112, 92, 66)

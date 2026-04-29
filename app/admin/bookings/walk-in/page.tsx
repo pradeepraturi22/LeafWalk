@@ -97,14 +97,22 @@ function SearchSelect({ options, value, onChange, placeholder, disabled = false 
 }
 
 // ── Number input — no scroll ──────────────────────────────────────────────────
-function NumInput({ value, onChange, min = 0, max, className = '' }: {
+function NumInput({ value, onChange, min = 0, max, className = '', disabled = false }: {
   value: number, onChange: (n: number) => void, min?: number, max?: number, className?: string
+  disabled?: boolean
 }) {
   return (
     <input type="number" min={min} max={max} value={value}
+      onFocus={e => e.currentTarget.select()}
       onWheel={e => e.currentTarget.blur()}
-      onChange={e => onChange(Math.max(min, parseInt(e.target.value) || 0))}
-      className={`${S} ${className}`} />
+      onChange={e => {
+        const parsed = parseInt(e.target.value) || 0
+        const clampedMin = Math.max(min, parsed)
+        const clamped = max !== undefined ? Math.min(max, clampedMin) : clampedMin
+        onChange(clamped)
+      }}
+      disabled={disabled}
+      className={`${S} ${disabled ? 'opacity-60 cursor-not-allowed' : ''} ${className}`} />
   )
 }
 
@@ -297,6 +305,25 @@ export default function WalkInBooking() {
   const sgst          = cgst
   const totalAmount   = grossAmt
   const balanceAmt    = Math.max(0, totalAmount - form.advance_amount)
+  const maxRoomsAllowed = Math.max(1, Number(availability?.available_rooms || selRoom?.total_rooms || 1))
+  const maxAdultsAllowed = Math.max(1, form.rooms_booked * 4)
+  const autoExtraBeds = Math.min(Math.max(0, form.adults - (form.rooms_booked * 2)), form.rooms_booked * 2)
+
+  useEffect(() => {
+    if (form.rooms_booked > maxRoomsAllowed) {
+      set('rooms_booked', maxRoomsAllowed)
+    }
+  }, [maxRoomsAllowed])
+
+  useEffect(() => {
+    if (form.adults > maxAdultsAllowed) {
+      set('adults', maxAdultsAllowed)
+      return
+    }
+    if (form.extra_beds !== autoExtraBeds) {
+      set('extra_beds', autoExtraBeds)
+    }
+  }, [form.rooms_booked, form.adults, maxAdultsAllowed, autoExtraBeds])
 
   // ── Validate ──────────────────────────────────────────────────────────────
   function validate() {
@@ -307,6 +334,12 @@ export default function WalkInBooking() {
     if (!form.room_id)   errs.room_id  = 'Select a room'
     if (!form.check_in)  errs.check_in  = 'Check-in required'
     if (!form.check_out) errs.check_out = 'Check-out required'
+    if (form.rooms_booked > maxRoomsAllowed) errs.rooms_booked = `Maximum ${maxRoomsAllowed} room(s) available`
+    if (form.adults > maxAdultsAllowed) errs.adults = `Maximum ${maxAdultsAllowed} adult(s) allowed`
+    if (gstWanted && form.gst_company_name.trim()) {
+      if (!form.gst_number.trim()) errs.gst_number = 'GSTIN required for company invoice'
+      if (!form.gst_state.trim()) errs.gst_state = 'GST state required for company invoice'
+    }
     if (form.check_out && form.check_in && form.check_out <= form.check_in)
       errs.check_out = 'Check-out must be after check-in'
     setErrors(errs)
@@ -355,6 +388,7 @@ export default function WalkInBooking() {
         season_id: rateInfo?.season_id || null,
         ...(mode === 'walk_in' ? { checked_in_at: new Date().toISOString() } : {}),
         ...(gstWanted ? {
+          gst_invoice_requested: true,
           gst_company_name: form.gst_company_name || null,
           gst_number:       form.gst_number       || null,
           gst_state:        form.gst_state         || null,
@@ -506,7 +540,7 @@ export default function WalkInBooking() {
 
               {/* State — India only */}
               {isIndia && (
-                <div>
+                <div className="relative z-50">
                   <label className={LBL}>State</label>
                   <SearchSelect options={states} value={form.guest_state} placeholder="Select state"
                     onChange={v => set('guest_state', v)} />
@@ -515,7 +549,7 @@ export default function WalkInBooking() {
 
               {/* District — India + state selected */}
               {isIndia && form.guest_state && (
-                <div>
+                <div className="relative z-50">
                   <label className={LBL}>District</label>
                   <SearchSelect
                     options={districts}
@@ -560,8 +594,12 @@ export default function WalkInBooking() {
               <div>
                 <label className={LBL}>Number of Rooms</label>
                 <NumInput value={form.rooms_booked}
-                  onChange={v => set('rooms_booked', Math.max(1, v))} min={1}
-                  max={selRoom?.total_rooms || 99} />
+                  onChange={v => set('rooms_booked', Math.max(1, Math.min(maxRoomsAllowed, v)))} min={1}
+                  max={maxRoomsAllowed} />
+                <p className="text-white/35 text-[11px] mt-1">
+                  Maximum {maxRoomsAllowed} room{maxRoomsAllowed > 1 ? 's' : ''} available
+                </p>
+                <Err f="rooms_booked" />
               </div>
 
               <div>
@@ -608,17 +646,24 @@ export default function WalkInBooking() {
           <Section num="3" title="Occupancy">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {([
-                { lbl: 'Adults *',        k: 'adults',            min: 1, note: '' },
+                { lbl: 'Adults *',        k: 'adults',            min: 1, note: `Maximum ${maxAdultsAllowed} adults` },
                 { lbl: 'Children (0–5)',  k: 'children_below_5',  min: 0, note: '✓ Complimentary' },
                 { lbl: 'Children (6–12)', k: 'children_5_to_12',  min: 0, note: 'Charged' },
-                { lbl: 'Extra Beds',      k: 'extra_beds',        min: 0, note: selRoom ? `Max ${(selRoom.max_extra_beds||0)*form.rooms_booked}` : '' },
+                { lbl: 'Extra Beds',      k: 'extra_beds',        min: 0, note: `Auto-added: ${autoExtraBeds}` },
               ] as const).map(({ lbl, k, min, note }) => (
                 <div key={k}>
                   <label className={LBL}>{lbl}</label>
                   {note && (
                     <p className={`text-[10px] mb-1 ${k==='children_below_5' ? 'text-green-400' : 'text-white/40'}`}>{note}</p>
                   )}
-                  <NumInput value={(form as any)[k]} min={min} onChange={v => set(k, v)} />
+                  <NumInput
+                    value={(form as any)[k]}
+                    min={min}
+                    max={k === 'adults' ? maxAdultsAllowed : undefined}
+                    disabled={k === 'extra_beds'}
+                    onChange={v => set(k, v)}
+                  />
+                  <Err f={k} />
                 </div>
               ))}
             </div>
@@ -772,19 +817,24 @@ export default function WalkInBooking() {
                 <div>
                   <label className={LBL}>Company / Firm Name</label>
                   <input type="text" value={form.gst_company_name} className={S}
-                    placeholder="Company name"
+                    placeholder="Optional - leave blank for guest-name invoice"
                     onChange={e => set('gst_company_name', e.target.value)} />
+                  <p className="text-white/35 text-[11px] mt-1">
+                    Blank chhodne par GST invoice guest name par banegi. Company name bharne par GSTIN aur GST state bhi required honge.
+                  </p>
                 </div>
                 <div>
                   <label className={LBL}>GSTIN</label>
                   <input type="text" value={form.gst_number} className={S} maxLength={15}
                     placeholder="22AAAAA0000A1Z5"
                     onChange={e => set('gst_number', e.target.value.toUpperCase())} />
+                  <Err f="gst_number" />
                 </div>
-                <div>
+                <div className="relative z-[80]">
                   <label className={LBL}>GST State</label>
                   <SearchSelect options={states} value={form.gst_state}
                     placeholder="Select state" onChange={v => set('gst_state', v)} />
+                  <Err f="gst_state" />
                 </div>
               </div>
             )}
@@ -845,7 +895,7 @@ export default function WalkInBooking() {
 // ── Section wrapper ───────────────────────────────────────────────────────────
 function Section({ num, title, children }: { num: string, title: string, children: React.ReactNode }) {
   return (
-    <div className="bg-white/5 backdrop-blur rounded-2xl border border-white/10 p-6">
+    <div className="relative z-0 overflow-visible bg-white/5 backdrop-blur rounded-2xl border border-white/10 p-6">
       <h2 className="text-white font-semibold mb-4 flex items-center gap-2 text-sm uppercase tracking-wide">
         <span className="w-6 h-6 bg-[#c9a14a] text-black text-xs rounded-full flex items-center justify-center font-bold shrink-0">
           {num}

@@ -3,6 +3,7 @@
 
 
 import { formatDate } from '@/lib/utils'
+import { getInvoicePartyMeta } from '@/lib/invoice-party'
 
 const RESORT = {
   name:    'LeafWalk Resort',
@@ -72,6 +73,7 @@ export function buildBookingReceiptHtml(
   const sgst        = Number(booking.sgst ?? (taxable ? Math.round(taxable * 0.025 * 100) / 100 : 0))
   const roomItems   = booking.room_items || []
   const hasMulti    = roomItems.length > 1
+  const invoiceParty = getInvoicePartyMeta(booking)
 
   /* ── room detail rows ─────────────────────────────────── */
   const roomRows = hasMulti
@@ -569,7 +571,7 @@ ${includePrintTools ? `<div class="print-tools" style="position:fixed;right:18px
     <!-- Guest + Dates -->
     <div class="top-row">
       <div class="guest-block">
-        <div class="guest-name">${booking.guest_name || '—'}</div>
+        <div class="guest-name">${invoiceParty.name || '—'}</div>
         <div class="guest-contact">
           ${booking.guest_phone ? `📞 ${booking.guest_phone}` : ''}
           ${booking.guest_email ? `<br>✉ ${booking.guest_email}` : ''}
@@ -583,6 +585,8 @@ ${includePrintTools ? `<div class="print-tools" style="position:fixed;right:18px
             return parts.length ? `<br>📍 ${parts.join(', ')}` : ''
           })()}
           ${booking.guest_id_type && booking.guest_id_number ? `<br>🪪 ${booking.guest_id_type.replace(/_/g,' ')}: ${booking.guest_id_number}` : ''}
+          ${!isCheckInPass && isFullyPaid && booking.gst_invoice_requested && invoiceParty.gstNumber ? `<br>GSTIN: ${invoiceParty.gstNumber}` : ''}
+          ${!isCheckInPass && isFullyPaid && booking.gst_invoice_requested && invoiceParty.gstState ? `<br>GST State: ${invoiceParty.gstState}` : ''}
         </div>
         ${operator ? `
         <div style="margin-top:10px;padding:8px 10px;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;font-size:11px">
@@ -697,6 +701,8 @@ ${includePrintTools ? `<div class="print-tools" style="position:fixed;right:18px
         <div class="info-box">
           <div class="ib-body">
             ${!isCheckInPass && isFullyPaid ? `<div class="ib-row"><span class="k">Invoice No.</span><span class="v">${invoiceNo}</span></div>` : ''}
+            ${!isCheckInPass && isFullyPaid && booking.gst_invoice_requested ? `<div class="ib-row"><span class="k">Invoice To</span><span class="v">${invoiceParty.name}</span></div>` : ''}
+            ${!isCheckInPass && isFullyPaid && booking.gst_invoice_requested && invoiceParty.gstNumber ? `<div class="ib-row"><span class="k">GSTIN</span><span class="v">${invoiceParty.gstNumber}</span></div>` : ''}
             <div class="ib-row"><span class="k">Booking No.</span><span class="v">${bookingNo}</span></div>
             <div class="ib-row"><span class="k">Issued On</span><span class="v">${issuedOn}</span></div>
             ${booking.confirmed_at ? `<div class="ib-row"><span class="k">Confirmed</span><span class="v">${fmt(booking.confirmed_at)}</span></div>` : ''}
