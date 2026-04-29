@@ -8,17 +8,11 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 function getGrantSecret() {
-  return process.env.PREVIEW_ACCESS_SECRET || process.env.INTERNAL_API_SECRET || ''
+  return process.env.PREVIEW_ACCESS_SECRET || ''
 }
 
 function getSigningSecret() {
-  return (
-    process.env.PREVIEW_ACCESS_SECRET ||
-    process.env.CUSTOM_AUTH_SECRET ||
-    process.env.AUTH_SESSION_SECRET ||
-    process.env.INTERNAL_API_SECRET ||
-    ''
-  )
+  return process.env.PREVIEW_ACCESS_SECRET || ''
 }
 
 function safeEquals(a: string, b: string) {

@@ -64,11 +64,7 @@ export async function parseJsonBody<T>(request: Request, schema: ZodType<T>) {
 
 export function createAdminSessionValue(userId: string, role: string) {
   const payload = Buffer.from(JSON.stringify({ userId, role, ts: Date.now() })).toString('base64url')
-  const secret =
-    process.env.ADMIN_SESSION_SECRET ||
-    process.env.CUSTOM_AUTH_SECRET ||
-    process.env.AUTH_SESSION_SECRET ||
-    process.env.INTERNAL_API_SECRET
+  const secret = process.env.ADMIN_SESSION_SECRET
   if (!secret) throw new Error('Admin session secret is not configured')
   const signature = crypto.createHmac('sha256', secret).update(payload).digest('base64url')
   return `${payload}.${signature}`

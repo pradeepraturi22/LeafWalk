@@ -4,7 +4,7 @@ import Link from 'next/link'
 export const metadata: Metadata = {
   title: 'Terms & Conditions | LeafWalk Resort',
   description: 'Terms and conditions, booking policies, cancellation policy, and refund policy for LeafWalk Resort, Uttarkashi, Uttarakhand.',
-  alternates: { canonical: 'https://leafwalk.in/terms' },
+  alternates: { canonical: 'https://www.leafwalk.in/terms' },
 }
 
 export default function TermsPage() {

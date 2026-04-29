@@ -9,7 +9,7 @@ import { BookingProvider } from '@/context/BookingContext'
 const playfair = Playfair_Display({ subsets: ['latin'], variable: '--font-playfair', display: 'swap' })
 const jost = Jost({ subsets: ['latin'], weight: ['300', '400', '500', '600', '700'], variable: '--font-jost', display: 'swap' })
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://leafwalk.in'
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.leafwalk.in'
 const siteName = 'LeafWalk Resort'
 
 export const metadata: Metadata = {

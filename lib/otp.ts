@@ -7,7 +7,7 @@ const OTP_RESEND_COOLDOWN_SECONDS = 30
 const OTP_MAX_ATTEMPTS = 5
 
 function getOtpSecret() {
-  const secret = process.env.OTP_SECRET || process.env.CUSTOM_AUTH_SECRET || process.env.AUTH_SESSION_SECRET
+  const secret = process.env.OTP_SECRET || process.env.CUSTOM_AUTH_SECRET
   if (!secret) throw new Error('OTP_SECRET or CUSTOM_AUTH_SECRET is not configured')
   return secret
 }

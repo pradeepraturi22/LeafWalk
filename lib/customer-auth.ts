@@ -29,7 +29,7 @@ type SessionPayload = {
 const CUSTOMER_PROFILE_SELECT = 'id,email,phone,name,role,email_verified,phone_verified,created_at,updated_at'
 
 function getSessionSecret() {
-  const secret = process.env.CUSTOM_AUTH_SECRET || process.env.AUTH_SESSION_SECRET
+  const secret = process.env.CUSTOM_AUTH_SECRET
   if (!secret) {
     throw new Error('CUSTOM_AUTH_SECRET is not configured')
   }

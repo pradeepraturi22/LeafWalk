@@ -1,14 +1,14 @@
 // Company Details for GST Bill
 export const COMPANY_DETAILS = {
   name: "Leafwalk Resort",
-  address: "Village Kanatal, Tehri Garhwal",
-  city: "Uttarakhand",
-  state: "Uttarakhand",
-  pincode: "249130",
-  phone: "+91 8630227541",
-  email: "bookings@leafwalkresort.com",
-  gstin: "05XXXXX1234X1Z5", // TODO: Replace with real GSTIN
-  pan: "XXXXX1234X",        // TODO: Replace with real PAN
+  address: process.env.COMPANY_ADDRESS || "Village Kanatal, Tehri Garhwal",
+  city: process.env.COMPANY_CITY || "Uttarakhand",
+  state: process.env.COMPANY_STATE || "Uttarakhand",
+  pincode: process.env.COMPANY_PINCODE || "249130",
+  phone: process.env.COMPANY_PHONE || "+91 8630227541",
+  email: process.env.COMPANY_EMAIL || "bookings@leafwalk.in",
+  gstin: process.env.COMPANY_GSTIN || "",
+  pan: process.env.COMPANY_PAN || "",
   sacCode: "996311"         // SAC for Hotel accommodation services
 }
 

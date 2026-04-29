@@ -28,11 +28,11 @@ export const siteMetadata: Metadata = {
     address: false,
     telephone: false
   },
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://leafwalkresort.com'),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://www.leafwalk.in'),
   openGraph: {
     type: 'website',
     locale: 'en_IN',
-    url: process.env.NEXT_PUBLIC_SITE_URL || 'https://leafwalkresort.com',
+    url: process.env.NEXT_PUBLIC_SITE_URL || 'https://www.leafwalk.in',
     siteName: 'Leafwalk Resort',
     title: 'Leafwalk Resort | Luxury Mountain Resort in Uttarakhand',
     description: 'Experience luxury in nature. Premium rooms, cottages & suites in Uttarakhand.',
@@ -68,7 +68,7 @@ export const siteMetadata: Metadata = {
     yandex: 'your-yandex-verification-code'
   },
   alternates: {
-    canonical: process.env.NEXT_PUBLIC_SITE_URL || 'https://leafwalkresort.com'
+    canonical: process.env.NEXT_PUBLIC_SITE_URL || 'https://www.leafwalk.in'
   }
 }
 
@@ -78,7 +78,7 @@ export const jsonLd = {
   '@type': 'Hotel',
   name: 'Leafwalk Resort',
   description: 'Luxury mountain resort in Uttarakhand offering premium rooms, cottages and suites.',
-  url: process.env.NEXT_PUBLIC_SITE_URL || 'https://leafwalkresort.com',
+  url: process.env.NEXT_PUBLIC_SITE_URL || 'https://www.leafwalk.in',
   telephone: '+918630227541',
   address: {
     '@type': 'PostalAddress',

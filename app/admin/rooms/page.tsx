@@ -60,18 +60,32 @@ export default function ManageRoomsPage() {
       }
 
       setToken(session.access_token)
-      await loadRooms()
+      await loadRooms(session.access_token)
     } catch (error) {
       console.error('Rooms page auth error:', error)
       window.location.href = '/admin/login'
     }
   }
 
-  async function loadRooms() {
+  async function loadRooms(accessToken = token) {
     setLoading(true)
-    const { data } = await supabase.from('rooms').select('*').order('category').order('name')
-    setRooms((data || []) as Room[])
-    setLoading(false)
+    try {
+      const response = await fetch('/api/admin/data?type=rooms-all', {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+        cache: 'no-store',
+      })
+      const result = await response.json()
+      if (!response.ok) {
+        throw new Error(result?.error || 'Could not load rooms')
+      }
+      setRooms((result.data || []) as Room[])
+    } catch (error: any) {
+      toast.error(error.message || 'Could not load rooms')
+    } finally {
+      setLoading(false)
+    }
   }
 
   if (loading) {

@@ -1,14 +1,18 @@
 import Image from 'next/image'
 import Link from 'next/link'
-import { getSupabaseAdmin } from '@/lib/supabaseServer'
+import { getSupabaseAdmin, hasSupabaseServerEnv } from '@/lib/supabaseServer'
 
 export default async function FoodPage() {
-  const supabase = getSupabaseAdmin()
   let settings: any = null
   let sections: any[] = []
   let items: any[] = []
 
   try {
+    if (!hasSupabaseServerEnv()) {
+      throw new Error('Supabase server environment variables are not configured')
+    }
+
+    const supabase = getSupabaseAdmin()
     const [settingsRes, sectionsRes, itemsRes] = await Promise.all([
       supabase.from('restaurant_menu_settings').select('*').eq('key', 'primary').single(),
       supabase.from('restaurant_menu_sections').select('*').eq('is_active', true).order('sort_order', { ascending: true }),

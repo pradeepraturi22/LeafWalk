@@ -45,6 +45,22 @@ export default function AdminDashboard() {
 
       let verifiedRole = ''
 
+      const response = await fetch('/api/admin/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        cache: 'no-store',
+      })
+      if (response.ok) {
+        const data = await response.json()
+        verifiedRole = data?.role || ''
+      } else if (response.status === 401 || response.status === 403 || response.status === 404) {
+        window.location.href = '/admin/login'
+        return
+      }
+
       // Step 2: Try server-side verification (service role — bypasses all RLS)
       try {
         const res = await fetch('/api/admin/verify', {
@@ -67,12 +83,8 @@ export default function AdminDashboard() {
 
       // Step 3: Fallback — direct DB query if API not available
       if (!verifiedRole) {
-        const { data: u, error: uErr } = await supabase
-          .from('users').select('role').eq('id', session.user.id).single() as any
-        if (uErr) {
-          console.error('users table query error:', uErr.message, uErr.code)
-        }
-        verifiedRole = u?.role || ''
+        window.location.href = '/admin/login'
+        return
       }
 
       if (!verifiedRole || !['admin', 'manager'].includes(verifiedRole)) {
@@ -82,7 +94,7 @@ export default function AdminDashboard() {
       }
 
       setRole(verifiedRole)
-      await loadData()
+      await loadData(session.access_token)
     } catch (err) {
       console.error('Dashboard init error:', err)
       window.location.href = '/admin/login'
@@ -91,20 +103,23 @@ export default function AdminDashboard() {
     }
   }
 
-  async function loadData() {
+  async function loadData(accessToken: string) {
     const today = new Date().toISOString().split('T')[0]
     const mStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]
 
-    const [{ data: bData, error: bErr }, { data: rData }] = await Promise.all([
-      supabase.from('bookings').select(`*, room:rooms(name,category), tour_operator:tour_operators(company_name)`).order('created_at',{ascending:false}),
-      supabase.from('rooms').select('id,name,category,total_rooms,is_active'),
-    ])
+    const response = await fetch('/api/admin/data?type=dashboard', {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      cache: 'no-store',
+    })
+    const result = await response.json()
+    if (!response.ok) {
+      throw new Error(result?.error || 'Could not load dashboard')
+    }
 
-    if (bErr) { console.error('Bookings error:', bErr.message); return }
-
-    const all = bData || []
-    const rooms = rData || []
-    console.log(`Loaded ${all.length} bookings, ${rooms.length} rooms`)
+    const all = result.allBookings || []
+    const rooms = result.rooms || []
 
     const active = all.filter(isActive)
     const totalRooms = rooms.reduce((s:number,r:any) => s + Number(r.total_rooms||0), 0)
@@ -133,7 +148,7 @@ export default function AdminDashboard() {
       occ: totalRooms > 0 ? Math.round(bookedRooms/totalRooms*100) : 0,
       totalRooms, bookedRooms, todayRev, monthRev, pendingBal, totalSettled,
     })
-    setRecent(all.slice(0,12))
+    setRecent((result.recent || all).slice(0,12))
     setTodayAct({
       checkIns: active.filter((b:any) => b.check_in===today),
       checkOuts: active.filter((b:any) => b.check_out===today),

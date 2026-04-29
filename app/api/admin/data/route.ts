@@ -274,6 +274,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ data })
     }
 
+    if (type === 'rooms-all') {
+      const { data, error } = await getSupabaseAdmin()
+        .from('rooms')
+        .select('*')
+        .order('category')
+        .order('name')
+      if (error) throw error
+      return NextResponse.json({ data: data || [] })
+    }
+
     if (type === 'operators' || type === 'active-operators') {
       let query = getSupabaseAdmin()
         .from('tour_operators')
@@ -466,6 +476,48 @@ export async function GET(request: NextRequest) {
         .order('created_at', { ascending: false })
       if (error) throw error
       return NextResponse.json({ data: data || [] })
+    }
+
+    if (type === 'tariff-data') {
+      const [dateRates, mealPrices, seasons, tourRates] = await Promise.all([
+        getSupabaseAdmin()
+          .from('room_rates')
+          .select('id,room_category,rate_type,rate_date,base_price,extra_bed_price,child_price')
+          .in('rate_type', ['lwweb', 'ota', 'b2c'])
+          .not('rate_date', 'is', null)
+          .order('rate_date', { ascending: false })
+          .limit(90) as any,
+        getSupabaseAdmin()
+          .from('meal_prices')
+          .select('id,meal_type,price,applicable_from,applicable_to')
+          .order('meal_type')
+          .order('applicable_from', { ascending: false }) as any,
+        getSupabaseAdmin()
+          .from('seasons')
+          .select('id,label,name,start_month,start_day,end_month,end_day,sort_order')
+          .order('sort_order') as any,
+        getSupabaseAdmin()
+          .from('room_rates')
+          .select('id,room_category,season_id,meal_plan,rate_type,price_per_night,extra_bed_price,child_5_12_price')
+          .eq('rate_type', 'b2b')
+          .not('season_id', 'is', null)
+          .not('meal_plan', 'is', null)
+          .order('room_category')
+          .order('season_id')
+          .order('meal_plan') as any,
+      ])
+
+      if (dateRates.error) throw dateRates.error
+      if (mealPrices.error) throw mealPrices.error
+      if (seasons.error) throw seasons.error
+      if (tourRates.error) throw tourRates.error
+
+      return NextResponse.json({
+        dateRates: dateRates.data || [],
+        mealPrices: mealPrices.data || [],
+        seasons: seasons.data || [],
+        tourRates: tourRates.data || [],
+      })
     }
 
     return NextResponse.json({ error: 'Invalid type' }, { status: 400 })

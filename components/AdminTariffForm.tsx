@@ -67,21 +67,33 @@ export default function AdminTariffForm() {
 
   async function loadData() {
     setLoading(true)
-    const [roomRes, mealRes, seasonRes, tourRes] = await Promise.all([
-      supabase.from('room_rates').select('id,room_category,rate_type,rate_date,base_price,extra_bed_price,child_price').in('rate_type', ['lwweb', 'ota', 'b2c']).not('rate_date', 'is', null).order('rate_date', { ascending: false }).limit(90) as any,
-      supabase.from('meal_prices').select('id,meal_type,price,applicable_from,applicable_to').order('meal_type').order('applicable_from', { ascending: false }).limit(30) as any,
-      supabase.from('seasons').select('id,label,name,start_month,start_day,end_month,end_day,sort_order').order('sort_order') as any,
-      supabase.from('room_rates').select('id,room_category,season_id,meal_plan,rate_type,price_per_night,extra_bed_price,child_5_12_price').eq('rate_type', 'b2b').not('season_id', 'is', null).not('meal_plan', 'is', null).order('room_category').order('season_id').order('meal_plan') as any,
-    ])
-    if (roomRes.error) toast.error(roomRes.error.message)
-    if (mealRes.error) toast.error(mealRes.error.message)
-    if (seasonRes.error) toast.error(seasonRes.error.message)
-    if (tourRes.error) toast.error(tourRes.error.message)
-    setDateRates((roomRes.data || []) as DateWiseRateRow[])
-    setMealPrices((mealRes.data || []) as MealPriceRow[])
-    setSeasons((seasonRes.data || []) as SeasonRow[])
-    setTourRates((tourRes.data || []) as TourOperatorRateRow[])
-    setLoading(false)
+    try {
+      const token = await getToken()
+      if (!token) {
+        toast.error('Admin session expired')
+        return
+      }
+
+      const response = await fetch('/api/admin/data?type=tariff-data', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        cache: 'no-store',
+      })
+      const result = await response.json()
+      if (!response.ok) {
+        throw new Error(result?.error || 'Could not load tariff data')
+      }
+
+      setDateRates((result.dateRates || []) as DateWiseRateRow[])
+      setMealPrices((result.mealPrices || []) as MealPriceRow[])
+      setSeasons((result.seasons || []) as SeasonRow[])
+      setTourRates((result.tourRates || []) as TourOperatorRateRow[])
+    } catch (error: any) {
+      toast.error(error.message || 'Could not load tariff data')
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => { void loadData() }, [])

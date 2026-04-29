@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     return NextResponse.json({
       success: false,
-      error: { code: 'VERIFY_FAILED', message: error.message || 'Verification failed' },
+      error: { code: 'VERIFY_FAILED', message: 'Verification failed' },
     }, { status: 500 })
   }
 }

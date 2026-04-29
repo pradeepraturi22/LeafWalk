@@ -1,6 +1,14 @@
 import { createClient } from '@supabase/supabase-js'
 import { isDevelopment } from '@/lib/runtime-mode'
 
+export function hasSupabaseAnonEnv() {
+  return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+}
+
+export function hasSupabaseServerEnv() {
+  return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY)
+}
+
 function applyLocalSupabaseTlsWorkaround() {
   // LOCAL DEVELOPMENT ONLY
   // REMOVE / DISABLE FOR PRODUCTION
@@ -19,7 +27,7 @@ export function getSupabaseAnon() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-  if (!supabaseUrl || !anonKey) {
+  if (!hasSupabaseAnonEnv() || !supabaseUrl || !anonKey) {
     throw new Error('Supabase anon environment variables are not configured')
   }
 
@@ -35,7 +43,7 @@ export function getSupabaseAdmin() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-  if (!supabaseUrl || !serviceRoleKey) {
+  if (!hasSupabaseServerEnv() || !supabaseUrl || !serviceRoleKey) {
     throw new Error('Supabase server environment variables are not configured')
   }
 

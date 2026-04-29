@@ -36,6 +36,12 @@ function shouldFailClosedOnRateLimitError(pathname: string, method: string) {
   return method !== 'GET'
 }
 
+function expectsJsonBody(pathname: string) {
+  if (pathname === '/api/admin/content-upload') return false
+  if (pathname === '/api/payments/webhook') return false
+  return true
+}
+
 function base64UrlToBytes(value: string) {
   const normalized = value.replace(/-/g, '+').replace(/_/g, '/')
   const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=')
@@ -52,11 +58,7 @@ async function verifyAdminSessionCookie(value?: string) {
   const [payload, signature] = value.split('.')
   if (!payload || !signature) return false
 
-  const secret =
-    process.env.ADMIN_SESSION_SECRET ||
-    process.env.CUSTOM_AUTH_SECRET ||
-    process.env.AUTH_SESSION_SECRET ||
-    process.env.INTERNAL_API_SECRET
+  const secret = process.env.ADMIN_SESSION_SECRET
   if (!secret) return false
 
   try {
@@ -83,11 +85,7 @@ async function verifyPreviewAccessCookie(value?: string) {
   const [payload, signature] = value.split('.')
   if (!payload || !signature) return false
 
-  const secret =
-    process.env.PREVIEW_ACCESS_SECRET ||
-    process.env.CUSTOM_AUTH_SECRET ||
-    process.env.AUTH_SESSION_SECRET ||
-    process.env.INTERNAL_API_SECRET
+  const secret = process.env.PREVIEW_ACCESS_SECRET
   if (!secret) return false
 
   try {
@@ -228,7 +226,7 @@ export async function middleware(request: NextRequest) {
   if (pathname.startsWith('/api/')) {
     if (request.method === 'POST' || request.method === 'PATCH' || request.method === 'PUT') {
       const contentType = request.headers.get('content-type') || ''
-      if (!contentType.includes('application/json')) {
+      if (expectsJsonBody(pathname) && !contentType.includes('application/json')) {
         return NextResponse.json({ error: 'Content-Type must be application/json' }, { status: 415, headers: response.headers })
       }
     }

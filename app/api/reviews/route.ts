@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server'
-import { getSupabaseAdmin } from '@/lib/supabaseServer'
+import { getSupabaseAdmin, hasSupabaseServerEnv } from '@/lib/supabaseServer'
 
 export async function GET() {
   try {
+    if (!hasSupabaseServerEnv()) {
+      return NextResponse.json({ reviews: [] })
+    }
+
     const { data, error } = await getSupabaseAdmin()
       .from('reviews')
       .select('id, rating, title, comment, reviewer_name, reviewer_image, created_at')
@@ -27,6 +31,6 @@ export async function GET() {
     return NextResponse.json({ reviews })
   } catch (error: any) {
     console.error('Reviews fetch error:', error)
-    return NextResponse.json({ error: error.message || 'Failed to load reviews' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to load reviews' }, { status: 500 })
   }
 }

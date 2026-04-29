@@ -130,9 +130,32 @@ export default function Navbar() {
     // Try fast: user_metadata first
     const meta = (await supabase.auth.getUser()).data.user?.user_metadata
     if (meta?.role) { setUserRole(meta.role); return }
-    // Fallback: DB
-    const { data } = await supabase.from('users').select('role').eq('id', userId).single() as any
-    if (data?.role) setUserRole(data.role)
+
+    if (!token) {
+      setUserRole('')
+      return
+    }
+
+    try {
+      const response = await fetch('/api/admin/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        cache: 'no-store',
+      })
+
+      if (!response.ok) {
+        setUserRole('')
+        return
+      }
+
+      const result = await response.json()
+      if (result?.role) setUserRole(result.role)
+    } catch {
+      setUserRole('')
+    }
   }
 
   const isAdmin = ['admin', 'manager'].includes(userRole)

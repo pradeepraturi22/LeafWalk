@@ -4,7 +4,7 @@ import Link from 'next/link'
 export const metadata: Metadata = {
   title: 'Privacy Policy | LeafWalk Resort',
   description: 'Privacy policy for LeafWalk Resort. How we collect, use, and protect your personal information.',
-  alternates: { canonical: 'https://leafwalk.in/privacy' },
+  alternates: { canonical: 'https://www.leafwalk.in/privacy' },
 }
 
 export default function PrivacyPage() {

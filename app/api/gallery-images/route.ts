@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server'
-import { getSupabaseAdmin } from '@/lib/supabaseServer'
+import { getSupabaseAdmin, hasSupabaseServerEnv } from '@/lib/supabaseServer'
 
 export async function GET() {
   try {
+    if (!hasSupabaseServerEnv()) {
+      return NextResponse.json({ images: [] })
+    }
+
     const { data, error } = await getSupabaseAdmin()
       .from('gallery_images')
       .select('id, title, description, image_url, category, is_featured, display_order')
@@ -17,6 +21,6 @@ export async function GET() {
     return NextResponse.json({ images: data || [] })
   } catch (error: any) {
     console.error('Gallery images fetch error:', error)
-    return NextResponse.json({ error: error.message || 'Failed to load gallery images' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to load gallery images' }, { status: 500 })
   }
 }

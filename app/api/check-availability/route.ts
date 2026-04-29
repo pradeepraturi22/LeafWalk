@@ -46,7 +46,7 @@ export async function POST(req: Request) {
     }
 
     if (error.message === 'Could not fetch room inventory' || error.message === 'Could not check availability') {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Could not check availability' }, { status: 500 })
     }
 
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
