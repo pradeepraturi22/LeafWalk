@@ -877,7 +877,7 @@ export default function WalkInBooking() {
 // ── Section wrapper ───────────────────────────────────────────────────────────
 function Section({ num, title, children }: { num: string, title: string, children: React.ReactNode }) {
   return (
-    <div className="relative z-0 overflow-visible bg-white/5 backdrop-blur rounded-2xl border border-white/10 p-6">
+    <div className="relative overflow-visible bg-white/5 backdrop-blur rounded-2xl border border-white/10 p-6">
       <h2 className="text-white font-semibold mb-4 flex items-center gap-2 text-sm uppercase tracking-wide">
         <span className="w-6 h-6 bg-[#c9a14a] text-black text-xs rounded-full flex items-center justify-center font-bold shrink-0">
           {num}
