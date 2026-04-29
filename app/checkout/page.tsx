@@ -187,69 +187,59 @@ function CheckoutContent() {
     setProcessing(true)
 
     try {
-      const bookingResponse = await fetch('/api/bookings/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: user?.id || null,
-          room_id: bookingData.room_id,
-          check_in: toLocalDateString(bookingData.check_in),
-          check_out: toLocalDateString(bookingData.check_out),
-          nights: bookingData.nights,
-          guests: 2,
-          rooms_booked: bookingData.rooms,
-          total_amount: bookingData.total,
-          subtotal: bookingData.subtotal,
-          cgst: bookingData.cgst,
-          sgst: bookingData.sgst,
-          gst_total: bookingData.gst,
-          meal_plan: bookingData.meal_plan,
-          rate_per_room_per_night: bookingData.pricePerRoom,
-          booking_status: 'pending',
-          payment_status: 'pending',
-          booking_source: 'online',
-          special_requests: formData.special_requests || null,
-          guest_name: formData.name,
-          guest_email: formData.email,
-          guest_phone: formData.phone,
-        }),
-      })
-
-      const bookingResult = await bookingResponse.json()
-      if (!bookingResponse.ok || !bookingResult.success) {
-        throw new Error(bookingResult.error || 'Failed to create booking')
-      }
-
-      const booking = bookingResult.booking || { id: bookingResult.booking_id }
-
       const orderResponse = await fetch('/api/payments/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          booking_id: booking.id,
           amount: bookingData.total,
-          receipt: `booking_${booking.id}`,
+          receipt: `lwweb_${Date.now()}`,
           notes: { room_name: room.name },
+          booking: {
+            room_id: bookingData.room_id,
+            check_in: toLocalDateString(bookingData.check_in),
+            check_out: toLocalDateString(bookingData.check_out),
+            nights: bookingData.nights,
+            rooms_booked: bookingData.rooms,
+            adults: 2,
+            children_below_5: 0,
+            children_5_to_12: 0,
+            children_above_12: 0,
+            extra_beds: 0,
+            meal_plan: bookingData.meal_plan,
+            booking_source: 'website',
+            special_requests: formData.special_requests || null,
+            guest_name: formData.name,
+            guest_email: formData.email,
+            guest_phone: formData.phone,
+            guest_phone_country: '+91',
+            discount_amount: 0,
+            discount_percent: 0,
+            discount_reason: null,
+            promo_code: null,
+          },
         }),
       })
 
       const orderData = await orderResponse.json()
-      if (!orderData.success) {
-        throw new Error('Failed to create payment order')
+      if (!orderResponse.ok || !orderData.success) {
+        throw new Error(orderData.error || 'Failed to create payment order')
       }
 
       await initiateRazorpayPayment({
-        amount: bookingData.total,
+        amount: Number(orderData.total_amount || bookingData.total),
         orderId: orderData.order.id,
-        bookingId: booking.id,
         userDetails: {
           name: formData.name,
           email: formData.email,
           contact: formData.phone,
         },
-        onSuccess: async () => {
+        onSuccess: async (_response, verificationResult) => {
+          const bookingId = verificationResult?.booking?.id
+          if (!bookingId) {
+            throw new Error('Booking confirmation did not complete')
+          }
           toast.success('Payment successful! Redirecting...')
-          const redirectTo = await resolvePostPaymentRedirect(booking.id)
+          const redirectTo = await resolvePostPaymentRedirect(bookingId)
           setTimeout(() => router.push(redirectTo), 2000)
         },
         onFailure: (error) => {

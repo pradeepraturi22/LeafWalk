@@ -24,7 +24,8 @@ export function loadRazorpayScript(): Promise<boolean> {
 }
 
 export interface CreateOrderParams {
-  booking_id: string
+  booking_id?: string
+  booking?: Record<string, unknown>
   amount: number
   currency?: string
   receipt?: string
@@ -35,7 +36,7 @@ export interface PaymentSuccessParams {
   razorpay_payment_id: string
   razorpay_order_id: string
   razorpay_signature: string
-  booking_id: string
+  booking_id?: string
 }
 
 const LAST_CONFIRMED_BOOKING_KEY = 'leafwalk_last_confirmed_booking'
@@ -100,13 +101,13 @@ export async function verifyPayment(params: PaymentSuccessParams) {
 export interface InitiatePaymentParams {
   amount: number
   orderId: string
-  bookingId: string
+  bookingId?: string
   userDetails: {
     name: string
     email: string
     contact: string
   }
-  onSuccess: (response: RazorpayResponse) => void
+  onSuccess: (response: RazorpayResponse, verificationResult: any) => void
   onFailure: (error: any) => void
 }
 
@@ -125,7 +126,7 @@ export async function initiateRazorpayPayment(params: InitiatePaymentParams) {
     amount: amount * 100, // Convert to paise
     currency: 'INR',
     name: 'Leafwalk Resort',
-    description: `Booking Payment - ${bookingId.slice(0, 8)}`,
+    description: `Booking Payment - ${(bookingId || orderId).slice(0, 8)}`,
     order_id: orderId,
     handler: async function (response: RazorpayResponse) {
       try {
@@ -134,11 +135,11 @@ export async function initiateRazorpayPayment(params: InitiatePaymentParams) {
           razorpay_payment_id: response.razorpay_payment_id,
           razorpay_order_id: response.razorpay_order_id,
           razorpay_signature: response.razorpay_signature,
-          booking_id: bookingId
+          ...(bookingId ? { booking_id: bookingId } : {})
         })
 
         if (verificationResult.success) {
-          onSuccess(response)
+          onSuccess(response, verificationResult)
         } else {
           onFailure(new Error('Payment verification failed'))
         }

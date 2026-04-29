@@ -205,6 +205,19 @@ async function markBookingPaymentProcessing(bookingId: string, orderId: string) 
     .neq('payment_status', 'fully_paid')
 }
 
+async function fetchStoredWebsiteBookingDraft(orderId: string) {
+  const { data } = await getSupabaseAdmin()
+    .from('processed_payment_events')
+    .select('id, booking_id, payload_json, processed_at')
+    .eq('event_type', 'booking_draft')
+    .eq('razorpay_order_id', orderId)
+    .order('processed_at', { ascending: false })
+    .limit(1)
+    .maybeSingle() as any
+
+  return data || null
+}
+
 async function applyPromoUsageOnce(input: {
   bookingId: string
   promoCode?: string | null
@@ -271,12 +284,193 @@ async function buildOrLinkCustomer(booking: any) {
   }
 }
 
+async function createBookingFromStoredDraft(input: ReconcileSuccessInput): Promise<ReconcileResult> {
+  const supabase = getSupabaseAdmin()
+  const storedDraft = await fetchStoredWebsiteBookingDraft(input.orderId)
+
+  const preparedDraft = storedDraft?.payload_json?.preparedDraft
+  const bookingPayload = preparedDraft?.bookingPayload
+  if (!bookingPayload) {
+    return { ok: false, code: 'not_found', message: 'Booking draft not found for payment reconciliation' }
+  }
+
+  const draftTotalAmount = Number(preparedDraft.totalAmount || bookingPayload.total_amount || 0)
+  const expectedAmountPaise = Math.round(draftTotalAmount * 100)
+  if (Number(input.gatewayPayment.amount) !== expectedAmountPaise || Number(input.gatewayOrder.amount) !== expectedAmountPaise) {
+    return { ok: false, code: 'amount_mismatch', message: 'Gateway amount does not match booking total' }
+  }
+
+  const creationClaim = await reserveWebhookEvent({
+    eventKey: `booking-create:${input.orderId}`,
+    eventType: 'booking_create',
+    paymentId: input.paymentId,
+    orderId: input.orderId,
+    payload: { source: input.source },
+  })
+
+  if (!creationClaim.claimed) {
+    const existingBooking = await fetchBookingForPaymentLookup({ orderId: input.orderId })
+    if (existingBooking?.payment_status === 'fully_paid') {
+      return {
+        ok: true,
+        code: 'already_processed',
+        message: 'Payment already processed',
+        booking: existingBooking,
+        customerUserId: existingBooking.user_id || null,
+      }
+    }
+    return {
+      ok: false,
+      code: 'conflict',
+      message: 'Booking creation is already being processed for this payment',
+      booking: existingBooking || undefined,
+    }
+  }
+
+  const existingBooking = await fetchBookingForPaymentLookup({ orderId: input.orderId })
+  if (existingBooking?.payment_status === 'fully_paid') {
+    return {
+      ok: true,
+      code: 'already_processed',
+      message: 'Payment already processed',
+      booking: existingBooking,
+      customerUserId: existingBooking.user_id || null,
+    }
+  }
+
+  const customerUserId = bookingPayload.user_id || await buildOrLinkCustomer(bookingPayload)
+  const nowIso = new Date().toISOString()
+  const today = nowIso.split('T')[0]
+
+  const insertPayload: Record<string, any> = {
+    ...bookingPayload,
+    payment_status: 'fully_paid',
+    booking_status: 'confirmed',
+    payment_method: 'razorpay',
+    advance_amount: bookingPayload.total_amount,
+    balance_amount: 0,
+    advance_paid_at: nowIso,
+    payment_date: today,
+    payment_ref: input.paymentId,
+    payment_id: input.paymentId,
+    razorpay_payment_id: input.paymentId,
+    razorpay_order_id: input.orderId,
+    razorpay_signature: input.paymentSignature || null,
+    confirmed_at: nowIso,
+    updated_at: nowIso,
+    user_id: customerUserId || bookingPayload.user_id || null,
+  }
+
+  const { data: insertedBooking, error: insertError } = await supabase
+    .from('bookings')
+    .insert(insertPayload)
+    .select(`
+      id, user_id, created_at, booking_number, invoice_number, total_amount, subtotal, cgst, sgst, gst_total,
+      promo_code, discount_amount, payment_status, booking_status, payment_method, razorpay_order_id, razorpay_payment_id,
+      guest_name, guest_email, guest_phone, guest_phone_country, check_in, check_out, nights, rooms_booked, adults, meal_plan,
+      advance_amount, balance_amount, room:rooms(name, category, featured_image)
+    `)
+    .single() as any
+
+  if (insertError) {
+    const latestBooking = await fetchBookingForPaymentLookup({ orderId: input.orderId })
+    if (latestBooking?.payment_status === 'fully_paid') {
+      return {
+        ok: true,
+        code: 'already_processed',
+        message: 'Payment already processed',
+        booking: latestBooking,
+        customerUserId: latestBooking.user_id || null,
+      }
+    }
+    throw new Error(insertError.message || 'Failed to create booking after payment')
+  }
+
+  const bookingNumber = buildBookingNumber({
+    id: insertedBooking.id,
+    createdAt: insertedBooking.created_at || nowIso,
+  })
+  const invoiceNumber = buildInvoiceNumber({
+    id: insertedBooking.id,
+    paidAt: nowIso,
+  })
+
+  const { data: finalizedBooking, error: finalizeError } = await supabase
+    .from('bookings')
+    .update({
+      booking_number: bookingNumber,
+      invoice_number: invoiceNumber,
+      updated_at: nowIso,
+    } as any)
+    .eq('id', insertedBooking.id)
+    .select(`
+      id, user_id, created_at, booking_number, invoice_number, total_amount, subtotal, cgst, sgst, gst_total,
+      promo_code, discount_amount, payment_status, booking_status, payment_method, razorpay_order_id, razorpay_payment_id,
+      guest_name, guest_email, guest_phone, guest_phone_country, check_in, check_out, nights, rooms_booked, adults, meal_plan,
+      advance_amount, balance_amount, room:rooms(name, category, featured_image)
+    `)
+    .single() as any
+
+  if (finalizeError || !finalizedBooking) {
+    throw new Error(finalizeError?.message || 'Failed to finalize booking reference numbers')
+  }
+
+  await supabase.from('payments').upsert({
+    booking_id: finalizedBooking.id,
+    amount: Number(finalizedBooking.total_amount),
+    currency: String(input.gatewayPayment.currency || input.gatewayOrder.currency || 'INR'),
+    payment_type: 'full',
+    payment_method: 'razorpay',
+    razorpay_order_id: input.orderId,
+    razorpay_payment_id: input.paymentId,
+    razorpay_signature: input.paymentSignature || null,
+    status: 'success',
+  }, { onConflict: 'razorpay_payment_id' })
+
+  await supabase.from('booking_payments').upsert({
+    booking_id: finalizedBooking.id,
+    booking_number: finalizedBooking.booking_number,
+    payment_type: 'final',
+    amount: Number(finalizedBooking.total_amount),
+    payment_method: 'razorpay',
+    payment_ref: input.paymentId,
+    payment_date: today,
+    notes: `Online payment reconciled via Razorpay (${input.source})`,
+  }, { onConflict: 'payment_method,payment_ref' })
+
+  await supabase
+    .from('processed_payment_events')
+    .update({ booking_id: finalizedBooking.id } as any)
+    .eq('event_type', 'booking_draft')
+    .eq('razorpay_order_id', input.orderId)
+
+  await applyPromoUsageOnce({
+    bookingId: finalizedBooking.id,
+    promoCode: finalizedBooking.promo_code,
+    guestPhone: finalizedBooking.guest_phone,
+    guestEmail: finalizedBooking.guest_email,
+    discountAmount: finalizedBooking.discount_amount,
+  })
+
+  if (finalizedBooking.guest_email) {
+    await sendBookingLifecycleEmails(finalizedBooking.id, 'payment_verified')
+  }
+
+  return {
+    ok: true,
+    code: 'processed',
+    message: 'Payment verified successfully',
+    booking: finalizedBooking,
+    customerUserId,
+  }
+}
+
 export async function reconcileSuccessfulPayment(input: ReconcileSuccessInput): Promise<ReconcileResult> {
   const supabase = getSupabaseAdmin()
   const booking = await fetchBookingForPaymentLookup({ bookingId: input.bookingId, orderId: input.orderId })
 
   if (!booking) {
-    return { ok: false, code: 'not_found', message: 'Booking not found for payment reconciliation' }
+    return createBookingFromStoredDraft(input)
   }
 
   if (!booking.razorpay_order_id || booking.razorpay_order_id !== input.orderId || input.gatewayOrder.id !== input.orderId) {
