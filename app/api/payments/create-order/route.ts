@@ -118,10 +118,15 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    if (!booking_id) {
+      return NextResponse.json({ error: 'Booking not found' }, { status: 404 })
+    }
+
+    const existingBookingId = booking_id
     const { data: existingBooking, error: bookingError } = await supabase
       .from('bookings')
       .select('id, total_amount, payment_status, guest_name, razorpay_order_id')
-      .eq('id', booking_id)
+      .eq('id', existingBookingId)
       .single() as any
 
     if (bookingError || !existingBooking) {
@@ -156,12 +161,12 @@ export async function POST(request: NextRequest) {
               payment_method: 'razorpay',
               updated_at: new Date().toISOString(),
             } as any)
-            .eq('id', booking_id)
+            .eq('id', existingBookingId)
             .neq('payment_status', 'fully_paid')
 
           return NextResponse.json({
             success: true,
-            booking_id,
+            booking_id: existingBookingId,
             order: {
               id: existingOrder.id,
               amount: existingOrder.amount,
@@ -174,7 +179,7 @@ export async function POST(request: NextRequest) {
       } catch {}
     }
 
-    const safeReceipt = sanitizeString(receipt || `booking_${booking_id}`, 40)
+    const safeReceipt = sanitizeString(receipt || `booking_${existingBookingId}`, 40)
     const safeNotes = Object.fromEntries(
       Object.entries(notes || {}).map(([key, value]) => [sanitizeString(key, 50), sanitizeString(value, 100)])
     )
@@ -184,7 +189,7 @@ export async function POST(request: NextRequest) {
       currency: 'INR',
       receipt: safeReceipt,
       notes: {
-        booking_id,
+        booking_id: existingBookingId,
         ...safeNotes,
       },
     })
@@ -197,7 +202,7 @@ export async function POST(request: NextRequest) {
         payment_method: 'razorpay',
         updated_at: new Date().toISOString(),
       })
-      .eq('id', booking_id)
+      .eq('id', existingBookingId)
 
     if (updateError) {
       return NextResponse.json({ error: 'Failed to link payment order to booking' }, { status: 500 })
@@ -205,7 +210,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      booking_id,
+      booking_id: existingBookingId,
       order: {
         id: order.id,
         amount: order.amount,
@@ -216,6 +221,25 @@ export async function POST(request: NextRequest) {
     })
   } catch (error: any) {
     logError('Error creating Razorpay order:', error)
+    const message = String(error?.message || '')
+    if (message === 'Payment gateway not configured') {
+      return NextResponse.json({ error: message }, { status: 500 })
+    }
+    if (message === 'Invalid phone number' || message === 'Invalid email address' || message === 'Invalid stay duration' || message === 'Check-out must be after check-in') {
+      return NextResponse.json({ error: message }, { status: 400 })
+    }
+    if (message === 'Room not found') {
+      return NextResponse.json({ error: message }, { status: 404 })
+    }
+    if (message.startsWith('Only ')) {
+      return NextResponse.json({ error: message }, { status: 409 })
+    }
+    if (message === 'Could not fetch room rates') {
+      return NextResponse.json({ error: message }, { status: 500 })
+    }
+    if (message.includes('tariff')) {
+      return NextResponse.json({ error: message }, { status: 400 })
+    }
     return NextResponse.json({ error: 'Failed to create order' }, { status: 500 })
   }
 }

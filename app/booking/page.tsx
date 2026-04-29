@@ -537,42 +537,39 @@ function BookingContent() {
       const sPhone = phone.replace(/\D/g, '').slice(0, 15)
       const sEmail = sanitize(email)
       const sNote  = sanitize(note).slice(0, 500)
-      const cgst   = cgstDisplay
-      const sgst   = sgstDisplay
-
       // ── Use API route with service role to bypass RLS ────────────────────────
-      const createRes = await fetch('/api/bookings/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: userId || null,
-          guest_name: sName, guest_email: sEmail,
-          guest_phone: sPhone, guest_phone_country: countryCode,
-          room_id: room!.id, check_in: checkIn, check_out: checkOut, nights,
-          adults, rooms_booked: numRooms, extra_beds: autoXbeds,
-          children_below_5: 0, children_5_to_12: 0, children_above_12: 0,
-          meal_plan: mealPlan,
-          rate_per_room_per_night: nights > 0 ? Math.round((stayTariff.roomSubtotalPerRoom / nights) * 100) / 100 : 0,
-          extra_bed_rate_per_night: xbRate, child_rate_per_night: 0,
-          discount_amount: promoResult?.valid ? promoDiscount : 0,
-          discount_percent: promoResult?.valid ? (promoResult.discount_percentage || 0) : 0,
-          discount_reason: promoResult?.valid ? `Promo: ${promoCode}` : null,
-          promo_code: promoResult?.valid ? promoCode.trim().toUpperCase() : null,
-          booking_source: 'website', special_requests: sNote || null,
-        }),
-      })
-      const createData = await createRes.json()
-      if (!createRes.ok) throw new Error(createData.error || 'Could not create booking. Please try again.')
-      const bookingId    = createData.booking_id
-      const bookingTotal = createData.total_amount || total
-
       const orderRes = await fetch('/api/payments/create-order', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ booking_id: bookingId, amount: bookingTotal, receipt: bookingId.slice(0, 40), notes: { guest: sName } }),
+        body: JSON.stringify({
+          amount: total,
+          receipt: `lwweb_${Date.now()}`,
+          notes: { guest: sName, room_name: room!.name },
+          booking: {
+            guest_name: sName,
+            guest_email: sEmail,
+            guest_phone: sPhone,
+            guest_phone_country: countryCode,
+            room_id: room!.id,
+            check_in: checkIn,
+            check_out: checkOut,
+            nights,
+            adults,
+            rooms_booked: numRooms,
+            extra_beds: autoXbeds,
+            children_below_5: 0,
+            children_5_to_12: 0,
+            children_above_12: 0,
+            meal_plan: mealPlan,
+            discount_amount: promoResult?.valid ? promoDiscount : 0,
+            discount_percent: promoResult?.valid ? (promoResult.discount_percentage || 0) : 0,
+            discount_reason: promoResult?.valid ? `Promo: ${promoCode}` : null,
+            promo_code: promoResult?.valid ? promoCode.trim().toUpperCase() : null,
+            booking_source: 'website',
+            special_requests: sNote || null,
+          },
+        }),
       })
       if (!orderRes.ok) {
-        // Update status via API since client can't write directly
-        await fetch('/api/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ booking_id: bookingId }) })
         throw new Error((await orderRes.json()).error || 'Could not create payment order.')
       }
       const { order } = await orderRes.json()
@@ -585,7 +582,7 @@ function BookingContent() {
         image: '/logo/leafwalk-logo.jpeg',
         order_id: order.id,
         prefill: { name: sName, email: sEmail, contact: countryCode + sPhone },
-        notes: { booking_id: bookingId },
+        notes: { guest: sName, room_name: room!.name },
         theme: { color: '#c9a14a' },
         handler: async (resp: any) => {
           paymentFinalizedRef.current = true
@@ -602,47 +599,36 @@ function BookingContent() {
             } catch {}
           }
 
-          const pollBookingConfirmation = async () => {
-            const startedAt = Date.now()
-            while (Date.now() - startedAt < 30000) {
-              try {
-                const statusRes = await fetch(`/api/bookings/${encodeURIComponent(bookingId)}`, {
-                  cache: 'no-store',
-                })
-                if (statusRes.ok) {
-                  const statusData = await statusRes.json()
-                  if (['confirmed', 'checked_in', 'checked_out', 'completed'].includes(statusData?.booking_status) || statusData?.payment_status === 'fully_paid') {
-                    cacheConfirmedBooking(statusData)
-                    toast.success('Payment successful! Booking confirmed.')
-                    window.location.href = await resolvePostPaymentRedirect(bookingId)
-                    return true
-                  }
-                }
-              } catch {}
-              await new Promise((resolve) => setTimeout(resolve, 2000))
-            }
-            return false
-          }
-
           try {
-            const vr = await fetch('/api/payments/verify', {
-              method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ ...resp, booking_id: bookingId }),
-            })
-            const verifyData = await vr.json().catch(() => null)
-            if (!vr.ok || !verifyData?.success) {
-              throw new Error(verifyData?.error?.message || verifyData?.error || 'Payment verification failed')
+            let verifyData: any = null
+            let verifyError = 'Payment verification failed'
+            for (let attempt = 0; attempt < 3; attempt += 1) {
+              const vr = await fetch('/api/payments/verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(resp),
+              })
+              verifyData = await vr.json().catch(() => null)
+              if (vr.ok && verifyData?.success) {
+                break
+              }
+              verifyError = verifyData?.error?.message || verifyData?.error || 'Payment verification failed'
+              await new Promise((resolve) => setTimeout(resolve, 1500))
+            }
+            if (!verifyData?.success) {
+              throw new Error(verifyError)
+            }
+            const bookingId = verifyData?.booking?.id
+            if (!bookingId) {
+              throw new Error('Booking confirmation did not complete')
             }
             cacheConfirmedBooking(verifyData?.booking)
             toast.success('Payment successful! Booking confirmed.')
             const redirectTo = await resolvePostPaymentRedirect(bookingId)
             setTimeout(() => { window.location.href = redirectTo }, 1200)
           } catch {
-            const recovered = await pollBookingConfirmation()
-            if (!recovered) {
-              toast.error('If amount was deducted, please do not pay again immediately. We are verifying your payment.')
-              setPaying(false)
-            }
+            toast.error('If amount was deducted, please do not pay again immediately. We are verifying your payment.')
+            setPaying(false)
           }
         },
         modal: {
@@ -655,7 +641,6 @@ function BookingContent() {
       })
       rzp.on('payment.failed', async (resp: any) => {
         paymentFinalizedRef.current = false
-        await fetch('/api/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ booking_id: bookingId }) })
         toast.error(`Payment failed: ${resp.error?.description || 'Please try again.'}`)
         setPaying(false)
       })
