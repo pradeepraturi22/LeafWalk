@@ -265,6 +265,7 @@ function getIstNow() {
 
 function canCheckInToday(checkInDate: string) {
   const now = getIstNow()
+  if (now.date > checkInDate) return true
   return now.date === checkInDate && (now.hour > 15 || (now.hour === 15 && now.minute >= 0))
 }
 

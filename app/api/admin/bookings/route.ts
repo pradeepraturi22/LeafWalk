@@ -33,10 +33,7 @@ function validateAdminCheckInWindow(checkInDate?: string | null) {
   if (bookingCheckInDate.getTime() > today.getTime()) {
     return 'Guests can only be checked in on their actual check-in date'
   }
-  if (bookingCheckInDate.getTime() < today.getTime()) {
-    return 'This booking check-in date has already passed; please handle it from the detailed booking screen if needed'
-  }
-  if (now.getHours() < 15) {
+  if (bookingCheckInDate.getTime() === today.getTime() && now.getHours() < 15) {
     return 'Guests can be checked in only after 3:00 PM on the check-in date'
   }
 
