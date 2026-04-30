@@ -184,10 +184,7 @@ export default function AdminBookingsPage() {
     if (checkInDate.getTime() > today.getTime()) {
       return { allowed: false, message: 'Future check-in is not allowed before the booking date.' }
     }
-    if (checkInDate.getTime() < today.getTime()) {
-      return { allowed: false, message: 'This booking can no longer be checked in from the list because the check-in date has already passed.' }
-    }
-    if (now.getHours() < 15) {
+    if (checkInDate.getTime() === today.getTime() && now.getHours() < 15) {
       return { allowed: false, message: 'Check-in is allowed only after 3:00 PM on the check-in date.' }
     }
 
