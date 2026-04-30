@@ -186,7 +186,7 @@ async function sendTrackedGuestEmail(input: {
 
 async function buildCheckInEmailAssets(booking: BookingEmailContext) {
   const isTourOperatorGuest = normalize(booking.booking_source) === 'tour_operator'
-  const wifiPayload = isTourOperatorGuest ? null : await buildWifiEmailPayload()
+  const wifiPayload = await buildWifiEmailPayload()
   const attachments = isTourOperatorGuest
     ? []
     : [
@@ -200,6 +200,13 @@ async function buildCheckInEmailAssets(booking: BookingEmailContext) {
       qrCid: wifiPayload?.qrAttachment ? getWifiQrCid() : null,
     }),
     attachments,
+  }
+}
+
+function getFrontDeskSender() {
+  return {
+    fromEmail: process.env.FROM_EMAIL_FRONTDESK || 'frontdesk@leafwalk.in',
+    fromName: 'LeafWalk Front Desk',
   }
 }
 
@@ -305,6 +312,7 @@ export async function sendBookingLifecycleEmails(bookingId: string, trigger: Boo
 
   if (booking.guest_email && shouldSendWalkInWelcomeEmailOnCreate(booking, trigger)) {
     const checkInAssets = await buildCheckInEmailAssets(booking)
+    const frontDeskSender = getFrontDeskSender()
     results.guestConfirmation = await sendTrackedGuestEmail({
       booking,
       recipient: booking.guest_email,
@@ -314,11 +322,14 @@ export async function sendBookingLifecycleEmails(bookingId: string, trigger: Boo
       eventType: 'booking_confirmation',
       debugLabel: 'walk-in welcome email',
       attachments: checkInAssets.attachments,
+      fromEmail: frontDeskSender.fromEmail,
+      fromName: frontDeskSender.fromName,
     })
   }
 
   if (booking.guest_email && trigger === 'admin_status_changed' && shouldSendGuestCheckInEmail(booking) && !isWalkInBooking(booking)) {
     const checkInAssets = await buildCheckInEmailAssets(booking)
+    const frontDeskSender = getFrontDeskSender()
     results.guestConfirmation = await sendTrackedGuestEmail({
       booking,
       recipient: booking.guest_email,
@@ -328,8 +339,8 @@ export async function sendBookingLifecycleEmails(bookingId: string, trigger: Boo
       eventType: 'checkin_reminder',
       debugLabel: `${source || 'unknown'} guest check-in completed`,
       attachments: checkInAssets.attachments,
-      fromEmail: process.env.FROM_EMAIL_BOOKINGS || process.env.FROM_EMAIL || process.env.SMTP_USER || 'no-reply@leafwalk.in',
-      fromName: 'LeafWalk Front Desk',
+      fromEmail: frontDeskSender.fromEmail,
+      fromName: frontDeskSender.fromName,
     })
   }
 

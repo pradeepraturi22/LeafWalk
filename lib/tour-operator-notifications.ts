@@ -247,7 +247,7 @@ export async function sendTourOperatorWelcomeEmail(operator: TourOperatorLike) {
     undefined,
     {
       emailType: 'general',
-      fromEmail: process.env.FROM_EMAIL_PARTNERS || process.env.FROM_EMAIL_BOOKINGS || process.env.FROM_EMAIL || 'no-reply@leafwalk.in',
+      fromEmail: process.env.FROM_EMAIL_PARTNERS || process.env.FROM_EMAIL || 'no-reply@leafwalk.in',
       fromName: 'LeafWalk Partner Desk',
     }
   )

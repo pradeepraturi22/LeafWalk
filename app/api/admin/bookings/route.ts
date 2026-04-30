@@ -139,6 +139,7 @@ export async function PATCH(request: NextRequest) {
       const transitionCheck = validateBookingStatusChange({
         currentStatus: existingBooking.booking_status,
         nextStatus: safeUpdates.booking_status,
+        paymentStatus: safeUpdates.payment_status ?? existingBooking.payment_status,
         bookingTotal: existingBooking.total_amount,
         advanceAmount: safeUpdates.advance_amount ?? existingBooking.advance_amount,
         balanceAmount: safeUpdates.balance_amount ?? existingBooking.balance_amount,

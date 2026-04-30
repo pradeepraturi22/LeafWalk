@@ -1,6 +1,7 @@
 type BookingTransitionInput = {
   currentStatus: string
   nextStatus: string
+  paymentStatus?: string | null
   bookingTotal?: number | null
   advanceAmount?: number | null
   balanceAmount?: number | null
@@ -33,6 +34,7 @@ export function isValidBookingTransition(currentStatus: string, nextStatus: stri
 export function validateBookingStatusChange(input: BookingTransitionInput) {
   const current = normalizeStatus(input.currentStatus)
   const next = normalizeStatus(input.nextStatus)
+  const paymentStatus = normalizeStatus(String(input.paymentStatus || 'pending'))
 
   if (!isValidBookingTransition(current, next)) {
     return { valid: false, error: `Invalid booking status transition: ${current || 'unknown'} -> ${next || 'unknown'}` }
@@ -56,6 +58,10 @@ export function validateBookingStatusChange(input: BookingTransitionInput) {
 
   if (next === 'checked_in' && !input.checkedInAt) {
     return { valid: false, error: 'checked_in_at is required before moving to checked_in' }
+  }
+
+  if (next === 'checked_in' && paymentStatus !== 'fully_paid') {
+    return { valid: false, error: 'Kindly record the full payment before check in' }
   }
 
   if (next === 'checked_out' && !input.checkedOutAt) {

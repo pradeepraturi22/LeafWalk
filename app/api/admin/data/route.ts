@@ -662,6 +662,9 @@ export async function POST(request: NextRequest) {
       bookingData.payment_status = normalizePaymentStatus(bookingData.payment_status)
       // Set created_by
       bookingData.created_by = admin.userId
+      if (String(bookingData.booking_status || '').trim().toLowerCase() === 'checked_in' && bookingData.payment_status !== 'fully_paid') {
+        return NextResponse.json({ error: 'Kindly record the full payment before check in' }, { status: 400 })
+      }
       if (bookingData.booking_source === 'tour_operator') {
         if (bookingData.booking_status === 'confirmed' && Number(bookingData.advance_amount || 0) <= 0) {
           return NextResponse.json({ error: 'Advance payment is required before final confirmation' }, { status: 400 })
@@ -894,9 +897,11 @@ export async function PATCH(request: NextRequest) {
       if (body.nights !== undefined)             updateData.nights = body.nights
 
       const nextStatus = String(updateData.booking_status || existingBooking?.booking_status || '')
+      const nextPaymentStatus = String(updateData.payment_status || existingBooking?.payment_status || '')
       const transitionCheck = validateBookingStatusChange({
         currentStatus: existingBooking.booking_status,
         nextStatus,
+        paymentStatus: nextPaymentStatus,
         bookingTotal: existingBooking.total_amount,
         advanceAmount: updateData.advance_amount ?? existingBooking.advance_amount,
         balanceAmount: updateData.balance_amount ?? existingBooking.balance_amount,
@@ -940,7 +945,6 @@ export async function PATCH(request: NextRequest) {
       if (nextStatus === 'confirmed' && ['hold', 'pending'].includes(String(existingBooking?.booking_status || ''))) {
         updateData.booking_number = buildBookingNumber({ id, createdAt: new Date().toISOString() })
       }
-      const nextPaymentStatus = String(updateData.payment_status || existingBooking?.payment_status || '')
       if (nextPaymentStatus === 'fully_paid' && !existingBooking?.invoice_number) {
         updateData.invoice_number = await reserveNextInvoiceNumber({
           paidAt: updateData.payment_date || updateData.advance_paid_at || new Date().toISOString(),
