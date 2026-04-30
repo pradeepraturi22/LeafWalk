@@ -171,6 +171,13 @@ async function sendWithSmtp(input: SendEmailInput): Promise<EmailProviderResult>
 
   const fromEmail = input.fromEmail || getFromEmail(input.emailType)
   const fromName = input.fromName || getFromName(input.emailType)
+  const attachments = withInlineLogoAttachments(input.attachments).map((attachment) => ({
+    filename: attachment.filename,
+    content: attachment.content,
+    contentType: attachment.contentType,
+    cid: attachment.cid,
+    contentDisposition: attachment.disposition || (attachment.cid ? 'inline' : 'attachment'),
+  }))
 
   const info = await transporter.sendMail({
     from: `"${fromName}" <${fromEmail}>`,
@@ -178,7 +185,7 @@ async function sendWithSmtp(input: SendEmailInput): Promise<EmailProviderResult>
     subject: input.subject,
     html: input.html,
     text: input.text,
-    attachments: withInlineLogoAttachments(input.attachments),
+    attachments,
   })
 
   return {
