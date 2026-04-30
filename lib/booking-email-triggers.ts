@@ -13,6 +13,7 @@ type BookingEmailContext = {
   booking_source?: string | null
   booking_type?: string | null
   booking_status?: string | null
+  checked_in_at?: string | null
   payment_status?: string | null
   payment_method?: string | null
   guest_name?: string | null
@@ -55,7 +56,7 @@ type BookingEmailTrigger =
   | 'payment_verified'
 
 const BOOKING_EMAIL_SELECT = `
-  id, created_at, booking_number, invoice_number, booking_source, booking_type, booking_status, payment_status, payment_method,
+  id, created_at, booking_number, invoice_number, booking_source, booking_type, booking_status, checked_in_at, payment_status, payment_method,
   guest_name, gst_invoice_requested, gst_company_name, gst_number, gst_state, guest_email, guest_phone, guest_phone_country,
   check_in, check_out, nights, rooms_booked, adults, meal_plan,
   total_amount, subtotal, cgst, sgst, gst_total, advance_amount, balance_amount, payment_due_date, razorpay_payment_id, tour_operator_id,
@@ -210,6 +211,12 @@ function getFrontDeskSender() {
   }
 }
 
+function getCheckInMarker(booking: BookingEmailContext, prefix: 'guest_check_in_completed' | 'walk_in_check_in_completed') {
+  const bookingKey = booking.booking_number || booking.id
+  const checkInStamp = booking.checked_in_at || booking.created_at || 'no-ts'
+  return `${prefix}:${bookingKey}:${checkInStamp}`
+}
+
 async function hasOperatorStatusEmailBeenSent(
   bookingId: string,
   recipient: string,
@@ -323,7 +330,7 @@ export async function sendBookingLifecycleEmails(bookingId: string, trigger: Boo
       recipient: booking.guest_email,
       subject: `Welcome to LeafWalk Resort - ${booking.booking_number || 'Walk-in Booking'}`,
       html: checkInAssets.html,
-      marker: `walk_in_check_in_completed:${booking.booking_number || booking.id}:${booking.payment_status || 'unknown'}`,
+      marker: getCheckInMarker(booking, 'walk_in_check_in_completed'),
       eventType: 'booking_confirmation',
       debugLabel: 'walk-in welcome email',
       attachments: checkInAssets.attachments,
@@ -340,7 +347,7 @@ export async function sendBookingLifecycleEmails(bookingId: string, trigger: Boo
       recipient: booking.guest_email,
       subject: `Welcome to LeafWalk Resort - Check-in Completed`,
       html: checkInAssets.html,
-      marker: `guest_check_in_completed:${booking.booking_number || booking.id}`,
+      marker: getCheckInMarker(booking, 'guest_check_in_completed'),
       eventType: 'checkin_reminder',
       debugLabel: `${source || 'unknown'} guest check-in completed`,
       attachments: checkInAssets.attachments,
