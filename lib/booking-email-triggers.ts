@@ -1,4 +1,4 @@
-import { generateCheckInCompletedEmail, generateReceiptAttachment, renderBookingConfirmationEmail, sendEmail } from '@/lib/email-service'
+import { generateCheckInCompletedEmail, generateReceiptAttachment, renderBookingConfirmationEmail, renderPaymentSuccessEmail, sendEmail } from '@/lib/email-service'
 import { logDebug, logError, logInfo } from '@/lib/logger'
 import { isLocalTestMode } from '@/lib/runtime-mode'
 import { getSupabaseAdmin } from '@/lib/supabaseServer'
@@ -200,6 +200,18 @@ function shouldSendGuestCheckInEmail(booking: BookingEmailContext) {
   return normalize(booking.booking_status) === 'checked_in'
 }
 
+function isWalkInBooking(booking: BookingEmailContext) {
+  return normalize(booking.booking_source) === 'walk_in'
+}
+
+function shouldSendWalkInWelcomeEmailOnCreate(booking: BookingEmailContext, trigger: BookingEmailTrigger) {
+  return trigger === 'admin_booking_created' && isWalkInBooking(booking) && shouldSendGuestCheckInEmail(booking)
+}
+
+function shouldSendWalkInPaymentCompletionEmail(booking: BookingEmailContext, trigger: BookingEmailTrigger) {
+  return trigger === 'admin_status_changed' && isWalkInBooking(booking) && normalize(booking.payment_status) === 'fully_paid'
+}
+
 function resolveOperatorStatusType(booking: BookingEmailContext): 'registered' | 'hold' | 'confirmed' | 'cancelled' {
   const status = normalize(booking.booking_status)
   if (status === 'hold') return 'hold'
@@ -269,7 +281,20 @@ export async function sendBookingLifecycleEmails(bookingId: string, trigger: Boo
     })
   }
 
-  if (booking.guest_email && trigger === 'admin_status_changed' && shouldSendGuestCheckInEmail(booking)) {
+  if (booking.guest_email && shouldSendWalkInWelcomeEmailOnCreate(booking, trigger)) {
+    results.guestConfirmation = await sendTrackedGuestEmail({
+      booking,
+      recipient: booking.guest_email,
+      subject: `Welcome to LeafWalk Resort - ${booking.booking_number || 'Walk-in Booking'}`,
+      html: generateCheckInCompletedEmail(booking as any),
+      marker: `walk_in_check_in_completed:${booking.booking_number || booking.id}:${booking.payment_status || 'unknown'}`,
+      eventType: 'booking_confirmation',
+      debugLabel: 'walk-in welcome email',
+      attachments: [await generateReceiptAttachment(booking as any)],
+    })
+  }
+
+  if (booking.guest_email && trigger === 'admin_status_changed' && shouldSendGuestCheckInEmail(booking) && !isWalkInBooking(booking)) {
     await sendTrackedGuestEmail({
       booking,
       recipient: booking.guest_email,
@@ -280,6 +305,19 @@ export async function sendBookingLifecycleEmails(bookingId: string, trigger: Boo
       debugLabel: `${source || 'unknown'} guest check-in completed`,
       fromEmail: 'frontdesk@leafwalk.in',
       fromName: 'LeafWalk Front Desk',
+    })
+  }
+
+  if (booking.guest_email && shouldSendWalkInPaymentCompletionEmail(booking, trigger)) {
+    results.paymentSuccess = await sendTrackedGuestEmail({
+      booking,
+      recipient: booking.guest_email,
+      subject: `Payment Completed - ${booking.booking_number || 'LeafWalk Resort'}`,
+      html: renderPaymentSuccessEmail(booking as any),
+      marker: `walk_in_payment_completed:${booking.booking_number || booking.id}`,
+      eventType: 'payment_success',
+      debugLabel: 'walk-in payment completion',
+      attachments: booking.gst_invoice_requested ? [await generateReceiptAttachment(booking as any)] : undefined,
     })
   }
 

@@ -445,6 +445,10 @@ export function renderCheckInReminderEmail(booking: BookingLike) {
 }
 
 export function renderCheckInCompletedEmail(booking: BookingLike) {
+  const paymentStatus = String(booking.payment_status || 'pending').replace(/_/g, ' ').toUpperCase()
+  const receiptLabel = booking.payment_status === 'fully_paid'
+    ? (booking.gst_invoice_requested ? 'GST invoice' : 'booking receipt')
+    : 'booking receipt'
   return layoutEmail(
     'Check-in completed successfully',
     `
@@ -460,6 +464,7 @@ export function renderCheckInCompletedEmail(booking: BookingLike) {
             ['Check-out Date', booking.check_out || '-'],
             ['Room Category', booking.room?.name || booking.room?.category || '-'],
             ['Number of Guests', String(booking.adults || 1)],
+            ['Payment Status', paymentStatus],
           ].map(([label, value]) => `
             <tr>
               <td style="padding:10px 0;border-bottom:1px solid #e5e7eb;color:#6b7280;font-size:13px;width:42%">${escapeHtml(label)}</td>
@@ -467,6 +472,11 @@ export function renderCheckInCompletedEmail(booking: BookingLike) {
             </tr>
           `).join('')}
         </table>
+      </div>
+
+      <div style="margin-top:22px">
+        <div style="font-size:12px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#6b7280;margin-bottom:10px">Payment Details</div>
+        ${bookingFactsTable(booking, 'Stay Total')}
       </div>
 
       <div style="margin-top:22px">
@@ -485,6 +495,7 @@ export function renderCheckInCompletedEmail(booking: BookingLike) {
         </table>
       </div>
 
+      <p style="margin-top:20px">Your ${escapeHtml(receiptLabel)} is attached with this email whenever applicable for the current payment stage.</p>
       <p style="margin-top:20px">If you need any assistance during your stay, please feel free to contact our front desk anytime. We are here to make your experience memorable.</p>
       <p>Wishing you a relaxing and enjoyable stay!</p>
       <p style="margin-top:20px">
