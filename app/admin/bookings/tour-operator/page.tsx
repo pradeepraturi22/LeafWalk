@@ -101,7 +101,6 @@ export default function TourOperatorBooking() {
     setForm(p => ({
       ...p,
       commission_rate: op ? op.commission_rate || 10 : p.commission_rate,
-      guest_email: op?.email || '',
     }))
   }, [form.tour_operator_id, operators])
 
@@ -276,7 +275,7 @@ export default function TourOperatorBooking() {
       const payload = {
         tour_operator_id: form.tour_operator_id,
         guest_name: form.guest_name,
-        guest_email: selectedOperator?.email || form.guest_email || null,
+        guest_email: form.guest_email || null,
         guest_phone: form.guest_phone || null,
         room_id: first.room_id,
         check_in: form.check_in, check_out: form.check_out, nights,
@@ -422,12 +421,13 @@ export default function TourOperatorBooking() {
                 <Err f="guest_phone" />
               </div>
               <div>
-                <label className={LABEL}>Operator Email</label>
-                <input type="text" value={form.guest_email}
-                  readOnly
-                  className={`${INPUT} ${errors.guest_email ? 'border-red-500' : ''} cursor-not-allowed opacity-80`}
-                  placeholder="Select operator to auto-fill email" />
-                <p className="text-white/35 text-xs mt-1">Mail registered tour operator email par hi jayegi.</p>
+                <label className={LABEL}>Guest Email</label>
+                <input type="email" value={form.guest_email}
+                  onChange={e => { set('guest_email', e.target.value.trim()); setErrors(p => ({...p, guest_email: ''})) }}
+                  onBlur={e => validateField('guest_email', e.target.value)}
+                  className={`${INPUT} ${errors.guest_email ? 'border-red-500' : ''}`}
+                  placeholder="guest@example.com" />
+                <p className="text-white/35 text-xs mt-1">Guest welcome mail is email par jayegi. Operator ko separate status mail automatically jayegi.</p>
                 <Err f="guest_email" />
               </div>
             </div>
