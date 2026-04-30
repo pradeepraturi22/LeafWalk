@@ -295,7 +295,7 @@ export async function sendTourOperatorBookingStatusEmail(
     ...(wifiPayload?.qrAttachment ? [wifiPayload.qrAttachment] : []),
   ]
 
-  const sent = await sendEmail(
+  const result = await sendEmailWithResult(
     operator.email,
     subjectMap[statusType],
     buildStatusHtml(booking, operator, statusType, wifiPayload ? {
@@ -310,8 +310,14 @@ export async function sendTourOperatorBookingStatusEmail(
     }
   )
 
-  await logNotification(booking.id, operator.email, sent ? 'sent' : 'failed', `tour_operator_${statusType}_${booking.payment_status || 'unknown'}:${booking.booking_number || booking.id}`)
-  return sent
+  await logNotification(
+    booking.id,
+    operator.email,
+    result.success ? 'sent' : 'failed',
+    `tour_operator_${statusType}_${booking.payment_status || 'unknown'}:${booking.booking_number || booking.id}`,
+    result.error
+  )
+  return result.success
 }
 
 export async function sendTourOperatorBalanceReminderEmail(
