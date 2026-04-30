@@ -440,6 +440,13 @@ export default function WalkInBooking() {
 
   const isIndia = form.guest_country === 'India'
   const isWalkIn = mode === 'walk_in'
+  const canUseGstInvoice = form.payment_status === 'fully_paid'
+
+  useEffect(() => {
+    if (canUseGstInvoice) return
+    setGstWanted(false)
+    setGstConfirmed(false)
+  }, [canUseGstInvoice])
 
   return (
     <div className="min-h-screen bg-[#0b0b0b] py-8 px-4">
@@ -815,20 +822,34 @@ export default function WalkInBooking() {
           {/* ── 6. GST ─── */}
           <Section num="6" title="GST Invoice">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-white/40 text-xs">Toggle if guest needs GST invoice</p>
-              <div onClick={() => { setGstWanted(v => !v); setGstConfirmed(false) }}
-                className={`relative w-12 h-6 rounded-full transition-colors cursor-pointer ${gstWanted ? 'bg-[#c9a14a]' : 'bg-white/20'}`}>
+              <p className="text-white/40 text-xs">
+                {canUseGstInvoice
+                  ? 'Toggle if guest needs GST invoice'
+                  : 'GST invoice option unlocks only after full payment'}
+              </p>
+              <div onClick={() => {
+                if (!canUseGstInvoice) return
+                setGstWanted(v => !v)
+                setGstConfirmed(false)
+              }}
+                className={`relative w-12 h-6 rounded-full transition-colors ${canUseGstInvoice ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'} ${gstWanted ? 'bg-[#c9a14a]' : 'bg-white/20'}`}>
                 <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${gstWanted ? 'left-7' : 'left-1'}`} />
               </div>
             </div>
 
-            {gstWanted && !isWalkIn && !gstConfirmed && (
+            {!canUseGstInvoice && (
+              <div className="p-4 bg-white/5 border border-white/10 rounded-xl text-sm text-white/55">
+                Full payment receive hone ke baad hi GST invoice generate aur mail ki jaayegi.
+              </div>
+            )}
+
+            {canUseGstInvoice && gstWanted && !isWalkIn && !gstConfirmed && (
               <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl text-sm text-blue-300">
                 📋 GST details fill karne ke liye pehle <b>"Next: Enter GST Details"</b> click karo
               </div>
             )}
 
-            {gstWanted && (isWalkIn || gstConfirmed) && (
+            {canUseGstInvoice && gstWanted && (isWalkIn || gstConfirmed) && (
               <div className="grid md:grid-cols-3 gap-3 p-4 bg-green-500/5 border border-green-500/20 rounded-xl">
                 <div>
                   <label className={LBL}>Company / Firm Name</label>

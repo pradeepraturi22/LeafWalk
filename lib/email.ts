@@ -485,7 +485,7 @@ export function renderCheckInCompletedEmail(booking: BookingLike) {
           ${[
             ['Wi-Fi', 'Leafwalk Resort / Password-123456'],
             ['Restaurant Timings', 'Breakfast 8:00 AM - 10:00 AM | Kitchen till 10:00 PM'],
-            ['Contact', '+91-9368080535'],
+            ['Contact', '+91-8630227541'],
           ].map(([label, value]) => `
             <tr>
               <td style="padding:10px 0;border-bottom:1px solid #e5e7eb;color:#6b7280;font-size:13px;width:42%">${escapeHtml(label)}</td>
@@ -501,7 +501,7 @@ export function renderCheckInCompletedEmail(booking: BookingLike) {
       <p style="margin-top:20px">
         Warm Regards,<br />
         Team LeafWalk Resort<br />
-        +91-9368080535
+        +91-8630227541
       </p>
     `
   )

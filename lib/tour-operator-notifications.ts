@@ -153,6 +153,23 @@ function buildStatusHtml(booking: BookingLike, operator: TourOperatorLike, statu
       <p>Hi ${safe(operator.contact_person || operator.company_name)},</p>
       <p>${introMap[statusType]}</p>
       ${bookingFacts(booking, operator)}
+      ${String(booking.booking_status || '').toLowerCase() === 'checked_in' ? `
+        <div style="margin-top:22px">
+          <div style="font-size:12px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#6b7280;margin-bottom:10px">Hotel Information</div>
+          <table style="width:100%;border-collapse:collapse">
+            ${[
+              ['Wi-Fi', 'Leafwalk Resort / Password-123456'],
+              ['Restaurant Timings', 'Breakfast 8:00 AM - 10:00 AM | Kitchen till 10:00 PM'],
+              ['Front Desk Contact', '+91-8630227541'],
+            ].map(([label, value]) => `
+              <tr>
+                <td style="padding:10px 0;border-bottom:1px solid #e5e7eb;color:#6b7280;font-size:13px;width:42%">${escapeHtml(label)}</td>
+                <td style="padding:10px 0;border-bottom:1px solid #e5e7eb;color:#111827;font-size:13px;font-weight:600">${escapeHtml(value)}</td>
+              </tr>
+            `).join('')}
+          </table>
+        </div>
+      ` : ''}
     `
   )
 }
