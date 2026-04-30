@@ -28,6 +28,7 @@ type BookingLike = {
   id: string
   booking_number?: string | null
   invoice_number?: string | null
+  booking_source?: string | null
   guest_name: string
   gst_invoice_requested?: boolean | null
   gst_company_name?: string | null
@@ -468,6 +469,7 @@ export function renderCheckInCompletedEmail(booking: BookingLike, wifi?: WifiEma
   const receiptLabel = booking.payment_status === 'fully_paid'
     ? (booking.gst_invoice_requested ? 'GST invoice' : 'booking receipt')
     : 'booking receipt'
+  const showAttachmentNote = String(booking.booking_source || '').toLowerCase() !== 'tour_operator'
   const wifiName = String(wifi?.ssid || 'Leafwalk Resort')
   const wifiPassword = String(wifi?.password || 'Password-123456')
   const wifiSecurity = String(wifi?.security || 'WPA')
@@ -489,10 +491,13 @@ export function renderCheckInCompletedEmail(booking: BookingLike, wifi?: WifiEma
         <div style="font-size:12px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#6b7280;margin-bottom:10px">Booking Details</div>
         <table style="width:100%;border-collapse:collapse">
           ${[
+            ['Booking Ref', booking.booking_number || booking.id.slice(0, 8).toUpperCase()],
             ['Check-in Date', booking.check_in || '-'],
             ['Check-out Date', booking.check_out || '-'],
             ['Room Category', booking.room?.name || booking.room?.category || '-'],
+            ['Rooms', String(booking.rooms_booked || 1)],
             ['Number of Guests', String(booking.adults || 1)],
+            ['Meal Plan', booking.meal_plan || 'EP'],
             ['Payment Status', paymentStatus],
           ].map(([label, value]) => `
             <tr>
@@ -501,11 +506,6 @@ export function renderCheckInCompletedEmail(booking: BookingLike, wifi?: WifiEma
             </tr>
           `).join('')}
         </table>
-      </div>
-
-      <div style="margin-top:22px">
-        <div style="font-size:12px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#6b7280;margin-bottom:10px">Payment Details</div>
-        ${bookingFactsTable(booking, 'Stay Total')}
       </div>
 
       <div style="margin-top:22px">
@@ -526,7 +526,7 @@ export function renderCheckInCompletedEmail(booking: BookingLike, wifi?: WifiEma
         ${wifiQrBlock}
       </div>
 
-      <p style="margin-top:20px">Your ${escapeHtml(receiptLabel)} is attached with this email whenever applicable for the current payment stage.</p>
+      ${showAttachmentNote ? `<p style="margin-top:20px">Your ${escapeHtml(receiptLabel)} is attached with this email whenever applicable for the current payment stage.</p>` : ''}
       <p style="margin-top:20px">If you need any assistance during your stay, please feel free to contact our front desk anytime. We are here to make your experience memorable.</p>
       <p>Wishing you a relaxing and enjoyable stay!</p>
       <p style="margin-top:20px">

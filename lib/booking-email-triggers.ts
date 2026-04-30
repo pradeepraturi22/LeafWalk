@@ -184,16 +184,19 @@ async function sendTrackedGuestEmail(input: {
 }
 
 async function buildCheckInEmailAssets(booking: BookingEmailContext) {
-  const wifiPayload = await buildWifiEmailPayload()
-  const attachments = [
-    await generateReceiptAttachment(booking as any),
-    ...(wifiPayload.qrAttachment ? [wifiPayload.qrAttachment] : []),
-  ]
+  const isTourOperatorGuest = normalize(booking.booking_source) === 'tour_operator'
+  const wifiPayload = isTourOperatorGuest ? null : await buildWifiEmailPayload()
+  const attachments = isTourOperatorGuest
+    ? []
+    : [
+        await generateReceiptAttachment(booking as any),
+        ...(wifiPayload?.qrAttachment ? [wifiPayload.qrAttachment] : []),
+      ]
 
   return {
     html: generateCheckInCompletedEmail(booking as any, {
-      ...wifiPayload.wifi,
-      qrCid: wifiPayload.qrAttachment ? getWifiQrCid() : null,
+      ...wifiPayload?.wifi,
+      qrCid: wifiPayload?.qrAttachment ? getWifiQrCid() : null,
     }),
     attachments,
   }
@@ -315,7 +318,7 @@ export async function sendBookingLifecycleEmails(bookingId: string, trigger: Boo
 
   if (booking.guest_email && trigger === 'admin_status_changed' && shouldSendGuestCheckInEmail(booking) && !isWalkInBooking(booking)) {
     const checkInAssets = await buildCheckInEmailAssets(booking)
-    await sendTrackedGuestEmail({
+    results.guestConfirmation = await sendTrackedGuestEmail({
       booking,
       recipient: booking.guest_email,
       subject: `Welcome to LeafWalk Resort - Check-in Completed`,
