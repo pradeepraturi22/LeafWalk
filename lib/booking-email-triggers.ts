@@ -1,4 +1,4 @@
-import { generateCheckInCompletedEmail, generateReceiptAttachment, renderAdminWebsiteBookingAlertEmail, renderBookingConfirmationEmail, renderPaymentSuccessEmail, sendEmail } from '@/lib/email-service'
+import { generateCheckInCompletedEmail, generateReceiptAttachment, renderAdminWebsiteBookingAlertEmail, renderBookingConfirmationEmail, renderPaymentSuccessEmail, sendEmailWithResult } from '@/lib/email-service'
 import { logDebug, logError, logInfo } from '@/lib/logger'
 import { isLocalTestMode } from '@/lib/runtime-mode'
 import { getSupabaseAdmin } from '@/lib/supabaseServer'
@@ -158,7 +158,7 @@ async function sendTrackedGuestEmail(input: {
     })
   }
 
-  const sent = await sendEmail(
+  const result = await sendEmailWithResult(
     input.recipient,
     input.subject,
     input.html,
@@ -174,13 +174,13 @@ async function sendTrackedGuestEmail(input: {
     bookingId: input.booking.id,
     recipient: input.recipient,
     subject: input.subject,
-    status: sent ? 'sent' : 'failed',
+    status: result.success ? 'sent' : 'failed',
     marker: input.marker,
     eventType: input.eventType,
-    errorMessage: sent ? undefined : 'Email provider rejected message',
+    errorMessage: result.success ? undefined : (result.error || 'Email provider rejected message'),
   })
 
-  return sent
+  return result.success
 }
 
 async function buildCheckInEmailAssets(booking: BookingEmailContext) {
