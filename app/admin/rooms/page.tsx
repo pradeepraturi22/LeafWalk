@@ -180,23 +180,26 @@ function AvailabilityControlsPanel({ rooms, token }: { rooms: Room[]; token: str
       if (!response.ok || !result.success) {
         throw new Error(result.error || 'Could not load availability controls')
       }
-      const nextSnapshots = Object.entries(result.categories || {}).reduce((acc, [category, entries]) => {
-        const day = Array.isArray(entries) ? entries[0] : null
-        if (day) {
-          acc[category] = {
-            category,
-            totalRooms: Number(day.totalRooms || 0),
-            controlAllowedRooms: Number(day.controlAllowedRooms || day.allowedRooms || 0),
-            allowedRooms: Number(day.allowedRooms || 0),
-            blockedRooms: Number(day.blockedRooms || 0),
-            bookedRooms: Number(day.bookedRooms || 0),
-            availableRooms: Number(day.availableRooms || 0),
-            physicalAvailableRooms: Number(day.physicalAvailableRooms || 0),
-            controlNotes: day.controlNotes || null,
-          }
-        }
-        return acc
-      }, {} as Record<string, AvailabilityControlSnapshot>)
+      const nextSnapshots = Array.isArray(result.sections)
+        ? result.sections.reduce((acc: Record<string, AvailabilityControlSnapshot>, section: any) => {
+            const category = String(section?.category || '').trim().toLowerCase()
+            const day = section?.rows?.[0]?.days?.[0]
+            if (!category || !day) return acc
+
+            acc[category] = {
+              category,
+              totalRooms: Number(day.totalRooms || section.totalRooms || 0),
+              controlAllowedRooms: Number(day.controlAllowedRooms || day.allowedRooms || 0),
+              allowedRooms: Number(day.allowedRooms || 0),
+              blockedRooms: Number(day.blockedRooms || 0),
+              bookedRooms: Number(day.bookedRooms || 0),
+              availableRooms: Number(day.availableRooms || 0),
+              physicalAvailableRooms: Number(day.physicalAvailableRooms || 0),
+              controlNotes: day.controlNotes || null,
+            }
+            return acc
+          }, {})
+        : {}
       setSnapshots(nextSnapshots)
     } catch (error: any) {
       toast.error(error.message || 'Could not load availability controls')
