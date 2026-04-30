@@ -10,6 +10,7 @@ export type CategoryAvailability = {
   }
   categoryRoomIds: string[]
   totalRooms: number
+  controlAllowedRooms: number
   allowedRooms: number
   blockedRooms: number
   bookedRooms: number
@@ -19,6 +20,7 @@ export type CategoryAvailability = {
   nightlyAvailability: Array<{
     date: string
     totalRooms: number
+    controlAllowedRooms: number
     allowedRooms: number
     blockedRooms: number
     bookedRooms: number
@@ -31,6 +33,7 @@ export type CategoryDailyAvailability = {
   date: string
   category: string
   totalRooms: number
+  controlAllowedRooms: number
   allowedRooms: number
   blockedRooms: number
   bookedRooms: number
@@ -82,6 +85,7 @@ export type AdminCalendarRoomCell = {
   roomLabel: string
   state: 'available' | 'blocked' | 'hold' | 'booked'
   totalRooms: number
+  controlAllowedRooms: number
   allowedRooms: number
   blockedRooms: number
   bookedRooms: number
@@ -336,6 +340,7 @@ function buildCategoryMetrics(
       date,
       category,
       totalRooms: sellableTotalRooms,
+      controlAllowedRooms: controlledRooms,
       allowedRooms,
       blockedRooms: Math.max(0, sellableTotalRooms - allowedRooms),
       bookedRooms,
@@ -417,6 +422,7 @@ function allocateCategoryRows(
         roomLabel: label,
         state,
         totalRooms: metric?.totalRooms || labels.length,
+        controlAllowedRooms: metric?.controlAllowedRooms || labels.length,
         allowedRooms: metric?.allowedRooms || labels.length,
         blockedRooms: metric?.blockedRooms || 0,
         bookedRooms: metric?.bookedRooms || 0,
@@ -541,6 +547,7 @@ export async function getCategoryAvailabilityForRoom(
     return {
       date,
       totalRooms: sellableTotalRooms,
+      controlAllowedRooms: controlledRooms,
       allowedRooms,
       blockedRooms: Math.max(0, sellableTotalRooms - allowedRooms),
       bookedRooms,
@@ -559,6 +566,7 @@ export async function getCategoryAvailabilityForRoom(
     room,
     categoryRoomIds,
     totalRooms,
+    controlAllowedRooms: nightlyAvailability.reduce((min, night) => Math.min(min, night.controlAllowedRooms), totalRooms),
     allowedRooms: minAllowedRooms,
     blockedRooms: maxBlockedRooms,
     bookedRooms: maxBookedRooms,
@@ -597,6 +605,7 @@ export async function getCategoryAvailabilityCalendar(
         date,
         category,
         totalRooms: sellableTotalRooms,
+        controlAllowedRooms: controlledRooms,
         allowedRooms,
         blockedRooms: Math.max(0, sellableTotalRooms - allowedRooms),
         bookedRooms,

@@ -23,6 +23,7 @@ interface Room {
 type AvailabilityControlSnapshot = {
   category: string
   totalRooms: number
+  controlAllowedRooms: number
   allowedRooms: number
   blockedRooms: number
   bookedRooms: number
@@ -185,6 +186,7 @@ function AvailabilityControlsPanel({ rooms, token }: { rooms: Room[]; token: str
           acc[category] = {
             category,
             totalRooms: Number(day.totalRooms || 0),
+            controlAllowedRooms: Number(day.controlAllowedRooms || day.allowedRooms || 0),
             allowedRooms: Number(day.allowedRooms || 0),
             blockedRooms: Number(day.blockedRooms || 0),
             bookedRooms: Number(day.bookedRooms || 0),
@@ -414,10 +416,10 @@ function AvailabilityControlsPanel({ rooms, token }: { rooms: Room[]; token: str
               <tbody>
                 <tr className="border-b border-white/5">
                   <td className="px-3 py-3 font-medium text-white">{selectedDate}</td>
-                  <td className="px-3 py-3 text-blue-200">{snapshots.deluxe?.allowedRooms ?? categoryTotals.deluxe ?? 0}</td>
+                  <td className="px-3 py-3 text-blue-200">{snapshots.deluxe?.controlAllowedRooms ?? categoryTotals.deluxe ?? 0}</td>
                   <td className="px-3 py-3 text-blue-200">{snapshots.deluxe?.bookedRooms ?? 0}</td>
                   <td className="px-3 py-3 text-emerald-300">{snapshots.deluxe?.availableRooms ?? categoryTotals.deluxe ?? 0}</td>
-                  <td className="px-3 py-3 text-[#e6c87a]">{snapshots.premium?.allowedRooms ?? categoryTotals.premium ?? 0}</td>
+                  <td className="px-3 py-3 text-[#e6c87a]">{snapshots.premium?.controlAllowedRooms ?? categoryTotals.premium ?? 0}</td>
                   <td className="px-3 py-3 text-[#e6c87a]">{snapshots.premium?.bookedRooms ?? 0}</td>
                   <td className="px-3 py-3 text-emerald-300">{snapshots.premium?.availableRooms ?? categoryTotals.premium ?? 0}</td>
                 </tr>
