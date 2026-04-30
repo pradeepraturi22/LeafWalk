@@ -32,6 +32,23 @@ type AvailabilityControlSnapshot = {
   controlNotes: string | null
 }
 
+type AvailabilitySummaryRow = {
+  date: string
+  deluxe?: AvailabilityControlSnapshot
+  premium?: AvailabilityControlSnapshot
+}
+
+function addDays(dateString: string, days: number) {
+  const date = new Date(`${dateString}T12:00:00`)
+  date.setDate(date.getDate() + days)
+  return toLocalDateString(date)
+}
+
+function formatSummaryDate(dateString: string) {
+  const date = new Date(`${dateString}T12:00:00`)
+  return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }).replace(' ', '-')
+}
+
 export default function ManageRoomsPage() {
   const [rooms, setRooms] = useState<Room[]>([])
   const [token, setToken] = useState('')
@@ -141,6 +158,7 @@ function AvailabilityControlsPanel({ rooms, token }: { rooms: Room[]; token: str
   const [saving, setSaving] = useState(false)
   const [mode, setMode] = useState<'single' | 'bulk'>('single')
   const [snapshots, setSnapshots] = useState<Record<string, AvailabilityControlSnapshot>>({})
+  const [summaryRows, setSummaryRows] = useState<AvailabilitySummaryRow[]>([])
 
   const categoryTotals = useMemo(() => (
     rooms.reduce((acc, room) => {
@@ -168,9 +186,7 @@ function AvailabilityControlsPanel({ rooms, token }: { rooms: Room[]; token: str
   async function loadSnapshots(date: string) {
     setLoading(true)
     try {
-      const nextDate = new Date(`${date}T12:00:00`)
-      nextDate.setDate(nextDate.getDate() + 1)
-      const checkOut = toLocalDateString(nextDate)
+      const checkOut = addDays(date, 7)
       const params = new URLSearchParams({ checkIn: date, checkOut })
       const response = await fetch(`/api/admin/availability-calendar?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -180,27 +196,40 @@ function AvailabilityControlsPanel({ rooms, token }: { rooms: Room[]; token: str
       if (!response.ok || !result.success) {
         throw new Error(result.error || 'Could not load availability controls')
       }
-      const nextSnapshots = Array.isArray(result.sections)
-        ? result.sections.reduce((acc: Record<string, AvailabilityControlSnapshot>, section: any) => {
+      const nextRowsMap = Array.isArray(result.sections)
+        ? result.sections.reduce((acc: Record<string, AvailabilitySummaryRow>, section: any) => {
             const category = String(section?.category || '').trim().toLowerCase()
-            const day = section?.rows?.[0]?.days?.[0]
-            if (!category || !day) return acc
+            const days = Array.isArray(section?.rows?.[0]?.days) ? section.rows[0].days : []
+            if (!category || days.length === 0) return acc
 
-            acc[category] = {
-              category,
-              totalRooms: Number(day.totalRooms || section.totalRooms || 0),
-              controlAllowedRooms: Number(day.controlAllowedRooms || day.allowedRooms || 0),
-              allowedRooms: Number(day.allowedRooms || 0),
-              blockedRooms: Number(day.blockedRooms || 0),
-              bookedRooms: Number(day.bookedRooms || 0),
-              availableRooms: Number(day.availableRooms || 0),
-              physicalAvailableRooms: Number(day.physicalAvailableRooms || 0),
-              controlNotes: day.controlNotes || null,
+            for (const day of days) {
+              const dateKey = String(day?.date || '').slice(0, 10)
+              if (!dateKey) continue
+              const snapshot: AvailabilityControlSnapshot = {
+                category,
+                totalRooms: Number(day.totalRooms || section.totalRooms || 0),
+                controlAllowedRooms: Number(day.controlAllowedRooms || day.allowedRooms || 0),
+                allowedRooms: Number(day.allowedRooms || 0),
+                blockedRooms: Number(day.blockedRooms || 0),
+                bookedRooms: Number(day.bookedRooms || 0),
+                availableRooms: Number(day.availableRooms || 0),
+                physicalAvailableRooms: Number(day.physicalAvailableRooms || 0),
+                controlNotes: day.controlNotes || null,
+              }
+              acc[dateKey] = acc[dateKey] || { date: dateKey }
+              acc[dateKey][category as 'deluxe' | 'premium'] = snapshot
             }
             return acc
           }, {})
         : {}
-      setSnapshots(nextSnapshots)
+
+      const nextSummaryRows = (Object.values(nextRowsMap) as AvailabilitySummaryRow[]).sort((left, right) => left.date.localeCompare(right.date))
+      const selectedDay = nextRowsMap[date]
+      setSummaryRows(nextSummaryRows)
+      setSnapshots({
+        deluxe: selectedDay?.deluxe as AvailabilityControlSnapshot,
+        premium: selectedDay?.premium as AvailabilityControlSnapshot,
+      })
     } catch (error: any) {
       toast.error(error.message || 'Could not load availability controls')
     } finally {
@@ -396,15 +425,35 @@ function AvailabilityControlsPanel({ rooms, token }: { rooms: Room[]; token: str
           <div className="flex items-start justify-between gap-3">
             <div>
               <div className="text-base font-semibold text-white">Availability Summary</div>
-              <div className="mt-1 text-xs text-white/40">Selected date wise bookable, booked, and available rooms</div>
+              <div className="mt-1 text-xs text-white/40">7-day bookable, booked, and available view for both categories</div>
             </div>
-            <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/55">
-              {selectedDate}
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedDate(addDays(selectedDate, -7))}
+                className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/70 transition hover:bg-white/10 hover:text-white"
+              >
+                Previous 7 Days
+              </button>
+              <input
+                type="date"
+                value={selectedDate}
+                min={today}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/70"
+              />
+              <button
+                type="button"
+                onClick={() => setSelectedDate(addDays(selectedDate, 7))}
+                className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/70 transition hover:bg-white/10 hover:text-white"
+              >
+                Next 7 Days
+              </button>
             </div>
           </div>
 
           <div className="mt-4 overflow-x-auto">
-            <table className="w-full min-w-[620px] text-sm">
+            <table className="w-full min-w-[760px] text-sm">
               <thead>
                 <tr className="border-b border-white/10 text-left">
                   <th className="px-3 py-2 text-[11px] uppercase tracking-[0.16em] text-white/35">Date</th>
@@ -417,15 +466,17 @@ function AvailabilityControlsPanel({ rooms, token }: { rooms: Room[]; token: str
                 </tr>
               </thead>
               <tbody>
-                <tr className="border-b border-white/5">
-                  <td className="px-3 py-3 font-medium text-white">{selectedDate}</td>
-                  <td className="px-3 py-3 text-blue-200">{snapshots.deluxe?.controlAllowedRooms ?? categoryTotals.deluxe ?? 0}</td>
-                  <td className="px-3 py-3 text-blue-200">{snapshots.deluxe?.bookedRooms ?? 0}</td>
-                  <td className="px-3 py-3 text-emerald-300">{snapshots.deluxe?.availableRooms ?? categoryTotals.deluxe ?? 0}</td>
-                  <td className="px-3 py-3 text-[#e6c87a]">{snapshots.premium?.controlAllowedRooms ?? categoryTotals.premium ?? 0}</td>
-                  <td className="px-3 py-3 text-[#e6c87a]">{snapshots.premium?.bookedRooms ?? 0}</td>
-                  <td className="px-3 py-3 text-emerald-300">{snapshots.premium?.availableRooms ?? categoryTotals.premium ?? 0}</td>
-                </tr>
+                {summaryRows.map((row) => (
+                  <tr key={row.date} className="border-b border-white/5">
+                    <td className="px-3 py-3 font-medium text-white">{formatSummaryDate(row.date)}</td>
+                    <td className="px-3 py-3 text-blue-200">{row.deluxe?.controlAllowedRooms ?? categoryTotals.deluxe ?? 0}</td>
+                    <td className="px-3 py-3 text-blue-200">{row.deluxe?.bookedRooms ?? 0}</td>
+                    <td className="px-3 py-3 text-emerald-300">{row.deluxe?.availableRooms ?? categoryTotals.deluxe ?? 0}</td>
+                    <td className="px-3 py-3 text-[#e6c87a]">{row.premium?.controlAllowedRooms ?? categoryTotals.premium ?? 0}</td>
+                    <td className="px-3 py-3 text-[#e6c87a]">{row.premium?.bookedRooms ?? 0}</td>
+                    <td className="px-3 py-3 text-emerald-300">{row.premium?.availableRooms ?? categoryTotals.premium ?? 0}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
