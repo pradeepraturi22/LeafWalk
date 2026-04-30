@@ -221,14 +221,11 @@ export default function TourOperatorBooking() {
   }
 
   function handleCheckOutChange(value: string) {
-    const minCheckout = tomorrowIso()
+    const minCheckout = form.check_in ? addDaysToDate(form.check_in, 1) : tomorrowIso()
     const safeCheckout = value && value < minCheckout ? minCheckout : value
-    const previousDay = safeCheckout ? addDaysToDate(safeCheckout, -1) : ''
-    const safeCheckIn = previousDay && previousDay < todayIso() ? todayIso() : previousDay
     setForm(p => ({
       ...p,
       check_out: safeCheckout,
-      check_in: safeCheckIn,
     }))
     setErrors(p => ({ ...p, check_out: '' }))
   }
@@ -453,7 +450,7 @@ export default function TourOperatorBooking() {
               <div>
                 <label className={LABEL}>Check-out *</label>
                 <input type="date" required value={form.check_out}
-                  min={tomorrowIso()}
+                  min={form.check_in ? addDaysToDate(form.check_in, 1) : tomorrowIso()}
                   onChange={e => handleCheckOutChange(e.target.value)}
                   className={`${INPUT} ${errors.check_out ? 'border-red-500' : ''}`} />
                 <Err f="check_out" />
