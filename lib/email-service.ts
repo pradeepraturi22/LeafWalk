@@ -1,6 +1,7 @@
 import {
   createBookingReceiptPdf,
   renderBookingConfirmationEmail,
+  renderAdminWebsiteBookingAlertEmail,
   renderCheckInCompletedEmail,
   renderCheckInReminderEmail,
   renderPaymentSuccessEmail,
@@ -121,6 +122,7 @@ export function generateOtpEmail(name: string, otp: string) {
 }
 
 export { renderBookingConfirmationEmail, renderPaymentSuccessEmail, renderCheckInReminderEmail, renderCheckInCompletedEmail }
+export { renderAdminWebsiteBookingAlertEmail }
 
 function safeDocumentReference(value: string) {
   return value

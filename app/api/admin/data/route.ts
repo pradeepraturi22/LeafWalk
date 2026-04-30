@@ -18,6 +18,8 @@ type RoomInventoryRow = {
   is_active?: boolean | null
 }
 
+const PROPERTY_ROOM_CAP = Math.max(1, Number(process.env.PROPERTY_TOTAL_ROOM_CAP || 10))
+
 
 // ── Shared auth guard ────────────────────────────────────────────────────────
 function getJwtSubjectForLocalFallback(token: string) {
@@ -67,6 +69,22 @@ const normalizePaymentStatus = (value: unknown) => {
   if (normalized === 'advance_paid') return 'payment_processing'
   if (['pending', 'payment_processing', 'fully_paid', 'failed', 'refunded'].includes(normalized)) return normalized
   return 'pending'
+}
+
+const addDays = (dateString: string, days: number) => {
+  const date = new Date(`${dateString}T12:00:00`)
+  date.setDate(date.getDate() + days)
+  return date.toISOString().slice(0, 10)
+}
+
+const getDateRange = (checkIn: string, checkOut: string) => {
+  const dates: string[] = []
+  let current = checkIn
+  while (current < checkOut) {
+    dates.push(current)
+    current = addDays(current, 1)
+  }
+  return dates
 }
 
 const operatorSchema = z.object({
@@ -147,62 +165,80 @@ async function getCategoryAvailability(
   const categories: string[] = Array.from(
     selectedRooms.reduce((set: Set<string>, room: any) => set.add(room.category), new Set<string>())
   )
-  const { data: categoryRooms, error: categoryRoomsError } = await supabase
+  const { data: activeRooms, error: activeRoomsError } = await supabase
     .from('rooms')
     .select('id, category, total_rooms')
-    .in('category', categories)
     .eq('is_active', true) as { data: RoomInventoryRow[] | null; error: Error | null }
 
-  if (categoryRoomsError || !categoryRooms?.length) {
+  if (activeRoomsError || !activeRooms?.length) {
     throw new Error('Could not load category inventory')
   }
 
   const roomIdsByCategory = new Map<string, string[]>()
   const totalByCategory = new Map<string, number>()
-  for (const room of categoryRooms) {
+  const roomCategoryMap = new Map<string, string>()
+  for (const room of activeRooms) {
+    roomCategoryMap.set(room.id, room.category)
     roomIdsByCategory.set(room.category, [...(roomIdsByCategory.get(room.category) || []), room.id])
     totalByCategory.set(room.category, (totalByCategory.get(room.category) || 0) + (Number(room.total_rooms) || 0))
   }
+  const propertyTotalInventory = Array.from(totalByCategory.values()).reduce((sum, value) => sum + value, 0)
+  const propertyCap = Math.max(1, Math.min(PROPERTY_ROOM_CAP, Math.max(propertyTotalInventory, PROPERTY_ROOM_CAP)))
+  for (const category of categories) {
+    totalByCategory.set(category, Math.max(totalByCategory.get(category) || 0, propertyCap))
+  }
+
+  let overlapQuery = supabase
+    .from('bookings')
+    .select('room_id, check_in, check_out, rooms_booked')
+    .in('room_id', activeRooms.map((room) => room.id))
+    .in('booking_status', ['pending', 'confirmed', 'hold', 'checked_in'])
+    .lt('check_in', checkOut)
+    .gt('check_out', checkIn)
+
+  if (excludeBookingId) {
+    overlapQuery = overlapQuery.neq('id', excludeBookingId)
+  }
+
+  const { data: overlapping, error: overlapError } = await overlapQuery as any
+
+  if (overlapError) {
+    logError('Admin booking availability overlap query failed:', {
+      categories,
+      checkIn,
+      checkOut,
+      excludeBookingId,
+      error: overlapError,
+    })
+    throw new Error('Could not validate room availability')
+  }
 
   const overlappingByCategory = new Map<string, number>()
+  const stayDates = getDateRange(checkIn, checkOut)
   for (const category of categories) {
-    const catRoomIds = roomIdsByCategory.get(category) || []
-
-    if (!catRoomIds.length) {
+    const categoryBaseTotal = (roomIdsByCategory.get(category) || []).length ? (activeRooms
+      .filter((room) => room.category === category)
+      .reduce((sum, room) => sum + (Number(room.total_rooms) || 0), 0)) : 0
+    const sellableTotal = totalByCategory.get(category) || propertyCap
+    if (!categoryBaseTotal) {
       overlappingByCategory.set(category, 0)
       continue
     }
+    const nightlyAvailable = stayDates.map((date) => {
+      const bookedCategory = (overlapping || [])
+        .filter((booking: any) => roomCategoryMap.get(String(booking.room_id)) === category)
+        .filter((booking: any) => booking.check_in <= date && booking.check_out > date)
+        .reduce((sum: number, booking: any) => sum + (Number(booking.rooms_booked) || 1), 0)
+      const bookedAll = (overlapping || [])
+        .filter((booking: any) => booking.check_in <= date && booking.check_out > date)
+        .reduce((sum: number, booking: any) => sum + (Number(booking.rooms_booked) || 1), 0)
+      const categoryCapFromProperty = Math.max(bookedCategory, propertyCap - Math.max(0, bookedAll - bookedCategory))
+      const allowedForCategory = Math.max(0, Math.min(sellableTotal, categoryCapFromProperty))
+      return Math.max(0, allowedForCategory - bookedCategory)
+    })
 
-    let overlapQuery = supabase
-      .from('bookings')
-      .select('rooms_booked')
-      .in('room_id', catRoomIds)
-      .in('booking_status', ['pending', 'confirmed', 'hold', 'checked_in'])
-      .lt('check_in', checkOut)
-      .gt('check_out', checkIn)
-
-    if (excludeBookingId) {
-      overlapQuery = overlapQuery.neq('id', excludeBookingId)
-    }
-
-    const { data: overlapping, error: overlapError } = await overlapQuery as any
-
-    if (overlapError) {
-      logError('Admin booking availability overlap query failed:', {
-        category,
-        catRoomIds,
-        checkIn,
-        checkOut,
-        excludeBookingId,
-        error: overlapError,
-      })
-      throw new Error('Could not validate room availability')
-    }
-
-    overlappingByCategory.set(
-      category,
-      (overlapping || []).reduce((sum: number, booking: any) => sum + (Number(booking.rooms_booked) || 1), 0)
-    )
+    const minNightlyAvailable = nightlyAvailable.length ? Math.min(...nightlyAvailable) : sellableTotal
+    overlappingByCategory.set(category, Math.max(0, sellableTotal - minNightlyAvailable))
   }
 
   return { selectedRooms, totalByCategory, overlappingByCategory }
@@ -230,6 +266,11 @@ function getIstNow() {
 function canCheckInToday(checkInDate: string) {
   const now = getIstNow()
   return now.date === checkInDate && (now.hour > 15 || (now.hour === 15 && now.minute >= 0))
+}
+
+function canCheckOutToday(checkOutDate: string) {
+  const now = getIstNow()
+  return now.date >= checkOutDate
 }
 
 // ── GET ──────────────────────────────────────────────────────────────────────
@@ -868,6 +909,9 @@ export async function PATCH(request: NextRequest) {
       }
       if (nextStatus === 'checked_in' && !canCheckInToday(String(existingBooking?.check_in || ''))) {
         return NextResponse.json({ error: 'Check-in is allowed only on the arrival date after 3:00 PM' }, { status: 400 })
+      }
+      if (nextStatus === 'checked_out' && !canCheckOutToday(String(existingBooking?.check_out || ''))) {
+        return NextResponse.json({ error: 'Check-out is allowed only on or after the departure date' }, { status: 400 })
       }
 
       if (updateData.check_in || updateData.check_out) {

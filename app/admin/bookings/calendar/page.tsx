@@ -252,8 +252,8 @@ export default function AdminBookingsCalendarPage() {
         date,
         leftCells,
         rightCells,
-        leftAvailable: leftCells.filter((cell) => cell.day.state === 'available').length,
-        rightAvailable: rightCells.filter((cell) => cell.day.state === 'available').length,
+        leftAvailable: leftCells[0]?.day.availableRooms ?? 0,
+        rightAvailable: rightCells[0]?.day.availableRooms ?? 0,
       }
     })
   }, [dates, leftSection, rightSection])

@@ -43,6 +43,24 @@ function validateAdminCheckInWindow(checkInDate?: string | null) {
   return null
 }
 
+function validateAdminCheckOutWindow(checkOutDate?: string | null) {
+  if (!checkOutDate) {
+    return 'Check-out date is missing for this booking'
+  }
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  const bookingCheckOutDate = new Date(`${checkOutDate}T12:00:00`)
+  bookingCheckOutDate.setHours(0, 0, 0, 0)
+
+  if (bookingCheckOutDate.getTime() > today.getTime()) {
+    return 'Guests can only be checked out on or after their actual check-out date'
+  }
+
+  return null
+}
+
 export async function POST(request: NextRequest) {
   const admin = await requireAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -90,7 +108,7 @@ export async function PATCH(request: NextRequest) {
 
     const { data: existingBooking } = await getSupabaseAdmin()
       .from('bookings')
-      .select('id, booking_status, total_amount, advance_amount, balance_amount, tour_operator_id, check_in')
+      .select('id, booking_status, total_amount, advance_amount, balance_amount, tour_operator_id, check_in, check_out')
       .eq('id', booking_id)
       .single() as any
 
@@ -110,6 +128,12 @@ export async function PATCH(request: NextRequest) {
         const checkInWindowError = validateAdminCheckInWindow(existingBooking.check_in)
         if (checkInWindowError) {
           return NextResponse.json({ error: checkInWindowError }, { status: 400 })
+        }
+      }
+      if (safeUpdates.booking_status === 'checked_out') {
+        const checkOutWindowError = validateAdminCheckOutWindow(existingBooking.check_out)
+        if (checkOutWindowError) {
+          return NextResponse.json({ error: checkOutWindowError }, { status: 400 })
         }
       }
       const transitionCheck = validateBookingStatusChange({

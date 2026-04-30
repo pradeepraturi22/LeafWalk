@@ -301,6 +301,9 @@ export default function BookingDetailPage() {
   const nights = booking.nights || 0
   const formatCurrency = (n: number) => `₹${Number(n || 0).toLocaleString()}`
   const formatDate = (d: string) => formatDisplayDate(d)
+  const todayKey = new Date().toISOString().slice(0, 10)
+  const canCheckOutNow = Boolean(booking?.check_out && booking.check_out <= todayKey)
+  const checkOutGuardMessage = 'Check-out booking departure date se pehle allow nahi hai.'
 
   return (
     <>
@@ -462,7 +465,7 @@ export default function BookingDetailPage() {
                   </button>
                 )}
                 {booking.booking_status === 'checked_in' && (
-                  <button onClick={() => updateStatus('checked_out')} disabled={updatingStatus} className="px-5 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded-full text-sm font-medium transition-all disabled:opacity-50">
+                  <button onClick={() => updateStatus('checked_out')} disabled={updatingStatus || !canCheckOutNow} title={!canCheckOutNow ? checkOutGuardMessage : 'Mark guest as checked out'} className="px-5 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded-full text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed">
                     ← Check Out
                   </button>
                 )}

@@ -1,5 +1,7 @@
 import { getSupabaseAdmin } from '@/lib/supabaseServer'
 
+const PROPERTY_ROOM_CAP = Math.max(1, Number(process.env.PROPERTY_TOTAL_ROOM_CAP || 10))
+
 export type CategoryAvailability = {
   room: {
     id: string
@@ -183,6 +185,17 @@ function formatRoomLabel(index: number) {
   return `LW${String(index).padStart(2, '0')}`
 }
 
+function getPropertyCap(totalInventory: number) {
+  return Math.max(1, Math.min(PROPERTY_ROOM_CAP, Math.max(totalInventory, PROPERTY_ROOM_CAP)))
+}
+
+function getBookedRoomsForDate(bookings: RawBookingRow[], date: string, roomCategoryMap?: Map<string, string>, category?: string) {
+  return bookings
+    .filter((booking) => (!category || roomCategoryMap?.get(booking.room_id) === category))
+    .filter((booking) => booking.check_in <= date && booking.check_out > date)
+    .reduce((sum, booking) => sum + (Number(booking.rooms_booked) || 1), 0)
+}
+
 function getLabelInventory(totalsByCategory: Map<string, number>) {
   const categories = Array.from(totalsByCategory.keys()).sort((a, b) => {
     const orderDelta = getCategoryOrder(a) - getCategoryOrder(b)
@@ -286,13 +299,19 @@ function buildCategoryMetrics(
   dates: string[],
   totalRooms: number,
   bookings: RawBookingRow[],
-  controls: Map<string, AvailabilityControlRow>
+  controls: Map<string, AvailabilityControlRow>,
+  totalBookedByDate: Map<string, number>,
+  propertyCap: number
 ) {
   return dates.reduce((map, date) => {
     const dayBookings = bookings.filter((booking) => booking.check_in <= date && booking.check_out > date)
     const bookedRooms = dayBookings.reduce((sum, booking) => sum + (Number(booking.rooms_booked) || 1), 0)
+    const totalBookedForDate = totalBookedByDate.get(date) || 0
     const control = controls.get(`${category}:${date}`)
-    const allowedRooms = Math.max(0, Math.min(totalRooms, Number(control?.allowed_rooms ?? totalRooms) || 0))
+    const sellableTotalRooms = Math.max(totalRooms, propertyCap)
+    const controlledRooms = Math.max(0, Math.min(sellableTotalRooms, Number(control?.allowed_rooms ?? sellableTotalRooms) || 0))
+    const propertyBoundRooms = Math.max(bookedRooms, propertyCap - Math.max(0, totalBookedForDate - bookedRooms))
+    const allowedRooms = Math.max(0, Math.min(controlledRooms, propertyBoundRooms))
     const holdRooms = dayBookings
       .filter((booking) => String(booking.booking_status || '') === 'hold')
       .reduce((sum, booking) => sum + (Number(booking.rooms_booked) || 1), 0)
@@ -316,12 +335,12 @@ function buildCategoryMetrics(
     map.set(date, {
       date,
       category,
-      totalRooms,
+      totalRooms: sellableTotalRooms,
       allowedRooms,
-      blockedRooms: Math.max(0, totalRooms - allowedRooms),
+      blockedRooms: Math.max(0, sellableTotalRooms - allowedRooms),
       bookedRooms,
       availableRooms: Math.max(0, allowedRooms - bookedRooms),
-      physicalAvailableRooms: Math.max(0, totalRooms - bookedRooms),
+      physicalAvailableRooms: Math.max(0, sellableTotalRooms - bookedRooms),
       sourceSummary,
       holdRooms,
       confirmedRooms,
@@ -484,11 +503,25 @@ export async function getCategoryAvailabilityForRoom(
   const categoryRoomIds = categoryRooms.map((entry: any) => entry.id)
   const totalRooms = categoryRooms.reduce((sum: number, entry: any) => sum + (Number(entry.total_rooms) || 0), 0)
   const controls = await getAvailabilityControls(checkIn, checkOut)
+  const propertyCap = getPropertyCap(totalRooms)
+
+  const { data: allRooms, error: allRoomsError } = await supabase
+    .from('rooms')
+    .select('id, category')
+    .eq('is_active', true) as any
+
+  if (allRoomsError || !allRooms?.length) throw new Error('Could not fetch room inventory')
+
+  const roomCategoryMap = new Map<string, string>()
+  const allRoomIds = allRooms.map((entry: any) => {
+    roomCategoryMap.set(entry.id, entry.category)
+    return entry.id
+  })
 
   const { data: overlapping, error: overlappingError } = await supabase
     .from('bookings')
-    .select('check_in, check_out, rooms_booked')
-    .in('room_id', categoryRoomIds)
+    .select('room_id, check_in, check_out, rooms_booked')
+    .in('room_id', allRoomIds)
     .in('booking_status', ACTIVE_BOOKING_STATUSES)
     .lt('check_in', checkOut)
     .gt('check_out', checkIn) as any
@@ -496,18 +529,20 @@ export async function getCategoryAvailabilityForRoom(
   if (overlappingError) throw new Error('Could not check availability')
 
   const nightlyAvailability = getDateRange(checkIn, checkOut).map((date) => {
-    const bookedRooms = (overlapping || [])
-      .filter((booking: any) => booking.check_in <= date && booking.check_out > date)
-      .reduce((sum: number, booking: any) => sum + (Number(booking.rooms_booked) || 1), 0)
+    const bookedRooms = getBookedRoomsForDate(overlapping || [], date, roomCategoryMap, room.category)
+    const totalBookedForDate = getBookedRoomsForDate(overlapping || [], date)
     const control = controls.get(`${room.category}:${date}`)
-    const allowedRooms = Math.max(0, Math.min(totalRooms, Number(control?.allowed_rooms ?? totalRooms) || 0))
-    const physicalAvailableRooms = Math.max(0, totalRooms - bookedRooms)
+    const sellableTotalRooms = Math.max(totalRooms, propertyCap)
+    const controlledRooms = Math.max(0, Math.min(sellableTotalRooms, Number(control?.allowed_rooms ?? sellableTotalRooms) || 0))
+    const propertyBoundRooms = Math.max(bookedRooms, propertyCap - Math.max(0, totalBookedForDate - bookedRooms))
+    const allowedRooms = Math.max(0, Math.min(controlledRooms, propertyBoundRooms))
+    const physicalAvailableRooms = Math.max(0, sellableTotalRooms - bookedRooms)
 
     return {
       date,
-      totalRooms,
+      totalRooms: sellableTotalRooms,
       allowedRooms,
-      blockedRooms: Math.max(0, totalRooms - allowedRooms),
+      blockedRooms: Math.max(0, sellableTotalRooms - allowedRooms),
       bookedRooms,
       availableRooms: Math.max(0, allowedRooms - bookedRooms),
       physicalAvailableRooms,
@@ -541,25 +576,32 @@ export async function getCategoryAvailabilityCalendar(
   const { totalsByCategory, roomCategoryMap, overlapping } = await getInventoryAndBookings(checkIn, checkOut)
   const dates = getDateRange(checkIn, checkOut)
   const controls = await getAvailabilityControls(checkIn, checkOut)
+  const propertyTotalInventory = Array.from(totalsByCategory.values()).reduce((sum, value) => sum + value, 0)
+  const propertyCap = getPropertyCap(propertyTotalInventory)
+  const totalBookedByDate = dates.reduce((map, date) => {
+    map.set(date, getBookedRoomsForDate(overlapping, date))
+    return map
+  }, new Map<string, number>())
   const result: Record<string, CategoryDailyAvailability[]> = {}
 
   for (const category of Array.from(totalsByCategory.keys())) {
     const totalRooms = totalsByCategory.get(category) || 0
     result[category] = dates.map((date) => {
-      const bookedRooms = overlapping
-        .filter((booking) => roomCategoryMap.get(booking.room_id) === category)
-        .filter((booking) => booking.check_in <= date && booking.check_out > date)
-        .reduce((sum, booking) => sum + (Number(booking.rooms_booked) || 1), 0)
-      const allowedRooms = Math.max(0, Math.min(totalRooms, Number(controls.get(`${category}:${date}`)?.allowed_rooms ?? totalRooms) || 0))
+      const bookedRooms = getBookedRoomsForDate(overlapping, date, roomCategoryMap, category)
+      const sellableTotalRooms = Math.max(totalRooms, propertyCap)
+      const controlledRooms = Math.max(0, Math.min(sellableTotalRooms, Number(controls.get(`${category}:${date}`)?.allowed_rooms ?? sellableTotalRooms) || 0))
+      const totalBookedForDate = totalBookedByDate.get(date) || 0
+      const propertyBoundRooms = Math.max(bookedRooms, propertyCap - Math.max(0, totalBookedForDate - bookedRooms))
+      const allowedRooms = Math.max(0, Math.min(controlledRooms, propertyBoundRooms))
       return {
         date,
         category,
-        totalRooms,
+        totalRooms: sellableTotalRooms,
         allowedRooms,
-        blockedRooms: Math.max(0, totalRooms - allowedRooms),
+        blockedRooms: Math.max(0, sellableTotalRooms - allowedRooms),
         bookedRooms,
         availableRooms: Math.max(0, allowedRooms - bookedRooms),
-        physicalAvailableRooms: Math.max(0, totalRooms - bookedRooms),
+        physicalAvailableRooms: Math.max(0, sellableTotalRooms - bookedRooms),
       }
     })
   }
@@ -574,12 +616,18 @@ export async function getAdminAvailabilityCalendar(
   const { totalsByCategory, roomCategoryMap, overlapping } = await getInventoryAndBookings(checkIn, checkOut)
   const dates = getDateRange(checkIn, checkOut)
   const controls = await getAvailabilityControls(checkIn, checkOut)
+  const propertyTotalInventory = Array.from(totalsByCategory.values()).reduce((sum, value) => sum + value, 0)
+  const propertyCap = getPropertyCap(propertyTotalInventory)
+  const totalBookedByDate = dates.reduce((map, date) => {
+    map.set(date, getBookedRoomsForDate(overlapping, date))
+    return map
+  }, new Map<string, number>())
   const result: Record<string, AdminCategoryDailyAvailability[]> = {}
 
   for (const category of Array.from(totalsByCategory.keys())) {
     const totalRooms = totalsByCategory.get(category) || 0
     const categoryBookings = overlapping.filter((booking) => roomCategoryMap.get(booking.room_id) === category)
-    const metricsByDate = buildCategoryMetrics(category, dates, totalRooms, categoryBookings, controls)
+    const metricsByDate = buildCategoryMetrics(category, dates, totalRooms, categoryBookings, controls, totalBookedByDate, propertyCap)
 
     result[category] = dates.map((date) => {
       const dayBookings = categoryBookings
@@ -604,6 +652,12 @@ export async function getAdminRoomAvailabilityCalendar(
   const dates = getDateRange(checkIn, checkOut)
   const controls = await getAvailabilityControls(checkIn, checkOut)
   const labelsByCategory = getLabelInventory(totalsByCategory)
+  const propertyTotalInventory = Array.from(totalsByCategory.values()).reduce((sum, value) => sum + value, 0)
+  const propertyCap = getPropertyCap(propertyTotalInventory)
+  const totalBookedByDate = dates.reduce((map, date) => {
+    map.set(date, getBookedRoomsForDate(overlapping, date))
+    return map
+  }, new Map<string, number>())
 
   const sections = Array.from(totalsByCategory.keys())
     .sort((a, b) => {
@@ -614,7 +668,7 @@ export async function getAdminRoomAvailabilityCalendar(
       const totalRooms = totalsByCategory.get(category) || 0
       const labels = labelsByCategory.get(category) || []
       const categoryBookings = overlapping.filter((booking) => roomCategoryMap.get(booking.room_id) === category)
-      const metricsByDate = buildCategoryMetrics(category, dates, totalRooms, categoryBookings, controls)
+      const metricsByDate = buildCategoryMetrics(category, dates, totalRooms, categoryBookings, controls, totalBookedByDate, propertyCap)
 
       return {
         category,

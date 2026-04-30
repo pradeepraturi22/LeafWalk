@@ -154,7 +154,18 @@ export default function AdminBookingsPage() {
         (b.room?.name || '').toLowerCase().includes(q)
       )
     }
+    const todayKey = new Date().toISOString().slice(0, 10)
+    const getSortBucket = (booking: Booking) => {
+      if (booking.check_in === todayKey) return 0
+      if (booking.check_in > todayKey) return 1
+      return 2
+    }
+
     f.sort((left, right) => {
+      const leftBucket = getSortBucket(left)
+      const rightBucket = getSortBucket(right)
+      if (leftBucket !== rightBucket) return leftBucket - rightBucket
+
       const leftDate = new Date(`${left.check_in}T12:00:00`).getTime()
       const rightDate = new Date(`${right.check_in}T12:00:00`).getTime()
       if (leftDate !== rightDate) return leftDate - rightDate
@@ -180,6 +191,14 @@ export default function AdminBookingsPage() {
       return { allowed: false, message: 'Check-in is allowed only after 3:00 PM on the check-in date.' }
     }
 
+    return { allowed: true, message: '' }
+  }
+
+  function getCheckOutValidation(booking: Booking) {
+    const todayKey = new Date().toISOString().slice(0, 10)
+    if (booking.check_out > todayKey) {
+      return { allowed: false, message: 'Check-out booking departure date se pehle allow nahi hai.' }
+    }
     return { allowed: true, message: '' }
   }
 
@@ -374,7 +393,9 @@ export default function AdminBookingsPage() {
                         )}
                         {userRole === 'admin' && b.booking_status === 'checked_in' && (
                           <button onClick={() => updateStatus(b.id, 'checked_out')}
-                            className="px-3 py-1.5 bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/25 text-purple-400 rounded-lg text-xs transition-all">
+                            title={!getCheckOutValidation(b).allowed ? getCheckOutValidation(b).message : 'Mark guest as checked out'}
+                            disabled={!getCheckOutValidation(b).allowed}
+                            className="px-3 py-1.5 bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/25 text-purple-400 rounded-lg text-xs transition-all disabled:cursor-not-allowed disabled:opacity-40">
                             Check Out
                           </button>
                         )}

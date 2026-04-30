@@ -1,4 +1,4 @@
-import { generateCheckInCompletedEmail, generateReceiptAttachment, renderBookingConfirmationEmail, renderPaymentSuccessEmail, sendEmail } from '@/lib/email-service'
+import { generateCheckInCompletedEmail, generateReceiptAttachment, renderAdminWebsiteBookingAlertEmail, renderBookingConfirmationEmail, renderPaymentSuccessEmail, sendEmail } from '@/lib/email-service'
 import { logDebug, logError, logInfo } from '@/lib/logger'
 import { isLocalTestMode } from '@/lib/runtime-mode'
 import { getSupabaseAdmin } from '@/lib/supabaseServer'
@@ -249,13 +249,14 @@ export async function getBookingEmailContext(bookingId: string) {
 
 export async function sendBookingLifecycleEmails(bookingId: string, trigger: BookingEmailTrigger) {
   const booking = await getBookingEmailContext(bookingId)
-  if (!booking) return { guestConfirmation: false, paymentSuccess: false, operatorStatus: false }
+  if (!booking) return { guestConfirmation: false, paymentSuccess: false, operatorStatus: false, adminAlert: false }
 
   const source = normalize(booking.booking_source)
   const results = {
     guestConfirmation: false,
     paymentSuccess: false,
     operatorStatus: false,
+    adminAlert: false,
   }
 
   if (isLocalTestMode()) {
@@ -352,6 +353,20 @@ export async function sendBookingLifecycleEmails(bookingId: string, trigger: Boo
       debugLabel: 'website payment-verified booking confirmation',
       attachments: [await generateReceiptAttachment(booking as any)],
     })
+
+    if (source === 'website') {
+      const adminRecipient = process.env.ADMIN_BOOKING_ALERT_EMAIL || 'admin@leafwalk.in'
+      results.adminAlert = await sendTrackedGuestEmail({
+        booking,
+        recipient: adminRecipient,
+        subject: `New Website Booking - ${booking.booking_number || 'LeafWalk Resort'}`,
+        html: renderAdminWebsiteBookingAlertEmail(booking as any),
+        marker: `admin_website_booking_alert:${booking.booking_number || booking.id}`,
+        eventType: 'booking_confirmation',
+        debugLabel: 'website booking admin alert',
+        attachments: [await generateReceiptAttachment(booking as any)],
+      })
+    }
   }
 
   if (isLocalTestMode() && trigger === 'public_booking_created' && !shouldSendGuestConfirmationOnBookingEvent(booking)) {

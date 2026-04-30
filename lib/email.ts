@@ -440,6 +440,17 @@ export function renderPaymentSuccessEmail(booking: BookingLike) {
   )
 }
 
+export function renderAdminWebsiteBookingAlertEmail(booking: BookingLike) {
+  return layoutEmail(
+    'New website booking received',
+    `
+      <p>A new website booking has been confirmed after successful payment.</p>
+      ${bookingFactsTable(booking, 'Stay Total')}
+      <p style="margin-top:20px">Please review this booking in the admin panel for arrival planning and operations.</p>
+    `
+  )
+}
+
 export function renderCheckInReminderEmail(booking: BookingLike) {
   return layoutEmail(
     'Your stay is coming up',
