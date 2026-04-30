@@ -105,7 +105,7 @@ export async function PATCH(request: NextRequest) {
 
     const { data: existingBooking } = await getSupabaseAdmin()
       .from('bookings')
-      .select('id, booking_status, total_amount, advance_amount, balance_amount, tour_operator_id, check_in, check_out')
+      .select('id, booking_status, payment_status, total_amount, advance_amount, balance_amount, tour_operator_id, check_in, check_out')
       .eq('id', booking_id)
       .single() as any
 

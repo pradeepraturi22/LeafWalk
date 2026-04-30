@@ -280,7 +280,12 @@ export async function sendBookingLifecycleEmails(bookingId: string, trigger: Boo
     })
   }
 
-  if (source === 'tour_operator' && booking.tour_operator?.email && ['admin_booking_created', 'admin_status_changed'].includes(trigger)) {
+  if (
+    source === 'tour_operator' &&
+    booking.tour_operator?.email &&
+    ['admin_booking_created', 'admin_status_changed'].includes(trigger) &&
+    normalize(booking.booking_status) !== 'checked_in'
+  ) {
     const statusType = resolveOperatorStatusType(booking)
     const operatorAlreadySent = await hasOperatorStatusEmailBeenSent(booking.id, booking.tour_operator.email, statusType, booking.payment_status)
     if (!operatorAlreadySent) {
