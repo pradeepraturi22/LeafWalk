@@ -25,6 +25,7 @@ type AvailabilityControlSnapshot = {
   totalRooms: number
   allowedRooms: number
   blockedRooms: number
+  bookedRooms: number
   availableRooms: number
   physicalAvailableRooms: number
   controlNotes: string | null
@@ -186,6 +187,7 @@ function AvailabilityControlsPanel({ rooms, token }: { rooms: Room[]; token: str
             totalRooms: Number(day.totalRooms || 0),
             allowedRooms: Number(day.allowedRooms || 0),
             blockedRooms: Number(day.blockedRooms || 0),
+            bookedRooms: Number(day.bookedRooms || 0),
             availableRooms: Number(day.availableRooms || 0),
             physicalAvailableRooms: Number(day.physicalAvailableRooms || 0),
             controlNotes: day.controlNotes || null,
@@ -385,44 +387,56 @@ function AvailabilityControlsPanel({ rooms, token }: { rooms: Room[]; token: str
           </div>
         </div>
 
-        <div className="grid gap-3">
-          {(['deluxe', 'premium'] as const).map((category) => {
-            const snapshot = snapshots[category]
-            const total = snapshot?.totalRooms ?? categoryTotals[category] ?? 0
-            const allowed = snapshot?.allowedRooms ?? total
-            const blocked = snapshot?.blockedRooms ?? 0
-            const directFree = snapshot?.availableRooms ?? total
-            const adminFree = snapshot?.physicalAvailableRooms ?? total
+        <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-base font-semibold text-white">Availability Summary</div>
+              <div className="mt-1 text-xs text-white/40">Selected date wise bookable, booked, and available rooms</div>
+            </div>
+            <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/55">
+              {selectedDate}
+            </div>
+          </div>
 
-            return (
-              <div key={category} className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-base font-semibold capitalize text-white">{category}</div>
-                    <div className="mt-1 text-xs text-white/40">{selectedDate}</div>
-                  </div>
-                  <button
-                    onClick={() => setSelectedCategory(category)}
-                    className={`rounded-full px-3 py-1 text-xs font-medium ${selectedCategory === category ? 'bg-[#c9a14a] text-black' : 'border border-white/10 bg-white/5 text-white/60'}`}
-                  >
-                    Edit
-                  </button>
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full min-w-[620px] text-sm">
+              <thead>
+                <tr className="border-b border-white/10 text-left">
+                  <th className="px-3 py-2 text-[11px] uppercase tracking-[0.16em] text-white/35">Date</th>
+                  <th className="px-3 py-2 text-[11px] uppercase tracking-[0.16em] text-blue-300">Bookable DLX</th>
+                  <th className="px-3 py-2 text-[11px] uppercase tracking-[0.16em] text-blue-300">DLX Booked</th>
+                  <th className="px-3 py-2 text-[11px] uppercase tracking-[0.16em] text-blue-300">DLX Available</th>
+                  <th className="px-3 py-2 text-[11px] uppercase tracking-[0.16em] text-[#c9a14a]">Bookable Premium</th>
+                  <th className="px-3 py-2 text-[11px] uppercase tracking-[0.16em] text-[#c9a14a]">Premium Booked</th>
+                  <th className="px-3 py-2 text-[11px] uppercase tracking-[0.16em] text-[#c9a14a]">Premium Available</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-b border-white/5">
+                  <td className="px-3 py-3 font-medium text-white">{selectedDate}</td>
+                  <td className="px-3 py-3 text-blue-200">{snapshots.deluxe?.allowedRooms ?? categoryTotals.deluxe ?? 0}</td>
+                  <td className="px-3 py-3 text-blue-200">{snapshots.deluxe?.bookedRooms ?? 0}</td>
+                  <td className="px-3 py-3 text-emerald-300">{snapshots.deluxe?.availableRooms ?? categoryTotals.deluxe ?? 0}</td>
+                  <td className="px-3 py-3 text-[#e6c87a]">{snapshots.premium?.allowedRooms ?? categoryTotals.premium ?? 0}</td>
+                  <td className="px-3 py-3 text-[#e6c87a]">{snapshots.premium?.bookedRooms ?? 0}</td>
+                  <td className="px-3 py-3 text-emerald-300">{snapshots.premium?.availableRooms ?? categoryTotals.premium ?? 0}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            {(['deluxe', 'premium'] as const).map((category) => {
+              const snapshot = snapshots[category]
+              if (!snapshot?.controlNotes) return null
+
+              return (
+                <div key={category} className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-white/55">
+                  <span className="font-semibold capitalize text-white/75">{category} note:</span> {snapshot.controlNotes}
                 </div>
-                <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                  <InfoChip label="Physical total" value={total} />
-                  <InfoChip label="Allowed" value={allowed} />
-                  <InfoChip label="Blocked" value={blocked} />
-                  <InfoChip label="Direct/OTA free" value={directFree} accent="text-emerald-300" />
-                  <InfoChip label="Admin physical free" value={adminFree} accent="text-blue-300" />
-                </div>
-                {snapshot?.controlNotes ? (
-                  <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-white/55">
-                    {snapshot.controlNotes}
-                  </div>
-                ) : null}
-              </div>
-            )
-          })}
+              )
+            })}
+          </div>
         </div>
       </div>
       <style jsx>{`
@@ -432,15 +446,6 @@ function AvailabilityControlsPanel({ rooms, token }: { rooms: Room[]; token: str
           margin: 0;
         }
       `}</style>
-    </div>
-  )
-}
-
-function InfoChip({ label, value, accent = 'text-white' }: { label: string; value: number; accent?: string }) {
-  return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
-      <div className="text-[11px] uppercase tracking-[0.14em] text-white/35">{label}</div>
-      <div className={`mt-1 text-lg font-semibold ${accent}`}>{value}</div>
     </div>
   )
 }

@@ -66,7 +66,8 @@ type HomeRoom = {
 export default function HomeClient({ pageName }: { pageName?: string }) {
   const aboutRef = useRef<HTMLElement>(null)
   const stayRef = useRef<HTMLDivElement>(null)
-  const { checkInDate, checkOutDate, hasDates } = useBookingDates()
+  const homepageDatesInitializedRef = useRef(false)
+  const { checkInDate, checkOutDate, hydrated, setDates } = useBookingDates()
   const today = toLocalDateString(new Date())
   const tomorrow = (() => {
     const date = new Date(`${today}T12:00:00`)
@@ -80,6 +81,13 @@ export default function HomeClient({ pageName }: { pageName?: string }) {
   const [priceQuotes, setPriceQuotes] = useState<Record<string, PricingQuote | null>>({})
   const [availabilityQuotes, setAvailabilityQuotes] = useState<Record<string, AvailabilityQuote | null>>({})
   const [reviews, setReviews] = useState<ReviewCard[]>(FALLBACK_REVIEWS)
+
+  useEffect(() => {
+    if (!hydrated || homepageDatesInitializedRef.current) return
+
+    homepageDatesInitializedRef.current = true
+    setDates({ checkInDate: today, checkOutDate: tomorrow })
+  }, [hydrated, setDates, today, tomorrow])
 
   useEffect(() => {
     Promise.all([
