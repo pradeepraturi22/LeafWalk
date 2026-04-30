@@ -29,7 +29,21 @@ function buildWifiQrText(settings: WifiSettings) {
 }
 
 export function buildWifiQrPreviewUrl(settings: WifiSettings) {
-  return `https://quickchart.io/qr?size=220&text=${encodeURIComponent(buildWifiQrText(settings))}`
+  return `https://quickchart.io/qr?size=220&format=png&text=${encodeURIComponent(buildWifiQrText(settings))}`
+}
+
+function isPng(bytes: Buffer) {
+  return (
+    bytes.length >= 8 &&
+    bytes[0] === 0x89 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x4e &&
+    bytes[3] === 0x47 &&
+    bytes[4] === 0x0d &&
+    bytes[5] === 0x0a &&
+    bytes[6] === 0x1a &&
+    bytes[7] === 0x0a
+  )
 }
 
 export async function buildWifiEmailPayload(): Promise<WifiEmailPayload> {
@@ -48,6 +62,16 @@ export async function buildWifiEmailPayload(): Promise<WifiEmailPayload> {
     }
 
     const bytes = Buffer.from(await response.arrayBuffer())
+    const contentType = String(response.headers.get('content-type') || '').toLowerCase()
+
+    if (!contentType.includes('image/png')) {
+      throw new Error(`QR provider returned unexpected content-type: ${contentType || 'unknown'}`)
+    }
+
+    if (!isPng(bytes)) {
+      throw new Error('QR provider returned invalid PNG bytes')
+    }
+
     return {
       wifi,
       qrAttachment: {
