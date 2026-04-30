@@ -43,6 +43,13 @@ type GalleryForm = {
   display_order: number
 }
 
+type WifiSettingsForm = {
+  ssid: string
+  password: string
+  security: 'WPA' | 'WEP' | 'nopass'
+  hidden: boolean
+}
+
 const EMPTY_GALLERY_FORM: GalleryForm = {
   title: '',
   description: '',
@@ -50,6 +57,22 @@ const EMPTY_GALLERY_FORM: GalleryForm = {
   category: 'Nature',
   is_featured: false,
   display_order: 0,
+}
+
+const DEFAULT_WIFI_SETTINGS: WifiSettingsForm = {
+  ssid: 'Leafwalk Resort',
+  password: 'Password-123456',
+  security: 'WPA',
+  hidden: false,
+}
+
+function buildWifiQrPreviewUrl(settings: WifiSettingsForm) {
+  const escaped = (value: string) => value.replace(/([\\;,:"])/g, '\\$1')
+  const qrText = settings.security === 'nopass'
+    ? `WIFI:T:${settings.security};S:${escaped(settings.ssid)};H:${settings.hidden ? 'true' : 'false'};;`
+    : `WIFI:T:${settings.security};S:${escaped(settings.ssid)};P:${escaped(settings.password)};H:${settings.hidden ? 'true' : 'false'};;`
+
+  return `https://quickchart.io/qr?size=220&text=${encodeURIComponent(qrText)}`
 }
 
 async function readJsonSafely(response: Response) {
@@ -86,8 +109,10 @@ export default function AdminContentPage() {
   const [reviewDrafts, setReviewDrafts] = useState<Record<string, { title: string; comment: string; is_approved: boolean }>>({})
   const [galleryDrafts, setGalleryDrafts] = useState<Record<string, GalleryForm>>({})
   const [galleryForm, setGalleryForm] = useState<GalleryForm>(EMPTY_GALLERY_FORM)
+  const [wifiForm, setWifiForm] = useState<WifiSettingsForm>(DEFAULT_WIFI_SETTINGS)
   const [uploadingTarget, setUploadingTarget] = useState<string | null>(null)
   const [uploadError, setUploadError] = useState('')
+  const [wifiMessage, setWifiMessage] = useState('')
 
   useEffect(() => {
     init()
@@ -156,24 +181,54 @@ export default function AdminContentPage() {
 
   async function loadAll(authToken: string = token) {
     const headers = { Authorization: `Bearer ${authToken}` }
-    const [iqRes, rvRes, giRes] = await Promise.all([
+    const [iqRes, rvRes, giRes, wifiRes] = await Promise.all([
       fetch('/api/admin/data?type=inquiries', { headers }),
       fetch('/api/admin/data?type=reviews', { headers }),
       fetch('/api/admin/data?type=gallery-images', { headers }),
+      fetch('/api/admin/data?type=wifi-settings', { headers }),
     ])
 
-    const [iqData, rvData, giData] = await Promise.all([
+    const [iqData, rvData, giData, wifiData] = await Promise.all([
       readJsonSafely(iqRes),
       readJsonSafely(rvRes),
       readJsonSafely(giRes),
+      readJsonSafely(wifiRes),
     ])
     const nextInquiries = iqData.data || []
     const nextReviews = rvData.data || []
     const nextGallery = giData.data || []
+    const nextWifi = wifiData?.data || DEFAULT_WIFI_SETTINGS
     setInquiries(nextInquiries)
     setReviews(nextReviews)
     setGalleryImages(nextGallery)
+    setWifiForm({
+      ssid: nextWifi.ssid || DEFAULT_WIFI_SETTINGS.ssid,
+      password: nextWifi.password || DEFAULT_WIFI_SETTINGS.password,
+      security: nextWifi.security || DEFAULT_WIFI_SETTINGS.security,
+      hidden: Boolean(nextWifi.hidden),
+    })
     seedDrafts(nextInquiries, nextReviews, nextGallery)
+  }
+
+  async function saveWifiSettings() {
+    setSaving(true)
+    setWifiMessage('')
+
+    try {
+      const response = await adminFetch('/api/admin/data?type=wifi-settings', {
+        method: 'PATCH',
+        body: JSON.stringify(wifiForm),
+      })
+      const data = await readJsonSafely(response)
+      if (!response.ok) {
+        throw new Error(data?.error || 'Could not save Wi-Fi settings')
+      }
+      setWifiMessage('Wi-Fi settings saved. New check-in mails will use the updated QR automatically.')
+    } catch (error: any) {
+      setWifiMessage(error?.message || 'Could not save Wi-Fi settings')
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function saveInquiry(id: string) {
@@ -292,6 +347,64 @@ export default function AdminContentPage() {
             Back to Dashboard
           </button>
         </div>
+
+        <section className="bg-white/5 border border-white/10 rounded-2xl p-6">
+          <h2 className="text-xl font-semibold mb-4">Guest Wi-Fi</h2>
+          <p className="text-sm text-white/60 mb-5">
+            Check-in related mails will use these live Wi-Fi details. Password change karte hi next mail me naya QR automatically chala jayega.
+          </p>
+          <div className="grid lg:grid-cols-[1.2fr_0.8fr] gap-6">
+            <div className="grid md:grid-cols-2 gap-3">
+              <input
+                value={wifiForm.ssid}
+                onChange={(e) => setWifiForm((state) => ({ ...state, ssid: e.target.value }))}
+                placeholder="Wi-Fi name (SSID)"
+                className="bg-[#111] border border-white/10 rounded-lg px-3 py-2"
+              />
+              <input
+                value={wifiForm.password}
+                onChange={(e) => setWifiForm((state) => ({ ...state, password: e.target.value }))}
+                placeholder="Wi-Fi password"
+                className="bg-[#111] border border-white/10 rounded-lg px-3 py-2"
+              />
+              <select
+                value={wifiForm.security}
+                onChange={(e) => setWifiForm((state) => ({ ...state, security: e.target.value as WifiSettingsForm['security'] }))}
+                className="bg-[#111] border border-white/10 rounded-lg px-3 py-2"
+              >
+                <option value="WPA">WPA / WPA2</option>
+                <option value="WEP">WEP</option>
+                <option value="nopass">Open Network</option>
+              </select>
+              <label className="flex items-center gap-2 text-sm text-white/70 rounded-lg border border-white/10 bg-[#111] px-3 py-2">
+                <input
+                  type="checkbox"
+                  checked={wifiForm.hidden}
+                  onChange={(e) => setWifiForm((state) => ({ ...state, hidden: e.target.checked }))}
+                />
+                Hidden network
+              </label>
+              <div className="md:col-span-2 flex flex-wrap items-center gap-3">
+                <button onClick={saveWifiSettings} disabled={saving} className="px-4 py-2 rounded-lg bg-[#c9a14a] text-black font-semibold">
+                  Save Wi-Fi Settings
+                </button>
+                {wifiMessage ? <p className="text-sm text-white/65">{wifiMessage}</p> : null}
+              </div>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
+              <p className="text-sm font-semibold text-white">QR Preview</p>
+              <p className="text-xs text-white/45 mt-1">Guest check-in mails me isi live setup ka QR jayega.</p>
+              <div className="mt-4 overflow-hidden rounded-2xl border border-white/10 bg-white p-4">
+                <img src={buildWifiQrPreviewUrl(wifiForm)} alt="Wi-Fi QR preview" className="mx-auto h-52 w-52 object-contain" />
+              </div>
+              <div className="mt-4 space-y-1 text-sm text-white/70">
+                <p><span className="text-white/45">SSID:</span> {wifiForm.ssid || '-'}</p>
+                <p><span className="text-white/45">Password:</span> {wifiForm.password || '-'}</p>
+                <p><span className="text-white/45">Security:</span> {wifiForm.security}</p>
+              </div>
+            </div>
+          </div>
+        </section>
 
         <section className="bg-white/5 border border-white/10 rounded-2xl p-6">
           <h2 className="text-xl font-semibold mb-4">Enquiries</h2>

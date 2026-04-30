@@ -53,6 +53,14 @@ type BookingLike = {
   payment_status?: string | null
 }
 
+type WifiEmailDetails = {
+  ssid?: string | null
+  password?: string | null
+  security?: string | null
+  hidden?: boolean | null
+  qrCid?: string | null
+}
+
 export type EmailProviderResult = {
   success: boolean
   provider?: string
@@ -444,11 +452,21 @@ export function renderCheckInReminderEmail(booking: BookingLike) {
   )
 }
 
-export function renderCheckInCompletedEmail(booking: BookingLike) {
+export function renderCheckInCompletedEmail(booking: BookingLike, wifi?: WifiEmailDetails) {
   const paymentStatus = String(booking.payment_status || 'pending').replace(/_/g, ' ').toUpperCase()
   const receiptLabel = booking.payment_status === 'fully_paid'
     ? (booking.gst_invoice_requested ? 'GST invoice' : 'booking receipt')
     : 'booking receipt'
+  const wifiName = String(wifi?.ssid || 'Leafwalk Resort')
+  const wifiPassword = String(wifi?.password || 'Password-123456')
+  const wifiSecurity = String(wifi?.security || 'WPA')
+  const wifiQrBlock = wifi?.qrCid ? `
+        <div style="margin-top:18px;padding:18px;border:1px solid #e5e7eb;border-radius:16px;background:#faf7f1;text-align:center">
+          <div style="font-size:12px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#6b7280;margin-bottom:10px">Wi-Fi QR</div>
+          <img src="cid:${escapeHtml(wifi.qrCid)}" alt="LeafWalk Wi-Fi QR" width="170" height="170" style="display:block;margin:0 auto 10px;width:170px;height:170px;object-fit:contain" />
+          <div style="font-size:12px;color:#6b7280">Scan to connect instantly during your stay.</div>
+        </div>
+      ` : ''
   return layoutEmail(
     'Check-in completed successfully',
     `
@@ -483,7 +501,8 @@ export function renderCheckInCompletedEmail(booking: BookingLike) {
         <div style="font-size:12px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#6b7280;margin-bottom:10px">Hotel Information</div>
         <table style="width:100%;border-collapse:collapse">
           ${[
-            ['Wi-Fi', 'Leafwalk Resort / Password-123456'],
+            ['Wi-Fi', `${wifiName} / ${wifiPassword}`],
+            ['Wi-Fi Security', wifiSecurity],
             ['Restaurant Timings', 'Breakfast 8:00 AM - 10:00 AM | Kitchen till 10:00 PM'],
             ['Contact', '+91-8630227541'],
           ].map(([label, value]) => `
@@ -493,6 +512,7 @@ export function renderCheckInCompletedEmail(booking: BookingLike) {
             </tr>
           `).join('')}
         </table>
+        ${wifiQrBlock}
       </div>
 
       <p style="margin-top:20px">Your ${escapeHtml(receiptLabel)} is attached with this email whenever applicable for the current payment stage.</p>

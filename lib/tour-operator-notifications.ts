@@ -2,6 +2,7 @@ import { getSupabaseAdmin } from '@/lib/supabaseServer'
 import { generateCheckInPassAttachment, generateReceiptAttachment, sendEmail, sendEmailWithResult } from '@/lib/email-service'
 import { logDebug, logError, logInfo } from '@/lib/logger'
 import { isLocalTestMode } from '@/lib/runtime-mode'
+import { buildWifiEmailPayload, getWifiQrCid } from '@/lib/wifi-email'
 
 type TourOperatorLike = {
   id?: string
@@ -33,6 +34,14 @@ type BookingLike = {
   cancellation_reason?: string | null
   payment_due_date?: string | null
   room?: { name?: string | null; category?: string | null } | null
+}
+
+type WifiEmailDetails = {
+  ssid?: string | null
+  password?: string | null
+  security?: string | null
+  hidden?: boolean | null
+  qrCid?: string | null
 }
 
 function escapeHtml(value: string) {
@@ -132,7 +141,12 @@ function buildWelcomeHtml(operator: TourOperatorLike) {
   )
 }
 
-function buildStatusHtml(booking: BookingLike, operator: TourOperatorLike, statusType: 'registered' | 'hold' | 'confirmed' | 'cancelled') {
+function buildStatusHtml(
+  booking: BookingLike,
+  operator: TourOperatorLike,
+  statusType: 'registered' | 'hold' | 'confirmed' | 'cancelled',
+  wifi?: WifiEmailDetails
+) {
   const introMap = {
     registered: 'A new tour operator booking has been registered in your account.',
     hold: 'A booking has been placed on hold for your account.',
@@ -158,7 +172,8 @@ function buildStatusHtml(booking: BookingLike, operator: TourOperatorLike, statu
           <div style="font-size:12px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#6b7280;margin-bottom:10px">Hotel Information</div>
           <table style="width:100%;border-collapse:collapse">
             ${[
-              ['Wi-Fi', 'Leafwalk Resort / Password-123456'],
+              ['Wi-Fi', `${wifi?.ssid || 'Leafwalk Resort'} / ${wifi?.password || 'Password-123456'}`],
+              ['Wi-Fi Security', wifi?.security || 'WPA'],
               ['Restaurant Timings', 'Breakfast 8:00 AM - 10:00 AM | Kitchen till 10:00 PM'],
               ['Front Desk Contact', '+91-8630227541'],
             ].map(([label, value]) => `
@@ -168,6 +183,13 @@ function buildStatusHtml(booking: BookingLike, operator: TourOperatorLike, statu
               </tr>
             `).join('')}
           </table>
+          ${wifi?.qrCid ? `
+            <div style="margin-top:18px;padding:18px;border:1px solid #e5e7eb;border-radius:16px;background:#faf7f1;text-align:center">
+              <div style="font-size:12px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#6b7280;margin-bottom:10px">Guest Wi-Fi QR</div>
+              <img src="cid:${escapeHtml(wifi.qrCid)}" alt="LeafWalk Wi-Fi QR" width="170" height="170" style="display:block;margin:0 auto 10px;width:170px;height:170px;object-fit:contain" />
+              <div style="font-size:12px;color:#6b7280">Guest can scan this QR after arrival to connect instantly.</div>
+            </div>
+          ` : ''}
         </div>
       ` : ''}
     `
@@ -265,15 +287,21 @@ export async function sendTourOperatorBookingStatusEmail(
     confirmed: `Booking Confirmed - ${booking.booking_number || 'LeafWalk Resort'}`,
     cancelled: `Booking Cancelled - ${booking.booking_number || 'LeafWalk Resort'}`,
   }
+  const isCheckedIn = String(booking.booking_status || '').toLowerCase() === 'checked_in'
+  const wifiPayload = isCheckedIn ? await buildWifiEmailPayload() : null
   const attachments = [
     await generateReceiptAttachment(booking as any),
     await generateCheckInPassAttachment(booking as any),
+    ...(wifiPayload?.qrAttachment ? [wifiPayload.qrAttachment] : []),
   ]
 
   const sent = await sendEmail(
     operator.email,
     subjectMap[statusType],
-    buildStatusHtml(booking, operator, statusType),
+    buildStatusHtml(booking, operator, statusType, wifiPayload ? {
+      ...wifiPayload.wifi,
+      qrCid: wifiPayload.qrAttachment ? getWifiQrCid() : null,
+    } : undefined),
     attachments,
     {
       emailType: 'booking_confirmation',

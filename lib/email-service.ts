@@ -17,7 +17,7 @@ export async function sendEmail(
   to: string,
   subject: string,
   html: string,
-  attachments?: Array<{ filename: string; content: Buffer | string; contentType?: string }>,
+  attachments?: Array<{ filename: string; content: Buffer | string; contentType?: string; cid?: string; disposition?: 'attachment' | 'inline' }>,
   options?: {
     fromEmail?: string
     fromName?: string
@@ -40,7 +40,7 @@ export async function sendEmailWithResult(
   to: string,
   subject: string,
   html: string,
-  attachments?: Array<{ filename: string; content: Buffer | string; contentType?: string }>,
+  attachments?: Array<{ filename: string; content: Buffer | string; contentType?: string; cid?: string; disposition?: 'attachment' | 'inline' }>,
   options?: {
     fromEmail?: string
     fromName?: string
@@ -69,8 +69,11 @@ export function generateBalanceReminderEmail(booking: any, daysLeft: number) {
   })
 }
 
-export function generateCheckInCompletedEmail(booking: any) {
-  return renderCheckInCompletedEmail(booking)
+export function generateCheckInCompletedEmail(
+  booking: any,
+  wifi?: { ssid?: string | null; password?: string | null; security?: string | null; hidden?: boolean | null; qrCid?: string | null }
+) {
+  return renderCheckInCompletedEmail(booking, wifi)
 }
 
 export function generateTourOperatorBookingEmail(booking: any, operator: any) {

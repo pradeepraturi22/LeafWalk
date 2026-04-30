@@ -8,6 +8,7 @@ import { buildBookingNumber, buildHoldBookingNumber, reserveNextInvoiceNumber } 
 import { logDebug, logError } from '@/lib/logger'
 import { sanitizeEmail, sanitizePhone, sanitizeString, sanitizeUnknown } from '@/lib/security'
 import { validateBookingStatusChange } from '@/lib/booking-status'
+import { getWifiSettings, normalizeWifiSettingsInput, saveWifiSettings, wifiSettingsSchema, type WifiSettings } from '@/lib/site-settings'
 import { z } from 'zod'
 import { isLocalTestMode } from '@/lib/runtime-mode'
 type RoomInventoryRow = {
@@ -476,6 +477,11 @@ export async function GET(request: NextRequest) {
         .order('created_at', { ascending: false })
       if (error) throw error
       return NextResponse.json({ data: data || [] })
+    }
+
+    if (type === 'wifi-settings') {
+      const data = await getWifiSettings()
+      return NextResponse.json({ data })
     }
 
     if (type === 'tariff-data') {
@@ -988,6 +994,23 @@ export async function PATCH(request: NextRequest) {
       const { error } = await getSupabaseAdmin().from('gallery_images').update(safe as any).eq('id', id)
       if (error) throw error
       return NextResponse.json({ success: true })
+    }
+
+    if (type === 'wifi-settings') {
+      const parsedWifi = wifiSettingsSchema.safeParse(normalizeWifiSettingsInput(body))
+      if (!parsedWifi.success) {
+        return NextResponse.json({ error: 'Invalid Wi-Fi settings payload', details: parsedWifi.error.flatten() }, { status: 400 })
+      }
+
+      const wifiSettings: WifiSettings = {
+        ssid: parsedWifi.data.ssid,
+        password: parsedWifi.data.password,
+        security: parsedWifi.data.security,
+        hidden: parsedWifi.data.hidden,
+      }
+
+      await saveWifiSettings(wifiSettings, admin.userId)
+      return NextResponse.json({ success: true, data: wifiSettings })
     }
 
     return NextResponse.json({ error: 'Invalid type' }, { status: 400 })

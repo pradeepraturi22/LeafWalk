@@ -3,6 +3,7 @@ import { logDebug, logError, logInfo } from '@/lib/logger'
 import { isLocalTestMode } from '@/lib/runtime-mode'
 import { getSupabaseAdmin } from '@/lib/supabaseServer'
 import { sendTourOperatorBookingStatusEmail } from '@/lib/tour-operator-notifications'
+import { buildWifiEmailPayload, getWifiQrCid } from '@/lib/wifi-email'
 
 type BookingEmailContext = {
   id: string
@@ -132,7 +133,7 @@ async function sendTrackedGuestEmail(input: {
   marker: string
   eventType: 'booking_confirmation' | 'payment_success' | 'checkin_reminder'
   debugLabel: string
-  attachments?: Array<{ filename: string; content: Buffer | string; contentType?: string }>
+  attachments?: Array<{ filename: string; content: Buffer | string; contentType?: string; cid?: string; disposition?: 'attachment' | 'inline' }>
   fromEmail?: string
   fromName?: string
 }) {
@@ -180,6 +181,22 @@ async function sendTrackedGuestEmail(input: {
   })
 
   return sent
+}
+
+async function buildCheckInEmailAssets(booking: BookingEmailContext) {
+  const wifiPayload = await buildWifiEmailPayload()
+  const attachments = [
+    await generateReceiptAttachment(booking as any),
+    ...(wifiPayload.qrAttachment ? [wifiPayload.qrAttachment] : []),
+  ]
+
+  return {
+    html: generateCheckInCompletedEmail(booking as any, {
+      ...wifiPayload.wifi,
+      qrCid: wifiPayload.qrAttachment ? getWifiQrCid() : null,
+    }),
+    attachments,
+  }
 }
 
 async function hasOperatorStatusEmailBeenSent(
@@ -282,27 +299,30 @@ export async function sendBookingLifecycleEmails(bookingId: string, trigger: Boo
   }
 
   if (booking.guest_email && shouldSendWalkInWelcomeEmailOnCreate(booking, trigger)) {
+    const checkInAssets = await buildCheckInEmailAssets(booking)
     results.guestConfirmation = await sendTrackedGuestEmail({
       booking,
       recipient: booking.guest_email,
       subject: `Welcome to LeafWalk Resort - ${booking.booking_number || 'Walk-in Booking'}`,
-      html: generateCheckInCompletedEmail(booking as any),
+      html: checkInAssets.html,
       marker: `walk_in_check_in_completed:${booking.booking_number || booking.id}:${booking.payment_status || 'unknown'}`,
       eventType: 'booking_confirmation',
       debugLabel: 'walk-in welcome email',
-      attachments: [await generateReceiptAttachment(booking as any)],
+      attachments: checkInAssets.attachments,
     })
   }
 
   if (booking.guest_email && trigger === 'admin_status_changed' && shouldSendGuestCheckInEmail(booking) && !isWalkInBooking(booking)) {
+    const checkInAssets = await buildCheckInEmailAssets(booking)
     await sendTrackedGuestEmail({
       booking,
       recipient: booking.guest_email,
       subject: `Welcome to LeafWalk Resort - Check-in Completed`,
-      html: generateCheckInCompletedEmail(booking as any),
+      html: checkInAssets.html,
       marker: `guest_check_in_completed:${booking.booking_number || booking.id}`,
       eventType: 'checkin_reminder',
       debugLabel: `${source || 'unknown'} guest check-in completed`,
+      attachments: checkInAssets.attachments,
       fromEmail: 'frontdesk@leafwalk.in',
       fromName: 'LeafWalk Front Desk',
     })
