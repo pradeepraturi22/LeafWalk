@@ -328,7 +328,7 @@ export async function sendBookingLifecycleEmails(bookingId: string, trigger: Boo
       eventType: 'checkin_reminder',
       debugLabel: `${source || 'unknown'} guest check-in completed`,
       attachments: checkInAssets.attachments,
-      fromEmail: 'frontdesk@leafwalk.in',
+      fromEmail: process.env.FROM_EMAIL_BOOKINGS || process.env.FROM_EMAIL || process.env.SMTP_USER || 'no-reply@leafwalk.in',
       fromName: 'LeafWalk Front Desk',
     })
   }
