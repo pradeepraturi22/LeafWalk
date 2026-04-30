@@ -41,6 +41,7 @@ const nextConfig = {
       { protocol: 'https', hostname: '*.supabase.co' },
       { protocol: 'https', hostname: 'checkout.razorpay.com' },
       { protocol: 'https', hostname: 'cdn.razorpay.com' },
+      { protocol: 'https', hostname: 'quickchart.io' },
     ],
   },
   poweredByHeader: false,
