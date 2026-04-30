@@ -102,6 +102,7 @@ async function logEmailTrigger(input: {
       recipient: input.recipient,
       status: input.status,
       content: input.marker.slice(0, 500),
+      error_message: input.errorMessage || null,
       sent_at: input.status === 'sent' ? new Date().toISOString() : null,
     })
   } catch (error) {
