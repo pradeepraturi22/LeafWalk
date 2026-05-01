@@ -430,13 +430,38 @@ function bookingFactsTable(booking: BookingLike, amountLabel: string) {
 }
 
 export function renderBookingConfirmationEmail(booking: BookingLike) {
+  const isTourOperatorGuest = String(booking.booking_source || '').trim().toLowerCase() === 'tour_operator'
   const documentLabel = booking.payment_status === 'fully_paid' ? 'GST invoice' : 'receipt'
+  const bookingTable = isTourOperatorGuest
+    ? `
+      <table style="width:100%;border-collapse:collapse;margin-top:18px">
+        ${[
+          ['Booking Ref', booking.booking_number || booking.id.slice(0, 8).toUpperCase()],
+          ['Guest', booking.guest_name],
+          ['Room', booking.room?.name || booking.room?.category || '-'],
+          ['Check-in', booking.check_in],
+          ['Check-out', booking.check_out],
+          ['Nights', String(booking.nights)],
+          ['Rooms', String(booking.rooms_booked || 1)],
+          ['Adults', String(booking.adults || 1)],
+          ['Meal Plan', booking.meal_plan || 'EP'],
+        ].map(([label, value]) => `
+          <tr>
+            <td style="padding:10px 0;border-bottom:1px solid #e5e7eb;color:#6b7280;font-size:13px;width:42%">${escapeHtml(label)}</td>
+            <td style="padding:10px 0;border-bottom:1px solid #e5e7eb;color:#111827;font-size:13px;font-weight:600">${escapeHtml(value)}</td>
+          </tr>
+        `).join('')}
+      </table>
+    `
+    : bookingFactsTable(booking, 'Booking Total')
+
   return layoutEmail(
     'Your booking is confirmed',
     `
       <p>Hi ${escapeHtml(booking.guest_name)},</p>
-      <p>Thank you for choosing LeafWalk Resort. Your booking has been confirmed and your ${documentLabel} is attached.</p>
-      ${bookingFactsTable(booking, 'Booking Total')}
+      <p>Thank you for choosing LeafWalk Resort. Your booking has been confirmed${isTourOperatorGuest ? '' : ` and your ${documentLabel} is attached`}.</p>
+      ${bookingTable}
+      ${isTourOperatorGuest ? `<p style="margin-top:20px">Your check-in pass is attached for your arrival convenience.</p>` : ''}
       <p style="margin-top:20px">Need help? Reply to this email or call us at +91-9368080535.</p>
     `
   )

@@ -1,4 +1,4 @@
-import { generateCheckInCompletedEmail, generateReceiptAttachment, renderAdminWebsiteBookingAlertEmail, renderBookingConfirmationEmail, renderPaymentSuccessEmail, sendEmailWithResult } from '@/lib/email-service'
+import { generateCheckInCompletedEmail, generateCheckInPassAttachment, generateReceiptAttachment, renderAdminWebsiteBookingAlertEmail, renderBookingConfirmationEmail, renderPaymentSuccessEmail, sendEmailWithResult } from '@/lib/email-service'
 import { logDebug, logError, logInfo } from '@/lib/logger'
 import { isLocalTestMode } from '@/lib/runtime-mode'
 import { getSupabaseAdmin } from '@/lib/supabaseServer'
@@ -190,6 +190,7 @@ async function buildCheckInEmailAssets(booking: BookingEmailContext) {
   const wifiPayload = await buildWifiEmailPayload()
   const attachments = isTourOperatorGuest
     ? [
+        await generateCheckInPassAttachment(booking as any),
         ...(wifiPayload?.qrAttachment ? [wifiPayload.qrAttachment] : []),
       ]
     : [
@@ -330,6 +331,7 @@ export async function sendBookingLifecycleEmails(bookingId: string, trigger: Boo
   // `website` source is used both for public website bookings and admin-created direct bookings using LWWEB tariff.
   // We decide confirmation timing from booking/payment status so public pending bookings do not get premature emails.
   if (booking.guest_email && ['admin_booking_created', 'admin_status_changed'].includes(trigger) && shouldSendGuestConfirmationOnBookingEvent(booking)) {
+    const isTourOperatorGuest = source === 'tour_operator'
     results.guestConfirmation = await sendTrackedGuestEmail({
       booking,
       recipient: booking.guest_email,
@@ -338,7 +340,9 @@ export async function sendBookingLifecycleEmails(bookingId: string, trigger: Boo
       marker: `guest_booking_confirmation:${booking.booking_number || booking.id}`,
       eventType: 'booking_confirmation',
       debugLabel: `${source || 'unknown'} guest booking confirmation`,
-      attachments: [await generateReceiptAttachment(booking as any)],
+      attachments: isTourOperatorGuest
+        ? [await generateCheckInPassAttachment(booking as any)]
+        : [await generateReceiptAttachment(booking as any)],
     })
   }
 

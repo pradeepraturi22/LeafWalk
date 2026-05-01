@@ -425,6 +425,26 @@ export function buildBookingReceiptHtml(
     border-radius: 10px;
     overflow: hidden;
   }
+  .welcome-box {
+    border: 1px solid #e8dcc2;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #faf7f1 0%, #fffdf8 100%);
+    padding: 14px 16px;
+    margin-bottom: 16px;
+    page-break-inside: avoid;
+  }
+  .welcome-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: #111;
+    margin-bottom: 4px;
+  }
+  .welcome-copy {
+    font-size: 11px;
+    color: #6b7280;
+    line-height: 1.7;
+  }
   .ib-header {
     background: #f9f9f7;
     padding: 7px 12px;
@@ -630,6 +650,14 @@ ${includePrintTools ? `<div class="print-tools" style="position:fixed;right:18px
     </table>
 
     <!-- Payment + Transaction -->
+    ${isCheckInPass ? `
+    <div class="welcome-box">
+      <div class="welcome-title">Welcome to LeafWalk Resort</div>
+      <div class="welcome-copy">
+        Please share this pass at the front desk during arrival. We are ready to welcome you for a smooth check-in experience.
+      </div>
+    </div>` : ''}
+
     <div class="two-col">
       <!-- Payment summary / Check-in instructions -->
       ${isCheckInPass ? `
@@ -642,6 +670,8 @@ ${includePrintTools ? `<div class="print-tools" style="position:fixed;right:18px
             <div class="ib-row"><span class="k">Check-out Time</span><span class="v">Before 11:00 AM</span></div>
             <div class="ib-row"><span class="k">ID Requirement</span><span class="v">Valid government ID required</span></div>
             ${operator?.company_name ? `<div class="ib-row"><span class="k">Travel Partner</span><span class="v">${operator.company_name}</span></div>` : ''}
+            <div class="ib-row"><span class="k">Front Desk</span><span class="v">+91-8630227541</span></div>
+            <div class="ib-row"><span class="k">Restaurant</span><span class="v">Breakfast 8 AM - 10 AM</span></div>
           </div>
         </div>
       </div>` : `
