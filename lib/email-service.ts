@@ -198,6 +198,14 @@ export async function generateCheckInPassAttachment(booking: any) {
 }
 
 function createCheckInPassPdf(booking: any) {
+  const formatPassDate = (value: string) => {
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return value || '-'
+    const day = String(date.getDate()).padStart(2, '0')
+    const month = date.toLocaleString('en-GB', { month: 'short' })
+    const year = date.getFullYear()
+    return `${day}-${month}-${year}`
+  }
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
   const bookingRef = booking?.booking_number || String(booking?.id || '').slice(0, 8).toUpperCase()
   const bookingStatus = String(booking?.booking_status || '').toLowerCase()
@@ -205,6 +213,8 @@ function createCheckInPassPdf(booking: any) {
   const passStatus = bookingStatus === 'hold' ? 'HOLD' : paymentStatus
   const roomName = booking?.room?.name || booking?.room?.category || '-'
   const nights = Number(booking?.nights || 0)
+  const checkInDate = formatPassDate(String(booking?.check_in || ''))
+  const checkOutDate = formatPassDate(String(booking?.check_out || ''))
 
   doc.setFillColor(250, 247, 241)
   doc.rect(0, 0, 210, 297, 'F')
@@ -268,9 +278,9 @@ function createCheckInPassPdf(booking: any) {
   doc.setTextColor(17, 24, 39)
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(12)
-  doc.text(String(booking?.check_in || '-'), 30, 148)
+  doc.text(checkInDate, 30, 148)
   doc.text(String(nights || '-'), 99, 148, { align: 'center' })
-  doc.text(String(booking?.check_out || '-'), 146, 148)
+  doc.text(checkOutDate, 146, 148)
 
   const rows: Array<[string, string]> = [
     ['Room Type', roomName],
@@ -312,8 +322,9 @@ function createCheckInPassPdf(booking: any) {
   const notes = [
     'Check-in after 3:00 PM and check-out before 11:00 AM.',
     'Valid government ID is required at check-in.',
-    'Breakfast served 8-10 AM. Kitchen closes at 10 PM.',
-    'For assistance, contact LeafWalk Resort front desk.',
+    'Breakfast served 8:00 AM - 10:00 AM. Kitchen closes at 10:00 PM.',
+    'Front desk support: +91-8630227541.',
+    'Please keep this pass ready at arrival for a faster check-in.',
   ]
   y += 20
   for (const note of notes) {

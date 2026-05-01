@@ -49,10 +49,18 @@ export function buildBookingReceiptHtml(
   const isCheckInPass = options.documentMode === 'check_in_pass'
   const fmt = (d: string) => formatDate(d)
   const fmtLong = (d: string) => formatDate(d)
+  const fmtPassDate = (d: string) => {
+    const value = new Date(d)
+    if (Number.isNaN(value.getTime())) return d || '—'
+    const day = String(value.getDate()).padStart(2, '0')
+    const month = value.toLocaleString('en-GB', { month: 'short' })
+    const year = value.getFullYear()
+    return `${day}-${month}-${year}`
+  }
   const curr = (n: number) => '₹' + n.toLocaleString('en-IN')
 
-  const checkIn   = fmtLong(booking.check_in)
-  const checkOut  = fmtLong(booking.check_out)
+  const checkIn   = isCheckInPass ? fmtPassDate(booking.check_in) : fmtLong(booking.check_in)
+  const checkOut  = isCheckInPass ? fmtPassDate(booking.check_out) : fmtLong(booking.check_out)
   const issuedOn  = fmt(booking.created_at || new Date().toISOString())
   const mealLabel = MEAL_LABELS[booking.meal_plan] || booking.meal_plan || '—'
   const bSt  = BOOKING_STATUS[booking.booking_status] || BOOKING_STATUS.pending
@@ -671,7 +679,9 @@ ${includePrintTools ? `<div class="print-tools" style="position:fixed;right:18px
             <div class="ib-row"><span class="k">ID Requirement</span><span class="v">Valid government ID required</span></div>
             ${operator?.company_name ? `<div class="ib-row"><span class="k">Travel Partner</span><span class="v">${operator.company_name}</span></div>` : ''}
             <div class="ib-row"><span class="k">Front Desk</span><span class="v">+91-8630227541</span></div>
-            <div class="ib-row"><span class="k">Restaurant</span><span class="v">Breakfast 8 AM - 10 AM</span></div>
+            <div class="ib-row"><span class="k">Breakfast</span><span class="v">8:00 AM - 10:00 AM</span></div>
+            <div class="ib-row"><span class="k">Kitchen Closes</span><span class="v">10:00 PM</span></div>
+            <div class="ib-row"><span class="k">Resort Contact</span><span class="v">${RESORT.phone}</span></div>
           </div>
         </div>
       </div>` : `
@@ -761,7 +771,7 @@ ${includePrintTools ? `<div class="print-tools" style="position:fixed;right:18px
           <div class="pol-item">Front desk support: +91-8630227541</div>
           <div class="pol-item">Contact us 24×7: ${RESORT.phone}</div>
           <div class="pol-item">Outside food and alcohol are subject to resort policy</div>
-          <div class="pol-item">Invoice generated against declared guest and stay details</div>
+          <div class="pol-item">${isCheckInPass ? 'Please keep this pass ready at arrival for a faster check-in' : 'Invoice generated against declared guest and stay details'}</div>
         </div>
       </div>
 
