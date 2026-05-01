@@ -399,6 +399,8 @@ export function createStyledBookingReceiptPdf(booking: ReceiptBooking) {
   doc.text('- Valid government ID required at check-in', 21, 281)
   doc.text('- Breakfast 8-10 AM | Kitchen closes at 10 PM', 107, 276)
   doc.text('- Cancellation charges as per reservation policy', 107, 281)
+  doc.text('- Front desk support: +91-8630227541', 21, 286)
+  doc.text('- Outside food/alcohol as per resort policy', 107, 286)
 
   setFill(doc, COLORS.faint)
   doc.rect(0, 287, 210, 10, 'F')

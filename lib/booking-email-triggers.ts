@@ -191,7 +191,6 @@ async function buildCheckInEmailAssets(booking: BookingEmailContext) {
   const attachments = isTourOperatorGuest
     ? [
         await generateCheckInPassAttachment(booking as any),
-        ...(wifiPayload?.qrAttachment ? [wifiPayload.qrAttachment] : []),
       ]
     : [
         await generateReceiptAttachment(booking as any),
