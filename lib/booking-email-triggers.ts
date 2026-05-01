@@ -61,7 +61,7 @@ const BOOKING_EMAIL_SELECT = `
   check_in, check_out, nights, rooms_booked, adults, meal_plan,
   total_amount, subtotal, cgst, sgst, gst_total, advance_amount, balance_amount, payment_due_date, razorpay_payment_id, tour_operator_id,
   room:rooms(name, category, featured_image),
-  tour_operator:tour_operators(company_name, contact_person, email, phone)
+  tour_operator:tour_operators(company_name, contact_person, email, cc_email, phone)
 `
 
 function normalize(value?: string | null) {
@@ -263,8 +263,26 @@ export async function getBookingEmailContext(bookingId: string) {
     .select(BOOKING_EMAIL_SELECT)
     .eq('id', bookingId)
     .single() as any
+  const booking = (data || null) as BookingEmailContext | null
+  if (!booking) return null
 
-  return (data || null) as BookingEmailContext | null
+  if (
+    normalize(booking.booking_source) === 'tour_operator' &&
+    booking.tour_operator_id &&
+    (!booking.tour_operator || !booking.tour_operator.email)
+  ) {
+    const { data: operatorData } = await getSupabaseAdmin()
+      .from('tour_operators')
+      .select('company_name, contact_person, email, cc_email, phone')
+      .eq('id', booking.tour_operator_id)
+      .single() as any
+
+    if (operatorData) {
+      booking.tour_operator = operatorData
+    }
+  }
+
+  return booking
 }
 
 export async function sendBookingLifecycleEmails(bookingId: string, trigger: BookingEmailTrigger) {
