@@ -329,7 +329,7 @@ export async function sendBookingLifecycleEmails(bookingId: string, trigger: Boo
 
   // `website` source is used both for public website bookings and admin-created direct bookings using LWWEB tariff.
   // We decide confirmation timing from booking/payment status so public pending bookings do not get premature emails.
-  if (source !== 'tour_operator' && booking.guest_email && ['admin_booking_created', 'admin_status_changed'].includes(trigger) && shouldSendGuestConfirmationOnBookingEvent(booking)) {
+  if (booking.guest_email && ['admin_booking_created', 'admin_status_changed'].includes(trigger) && shouldSendGuestConfirmationOnBookingEvent(booking)) {
     results.guestConfirmation = await sendTrackedGuestEmail({
       booking,
       recipient: booking.guest_email,
