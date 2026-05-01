@@ -13,6 +13,7 @@ interface TourOperator {
   company_name: string
   contact_person: string
   email: string
+  cc_email?: string
   phone: string
   pan_number?: string
   gst_number?: string
@@ -37,6 +38,7 @@ export default function TourOperatorsPage() {
     company_name: '',
     contact_person: '',
     email: '',
+    cc_email: '',
     phone: '',
     pan_number: '',
     gst_number: '',
@@ -106,6 +108,7 @@ export default function TourOperatorsPage() {
         company_name: formData.company_name.trim(),
         contact_person: formData.contact_person.trim(),
         email: formData.email.trim().toLowerCase(),
+        cc_email: formData.cc_email.trim().toLowerCase(),
         phone: formData.phone.trim(),
         pan_number: formData.pan_number.trim(),
         gst_number: formData.gst_number.trim(),
@@ -123,7 +126,11 @@ export default function TourOperatorsPage() {
         })
         const result = await res.json()
         if (!res.ok) throw new Error(result.details ? `${result.error}: ${JSON.stringify(result.details.fieldErrors || {})}` : result.error)
-        toast.success('Tour operator updated successfully')
+        if (result.welcome_email_sent) {
+          toast.success('Tour operator updated successfully. Partnership confirmation mail sent again.')
+        } else {
+          toast.success('Tour operator updated successfully')
+        }
       } else {
         const res = await fetch('/api/admin/data?type=operator', {
           method: 'POST',
@@ -152,6 +159,7 @@ export default function TourOperatorsPage() {
       company_name: operator.company_name,
       contact_person: operator.contact_person,
       email: operator.email,
+      cc_email: operator.cc_email || '',
       phone: operator.phone,
       pan_number: operator.pan_number || '',
       gst_number: operator.gst_number || '',
@@ -182,6 +190,7 @@ export default function TourOperatorsPage() {
   const resetForm = () => {
     setFormData({
       company_name: '', contact_person: '', email: '', phone: '',
+      cc_email: '',
       pan_number: '', gst_number: '', address: '', city: '', state: '',
       commission_rate: 10, status: 'active'
     })
@@ -242,6 +251,11 @@ export default function TourOperatorsPage() {
                   <div>
                     <label className="block text-sm text-white/70 mb-2">Email *</label>
                     <input type="email" name="email" value={formData.email} onChange={handleInputChange} required className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#c9a14a]" />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-white/70 mb-2">CC Email</label>
+                    <input type="email" name="cc_email" value={formData.cc_email} onChange={handleInputChange} className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#c9a14a]" />
+                    <p className="mt-2 text-xs text-white/45">Partnership confirmation mail update hone par is address par CC me bhi jayegi.</p>
                   </div>
                   <div>
                     <label className="block text-sm text-white/70 mb-2">Phone *</label>
@@ -314,6 +328,7 @@ export default function TourOperatorsPage() {
                         <p className="text-white text-sm">{operator.contact_person}</p>
                         <p className="text-white/50 text-xs">{operator.phone}</p>
                         <p className="text-white/50 text-xs">{operator.email}</p>
+                        {operator.cc_email ? <p className="text-white/35 text-xs">CC: {operator.cc_email}</p> : null}
                       </td>
                       <td className="px-6 py-4 text-white">{operator.commission_rate}%</td>
                       <td className="px-6 py-4 text-white">{operator.total_bookings}</td>

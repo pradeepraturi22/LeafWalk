@@ -15,6 +15,7 @@ type EmailAttachment = {
 
 type SendEmailInput = {
   to: string | string[]
+  cc?: string | string[]
   subject: string
   html: string
   text?: string
@@ -182,6 +183,7 @@ async function sendWithSmtp(input: SendEmailInput): Promise<EmailProviderResult>
   const info = await transporter.sendMail({
     from: `"${fromName}" <${fromEmail}>`,
     to: input.to,
+    cc: input.cc,
     subject: input.subject,
     html: input.html,
     text: input.text,
@@ -223,6 +225,7 @@ async function sendWithResend(input: SendEmailInput): Promise<EmailProviderResul
     body: JSON.stringify({
       from: fromEmail,
       to: Array.isArray(input.to) ? input.to : [input.to],
+      cc: input.cc ? (Array.isArray(input.cc) ? input.cc : [input.cc]) : undefined,
       subject: input.subject,
       html: input.html,
       text: input.text,
@@ -264,7 +267,10 @@ async function sendWithSendGrid(input: SendEmailInput): Promise<EmailProviderRes
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      personalizations: [{ to: (Array.isArray(input.to) ? input.to : [input.to]).map((email) => ({ email })) }],
+      personalizations: [{
+        to: (Array.isArray(input.to) ? input.to : [input.to]).map((email) => ({ email })),
+        ...(input.cc ? { cc: (Array.isArray(input.cc) ? input.cc : [input.cc]).map((email) => ({ email })) } : {}),
+      }],
       from: { email: fromEmail, name: fromName },
       subject: input.subject,
       content: [

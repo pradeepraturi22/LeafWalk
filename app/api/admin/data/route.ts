@@ -91,6 +91,7 @@ const operatorSchema = z.object({
   company_name: z.string().trim().min(2).max(200),
   contact_person: z.string().trim().min(2).max(200),
   email: z.string().trim().email().max(254),
+  cc_email: z.preprocess(emptyToNull, z.string().trim().email().max(254).nullable().optional()),
   phone: z.string().trim().min(7).max(20),
   pan_number: z.preprocess(emptyToNull, z.string().max(30).nullable().optional()),
   gst_number: z.preprocess(emptyToNull, z.string().max(30).nullable().optional()),
@@ -114,6 +115,7 @@ function normalizeOperatorPayload(body: any) {
     company_name: sanitizeString(String(body.company_name || ''), 200),
     contact_person: sanitizeString(String(body.contact_person || ''), 200),
     email: sanitizeEmail(String(body.email || '')),
+    cc_email: emptyToNull(body.cc_email) ? sanitizeEmail(String(body.cc_email || '')) : null,
     phone: sanitizePhone(String(body.phone || '')),
     pan_number: emptyToNull(body.pan_number),
     gst_number: emptyToNull(body.gst_number),
@@ -242,6 +244,26 @@ async function getCategoryAvailability(
   }
 
   return { selectedRooms, totalByCategory, overlappingByCategory }
+}
+
+async function hasWelcomeEmailAlreadyBeenSentToAny(emailList: string[], companyName: string) {
+  const uniqueEmails = Array.from(new Set(emailList.map((value) => String(value || '').trim().toLowerCase()).filter(Boolean)))
+  if (!uniqueEmails.length) return false
+
+  const { data } = await getSupabaseAdmin()
+    .from('notification_logs')
+    .select('id, recipient')
+    .eq('type', 'email')
+    .eq('status', 'sent')
+    .like('content', `tour_operator_welcome:${companyName}`)
+    .limit(20)
+
+  return Boolean(
+    (data || []).some((row: any) => {
+      const recipientText = String(row.recipient || '').toLowerCase()
+      return uniqueEmails.some((email) => recipientText.includes(email))
+    })
+  )
 }
 
 function getIstNow() {
@@ -730,7 +752,10 @@ export async function POST(request: NextRequest) {
       let welcomeEmailSkipped = false
       if (data?.email) {
         try {
-          const alreadySent = await hasWelcomeEmailAlreadyBeenSent(data.email, data.company_name || '')
+          const alreadySent = await hasWelcomeEmailAlreadyBeenSentToAny(
+            [data.email, data.cc_email].filter(Boolean),
+            data.company_name || ''
+          )
           if (!alreadySent) {
             welcomeEmailSent = await sendTourOperatorWelcomeEmail(data)
           } else {
@@ -974,9 +999,50 @@ export async function PATCH(request: NextRequest) {
       if (!parsedOperator.success) {
         return NextResponse.json({ error: 'Invalid operator payload', details: parsedOperator.error.flatten() }, { status: 400 })
       }
-      const { error } = await getSupabaseAdmin().from('tour_operators').update(parsedOperator.data as any).eq('id', id)
+      const { data: existingOperator, error: existingOperatorError } = await getSupabaseAdmin()
+        .from('tour_operators')
+        .select('*')
+        .eq('id', id)
+        .single() as any
+      if (existingOperatorError || !existingOperator) {
+        return NextResponse.json({ error: existingOperatorError?.message || 'Tour operator not found' }, { status: 404 })
+      }
+
+      const { data: updatedOperator, error } = await getSupabaseAdmin()
+        .from('tour_operators')
+        .update(parsedOperator.data as any)
+        .eq('id', id)
+        .select('*')
+        .single() as any
       if (error) throw error
-      return NextResponse.json({ success: true })
+
+      let welcomeEmailSent = false
+      let welcomeEmailSkipped = false
+
+      const previousTo = String(existingOperator.email || '').trim().toLowerCase()
+      const previousCc = String(existingOperator.cc_email || '').trim().toLowerCase()
+      const nextTo = String(updatedOperator?.email || '').trim().toLowerCase()
+      const nextCc = String(updatedOperator?.cc_email || '').trim().toLowerCase()
+      const onboardingRecipientsChanged = previousTo !== nextTo || previousCc !== nextCc
+
+      if (updatedOperator?.email) {
+        try {
+          if (onboardingRecipientsChanged) {
+            welcomeEmailSent = await sendTourOperatorWelcomeEmail(updatedOperator)
+          } else {
+            welcomeEmailSkipped = true
+          }
+        } catch (emailError) {
+          logError('tour operator update welcome email failed:', emailError)
+        }
+      }
+
+      return NextResponse.json({
+        success: true,
+        welcome_email_sent: welcomeEmailSent,
+        welcome_email_skipped: welcomeEmailSkipped,
+        onboarding_recipients_changed: onboardingRecipientsChanged,
+      })
     }
 
     if (type === 'room') {

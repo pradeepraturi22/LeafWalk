@@ -20,6 +20,7 @@ export async function sendEmail(
   html: string,
   attachments?: Array<{ filename: string; content: Buffer | string; contentType?: string; cid?: string; disposition?: 'attachment' | 'inline' }>,
   options?: {
+    cc?: string | string[]
     fromEmail?: string
     fromName?: string
     emailType?: 'booking_confirmation' | 'payment_success' | 'otp_login' | 'checkin_reminder' | 'general'
@@ -30,6 +31,7 @@ export async function sendEmail(
     subject,
     html,
     attachments,
+    cc: options?.cc,
     fromEmail: options?.fromEmail,
     fromName: options?.fromName,
     emailType: options?.emailType,
@@ -43,6 +45,7 @@ export async function sendEmailWithResult(
   html: string,
   attachments?: Array<{ filename: string; content: Buffer | string; contentType?: string; cid?: string; disposition?: 'attachment' | 'inline' }>,
   options?: {
+    cc?: string | string[]
     fromEmail?: string
     fromName?: string
     emailType?: 'booking_confirmation' | 'payment_success' | 'otp_login' | 'checkin_reminder' | 'general'
@@ -53,6 +56,7 @@ export async function sendEmailWithResult(
     subject,
     html,
     attachments,
+    cc: options?.cc,
     fromEmail: options?.fromEmail,
     fromName: options?.fromName,
     emailType: options?.emailType,

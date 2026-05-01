@@ -9,6 +9,7 @@ type TourOperatorLike = {
   company_name?: string | null
   contact_person?: string | null
   email?: string | null
+  cc_email?: string | null
   phone?: string | null
   city?: string | null
   state?: string | null
@@ -214,6 +215,13 @@ function buildReminderHtml(booking: BookingLike, operator: TourOperatorLike, day
   )
 }
 
+function buildRecipientLogValue(primaryEmail?: string | null, ccEmail?: string | null) {
+  const to = String(primaryEmail || '').trim()
+  const cc = String(ccEmail || '').trim()
+  if (to && cc) return `${to} | cc:${cc}`
+  return to || cc || '-'
+}
+
 async function logNotification(bookingId: string | null, recipient: string, status: 'sent' | 'failed', content: string, errorMessage?: string) {
   try {
     await getSupabaseAdmin().from('notification_logs').insert({
@@ -246,6 +254,7 @@ export async function sendTourOperatorWelcomeEmail(operator: TourOperatorLike) {
     buildWelcomeHtml(operator),
     undefined,
     {
+      cc: operator.cc_email || undefined,
       emailType: 'general',
       fromEmail: process.env.FROM_EMAIL_PARTNERS || process.env.FROM_EMAIL || 'no-reply@leafwalk.in',
       fromName: 'LeafWalk Partner Desk',
@@ -256,12 +265,19 @@ export async function sendTourOperatorWelcomeEmail(operator: TourOperatorLike) {
     logError('Tour operator welcome email provider failed:', {
       recipient: operator.email,
       company_name: operator.company_name || '-',
+      cc_email: operator.cc_email || null,
       provider: result.provider || 'unknown',
       error: result.error || 'Unknown email provider error',
     })
   }
 
-  await logNotification(null, operator.email, result.success ? 'sent' : 'failed', `tour_operator_welcome:${operator.company_name}`, result.error)
+  await logNotification(
+    null,
+    buildRecipientLogValue(operator.email, operator.cc_email),
+    result.success ? 'sent' : 'failed',
+    `tour_operator_welcome:${operator.company_name}`,
+    result.error
+  )
   return result.success
 }
 
@@ -304,6 +320,7 @@ export async function sendTourOperatorBookingStatusEmail(
     } : undefined),
     attachments,
     {
+      cc: operator.cc_email || undefined,
       emailType: 'booking_confirmation',
       fromEmail: process.env.FROM_EMAIL_BOOKINGS || process.env.FROM_EMAIL || 'no-reply@leafwalk.in',
       fromName: 'LeafWalk Reservations',
@@ -312,7 +329,7 @@ export async function sendTourOperatorBookingStatusEmail(
 
   await logNotification(
     booking.id,
-    operator.email,
+    buildRecipientLogValue(operator.email, operator.cc_email),
     result.success ? 'sent' : 'failed',
     `tour_operator_${statusType}_${booking.payment_status || 'unknown'}:${booking.booking_number || booking.id}`,
     result.error
@@ -333,13 +350,19 @@ export async function sendTourOperatorBalanceReminderEmail(
     buildReminderHtml(booking, operator, daysLeft),
     [await generateReceiptAttachment(booking as any)],
     {
+      cc: operator.cc_email || undefined,
       emailType: 'payment_success',
       fromEmail: process.env.FROM_EMAIL_PAYMENTS || 'payments@leafwalk.in',
       fromName: 'LeafWalk Payments',
     }
   )
 
-  await logNotification(booking.id, operator.email, sent ? 'sent' : 'failed', `tour_operator_balance_${daysLeft}d:${booking.booking_number || booking.id}`)
+  await logNotification(
+    booking.id,
+    buildRecipientLogValue(operator.email, operator.cc_email),
+    sent ? 'sent' : 'failed',
+    `tour_operator_balance_${daysLeft}d:${booking.booking_number || booking.id}`
+  )
   return sent
 }
 
