@@ -2,6 +2,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
+import type { MouseEvent } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 
@@ -182,6 +183,17 @@ async function loadCustomerSession() {
   const isAdmin = ['admin', 'manager'].includes(userRole)
   const solid   = scrolled || open
 
+  function navigateTo(href: string) {
+    setOpen(false)
+    setUserMenuOpen(false)
+    router.push(href)
+  }
+
+  function handleNavClick(event: MouseEvent<HTMLAnchorElement>, href: string) {
+    event.preventDefault()
+    navigateTo(href)
+  }
+
   async function handleLogout() {
     await supabase.auth.signOut()
     await fetch('/api/auth/logout', { method: 'POST' }).catch(() => null)
@@ -200,7 +212,7 @@ async function loadCustomerSession() {
       <nav className="max-w-7xl mx-auto px-5 py-3 flex items-center justify-between">
 
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-3">
+        <Link href="/" onClick={(event) => handleNavClick(event, '/')} className="flex items-center gap-3">
           <div className={`relative rounded-full bg-white shadow overflow-hidden transition-all duration-500 ${scrolled ? 'w-10 h-10' : 'w-14 h-14'}`}>
             <Image src="/logo/leafwalk-logo.jpeg" alt="LeafWalk Resort" fill className="object-contain p-1.5" priority />
           </div>
@@ -210,7 +222,7 @@ async function loadCustomerSession() {
         {/* Desktop nav links */}
         <div className="hidden lg:flex items-center gap-7 text-xs uppercase tracking-widest">
           {LINKS.map(l => (
-            <Link key={l.href} href={l.href}
+            <Link key={l.href} href={l.href} onClick={(event) => handleNavClick(event, l.href)}
               className={`transition-colors pb-0.5 border-b-2 ${path === l.href ? 'text-[#c9a14a] border-[#c9a14a]' : 'text-white/75 border-transparent hover:text-[#c9a14a] hover:border-[#c9a14a]/50'}`}>
               {l.label}
             </Link>
@@ -257,7 +269,7 @@ async function loadCustomerSession() {
 
                   {/* Admin — show admin panel link */}
                   {isAdmin && (
-                    <Link href="/admin/dashboard" onClick={() => setUserMenuOpen(false)}
+                    <Link href="/admin/dashboard" onClick={(event) => handleNavClick(event, '/admin/dashboard')}
                       className="flex items-center gap-2 px-4 py-3 text-sm text-[#c9a14a] hover:bg-[#c9a14a]/10 transition-all border-b border-white/5">
                       <span>⚙️</span> Admin Panel
                     </Link>
@@ -265,7 +277,7 @@ async function loadCustomerSession() {
 
                   {/* Customer — show my bookings */}
                   {!isAdmin && (
-                    <Link href="/my-bookings" onClick={() => setUserMenuOpen(false)}
+                    <Link href="/my-bookings" onClick={(event) => handleNavClick(event, '/my-bookings')}
                       className="block px-4 py-3 text-sm text-white/70 hover:text-white hover:bg-white/5 transition-all">
                       📋 My Bookings
                     </Link>
@@ -279,7 +291,7 @@ async function loadCustomerSession() {
               )}
             </div>
           ) : (
-            <Link href="/auth"
+            <Link href="/auth" onClick={(event) => handleNavClick(event, '/auth')}
               className="flex items-center gap-1.5 px-4 py-2 bg-white/10 border border-white/20 text-white rounded-full text-xs font-semibold hover:bg-white/15 transition-all">
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -289,7 +301,7 @@ async function loadCustomerSession() {
           )}
 
           {/* Book Now */}
-          <Link href="/rooms" className="px-5 py-2.5 bg-gradient-to-r from-[#c9a14a] to-[#e6c87a] text-black rounded-full text-xs font-bold hover:opacity-90 transition-all shadow-lg shadow-[#c9a14a]/20">
+          <Link href="/rooms" onClick={(event) => handleNavClick(event, '/rooms')} className="px-5 py-2.5 bg-gradient-to-r from-[#c9a14a] to-[#e6c87a] text-black rounded-full text-xs font-bold hover:opacity-90 transition-all shadow-lg shadow-[#c9a14a]/20">
             Book Now
           </Link>
         </div>
@@ -306,7 +318,7 @@ async function loadCustomerSession() {
       <div className={`lg:hidden overflow-hidden transition-all duration-300 ${open ? 'max-h-[600px]' : 'max-h-0'}`}>
         <div className="px-5 pb-6 pt-2 border-t border-white/10 space-y-1">
           {LINKS.map(l => (
-            <Link key={l.href} href={l.href}
+            <Link key={l.href} href={l.href} onClick={(event) => handleNavClick(event, l.href)}
               className={`block py-3 px-4 rounded-xl text-sm uppercase tracking-widest transition-all ${path === l.href ? 'text-[#c9a14a] bg-[#c9a14a]/10' : 'text-white/70 hover:text-[#c9a14a] hover:bg-white/5'}`}>
               {l.label}
             </Link>
@@ -320,12 +332,12 @@ async function loadCustomerSession() {
                 {isAdmin && <span className="ml-2 text-[#c9a14a] capitalize">({userRole})</span>}
               </div>
               {isAdmin ? (
-                <Link href="/admin/dashboard"
+                <Link href="/admin/dashboard" onClick={(event) => handleNavClick(event, '/admin/dashboard')}
                   className="block py-3 px-4 rounded-xl text-sm text-[#c9a14a] bg-[#c9a14a]/10 hover:bg-[#c9a14a]/15 transition-all">
                   ⚙️ Admin Panel
                 </Link>
               ) : (
-                <Link href="/my-bookings"
+                <Link href="/my-bookings" onClick={(event) => handleNavClick(event, '/my-bookings')}
                   className="block py-3 px-4 rounded-xl text-sm text-white/70 hover:text-white hover:bg-white/5 transition-all">
                   📋 My Bookings
                 </Link>
@@ -335,13 +347,13 @@ async function loadCustomerSession() {
               </button>
             </>
           ) : (
-            <Link href="/auth" className="block py-3 px-4 rounded-xl text-sm text-white/70 hover:text-[#c9a14a] hover:bg-white/5 transition-all uppercase tracking-widest">
+            <Link href="/auth" onClick={(event) => handleNavClick(event, '/auth')} className="block py-3 px-4 rounded-xl text-sm text-white/70 hover:text-[#c9a14a] hover:bg-white/5 transition-all uppercase tracking-widest">
               🔑 Login / Sign Up
             </Link>
           )}
 
           <div className="pt-3 space-y-2">
-            <Link href="/rooms" className="block py-3 text-center bg-gradient-to-r from-[#c9a14a] to-[#e6c87a] text-black rounded-xl font-bold text-sm uppercase tracking-widest">
+            <Link href="/rooms" onClick={(event) => handleNavClick(event, '/rooms')} className="block py-3 text-center bg-gradient-to-r from-[#c9a14a] to-[#e6c87a] text-black rounded-xl font-bold text-sm uppercase tracking-widest">
               Book Now
             </Link>
             <a href="https://wa.me/919368080535" target="_blank" rel="noopener noreferrer"
