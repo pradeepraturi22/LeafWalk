@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import AvailabilityBar from '@/components/AvailabilityBar'
 import RoomCard from '@/components/RoomCard'
@@ -81,6 +81,11 @@ export default function HomeClient({ pageName }: { pageName?: string }) {
   const [priceQuotes, setPriceQuotes] = useState<Record<string, PricingQuote | null>>({})
   const [availabilityQuotes, setAvailabilityQuotes] = useState<Record<string, AvailabilityQuote | null>>({})
   const [reviews, setReviews] = useState<ReviewCard[]>(FALLBACK_REVIEWS)
+  const featuredRooms = useMemo(() => {
+    const deluxe = rooms.find((room) => room.category === 'deluxe') || null
+    const premium = rooms.find((room) => room.category === 'premium') || null
+    return [deluxe, premium].filter(Boolean) as HomeRoom[]
+  }, [rooms])
 
   useEffect(() => {
     if (!hydrated || homepageDatesInitializedRef.current) return
@@ -91,8 +96,8 @@ export default function HomeClient({ pageName }: { pageName?: string }) {
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/rooms'),
-      fetch('/api/reviews'),
+      fetch('/api/rooms', { cache: 'force-cache' }),
+      fetch('/api/reviews', { cache: 'force-cache' }),
     ])
       .then(async ([roomsResponse, reviewsResponse]) => {
         const roomsPayload = roomsResponse.ok ? await roomsResponse.json() : { rooms: [] }
@@ -117,13 +122,13 @@ export default function HomeClient({ pageName }: { pageName?: string }) {
   }
 
   useEffect(() => {
-    if (!pricingReady || rooms.length === 0) {
+    if (!hydrated || !pricingReady || featuredRooms.length === 0) {
       setPriceQuotes({})
       return
     }
 
     Promise.all(
-      rooms.map(async (room) => {
+      featuredRooms.map(async (room) => {
         const response = await fetch('/api/get-room-pricing', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -140,16 +145,16 @@ export default function HomeClient({ pageName }: { pageName?: string }) {
         return [room.id, { totalPrice: Number(quote.total?.EP || 0), nights: Array.isArray(quote.nights) ? quote.nights.length : 0 }] as const
       })
     ).then((entries) => setPriceQuotes(Object.fromEntries(entries)))
-  }, [effectiveCheckInDate, effectiveCheckOutDate, pricingReady, rooms])
+  }, [effectiveCheckInDate, effectiveCheckOutDate, featuredRooms, hydrated, pricingReady])
 
   useEffect(() => {
-    if (!pricingReady || rooms.length === 0) {
+    if (!hydrated || !pricingReady || featuredRooms.length === 0) {
       setAvailabilityQuotes({})
       return
     }
 
     Promise.all(
-      rooms.map(async (room) => {
+      featuredRooms.map(async (room) => {
         const response = await fetch('/api/check-availability', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -170,7 +175,7 @@ export default function HomeClient({ pageName }: { pageName?: string }) {
         }] as const
       })
     ).then((entries) => setAvailabilityQuotes(Object.fromEntries(entries)))
-  }, [effectiveCheckInDate, effectiveCheckOutDate, pricingReady, rooms])
+  }, [effectiveCheckInDate, effectiveCheckOutDate, featuredRooms, hydrated, pricingReady])
 
   function getCategoryRoom(category: 'deluxe' | 'premium') {
     return rooms.find((room) => room.category === category) || null
@@ -194,7 +199,7 @@ export default function HomeClient({ pageName }: { pageName?: string }) {
   return (
     <>
       <div className="hero">
-        <video autoPlay muted loop playsInline preload="metadata">
+        <video autoPlay muted loop playsInline preload="none">
           <source src="/videos/Hero-Demo2.mp4" type="video/mp4" />
         </video>
         <div className="hero-overlay">

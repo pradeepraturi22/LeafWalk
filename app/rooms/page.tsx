@@ -188,7 +188,7 @@ function RoomsContent() {
   useEffect(() => {
     const cat = searchParams.get('category')
     if (cat === 'deluxe' || cat === 'premium') setCategory(cat)
-    fetch('/api/rooms', { cache: 'no-store' })
+    fetch('/api/rooms', { cache: 'force-cache' })
       .then(async (response) => {
         if (!response.ok) throw new Error('Failed to load rooms')
         return response.json()
@@ -209,7 +209,11 @@ function RoomsContent() {
       return
     }
 
-    const availableCombos = rooms.flatMap((room) => {
+    const representativeRooms = (['deluxe', 'premium'] as const)
+      .map((category) => rooms.find((room) => room.category === category))
+      .filter(Boolean) as Room[]
+
+    const availableCombos = representativeRooms.flatMap((room) => {
       return PUBLIC_MEAL_PLANS.map((meal) => ({ room, meal }))
     })
 
@@ -239,8 +243,12 @@ function RoomsContent() {
       return
     }
 
+    const representativeRooms = (['deluxe', 'premium'] as const)
+      .map((category) => rooms.find((room) => room.category === category))
+      .filter(Boolean) as Room[]
+
     Promise.all(
-      rooms.map(async (room) => {
+      representativeRooms.map(async (room) => {
         const response = await fetch('/api/check-availability', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

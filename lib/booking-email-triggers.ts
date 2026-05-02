@@ -68,6 +68,19 @@ function normalize(value?: string | null) {
   return String(value || '').trim().toLowerCase()
 }
 
+function getTodayDateKey() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+function getCheckInDateKey(booking: BookingEmailContext) {
+  return String(booking.check_in || '').slice(0, 10)
+}
+
+function isBackdatedBookingEntry(booking: BookingEmailContext) {
+  const checkInKey = getCheckInDateKey(booking)
+  return Boolean(checkInKey) && checkInKey < getTodayDateKey()
+}
+
 async function hasNotificationMarker(bookingId: string | null, recipient: string, markerPrefix: string) {
   try {
     let query = getSupabaseAdmin()
@@ -290,6 +303,7 @@ export async function sendBookingLifecycleEmails(bookingId: string, trigger: Boo
   if (!booking) return { guestConfirmation: false, paymentSuccess: false, operatorStatus: false, adminAlert: false }
 
   const source = normalize(booking.booking_source)
+  const suppressCreateEmailsForBackdatedEntry = trigger === 'admin_booking_created' && isBackdatedBookingEntry(booking)
   const results = {
     guestConfirmation: false,
     paymentSuccess: false,
@@ -304,10 +318,12 @@ export async function sendBookingLifecycleEmails(bookingId: string, trigger: Boo
       booking_source: booking.booking_source || 'unknown',
       booking_status: booking.booking_status || 'unknown',
       payment_status: booking.payment_status || 'unknown',
+      suppress_create_emails_for_backdated_entry: suppressCreateEmailsForBackdatedEntry,
     })
   }
 
   if (
+    !suppressCreateEmailsForBackdatedEntry &&
     source === 'tour_operator' &&
     booking.tour_operator?.email &&
     ['admin_booking_created', 'admin_status_changed'].includes(trigger) &&
@@ -329,7 +345,7 @@ export async function sendBookingLifecycleEmails(bookingId: string, trigger: Boo
 
   // `website` source is used both for public website bookings and admin-created direct bookings using LWWEB tariff.
   // We decide confirmation timing from booking/payment status so public pending bookings do not get premature emails.
-  if (booking.guest_email && ['admin_booking_created', 'admin_status_changed'].includes(trigger) && shouldSendGuestConfirmationOnBookingEvent(booking)) {
+  if (!suppressCreateEmailsForBackdatedEntry && booking.guest_email && ['admin_booking_created', 'admin_status_changed'].includes(trigger) && shouldSendGuestConfirmationOnBookingEvent(booking)) {
     const isTourOperatorGuest = source === 'tour_operator'
     results.guestConfirmation = await sendTrackedGuestEmail({
       booking,
@@ -345,7 +361,7 @@ export async function sendBookingLifecycleEmails(bookingId: string, trigger: Boo
     })
   }
 
-  if (booking.guest_email && shouldSendWalkInWelcomeEmailOnCreate(booking, trigger)) {
+  if (!suppressCreateEmailsForBackdatedEntry && booking.guest_email && shouldSendWalkInWelcomeEmailOnCreate(booking, trigger)) {
     const checkInAssets = await buildCheckInEmailAssets(booking)
     const frontDeskSender = getFrontDeskSender()
     results.guestConfirmation = await sendTrackedGuestEmail({
