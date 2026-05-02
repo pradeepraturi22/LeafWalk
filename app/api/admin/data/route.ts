@@ -186,9 +186,6 @@ async function getCategoryAvailability(
   }
   const propertyTotalInventory = Array.from(totalByCategory.values()).reduce((sum, value) => sum + value, 0)
   const propertyCap = Math.max(1, Math.min(PROPERTY_ROOM_CAP, Math.max(propertyTotalInventory, PROPERTY_ROOM_CAP)))
-  for (const category of categories) {
-    totalByCategory.set(category, Math.max(totalByCategory.get(category) || 0, propertyCap))
-  }
 
   let overlapQuery = supabase
     .from('bookings')
@@ -218,10 +215,7 @@ async function getCategoryAvailability(
   const overlappingByCategory = new Map<string, number>()
   const stayDates = getDateRange(checkIn, checkOut)
   for (const category of categories) {
-    const categoryBaseTotal = (roomIdsByCategory.get(category) || []).length ? (activeRooms
-      .filter((room) => room.category === category)
-      .reduce((sum, room) => sum + (Number(room.total_rooms) || 0), 0)) : 0
-    const sellableTotal = totalByCategory.get(category) || propertyCap
+    const categoryBaseTotal = totalByCategory.get(category) || 0
     if (!categoryBaseTotal) {
       overlappingByCategory.set(category, 0)
       continue
@@ -235,12 +229,12 @@ async function getCategoryAvailability(
         .filter((booking: any) => booking.check_in <= date && booking.check_out > date)
         .reduce((sum: number, booking: any) => sum + (Number(booking.rooms_booked) || 1), 0)
       const categoryCapFromProperty = Math.max(bookedCategory, propertyCap - Math.max(0, bookedAll - bookedCategory))
-      const allowedForCategory = Math.max(0, Math.min(sellableTotal, categoryCapFromProperty))
+      const allowedForCategory = Math.max(0, Math.min(categoryBaseTotal, categoryCapFromProperty))
       return Math.max(0, allowedForCategory - bookedCategory)
     })
 
-    const minNightlyAvailable = nightlyAvailable.length ? Math.min(...nightlyAvailable) : sellableTotal
-    overlappingByCategory.set(category, Math.max(0, sellableTotal - minNightlyAvailable))
+    const minNightlyAvailable = nightlyAvailable.length ? Math.min(...nightlyAvailable) : categoryBaseTotal
+    overlappingByCategory.set(category, Math.max(0, categoryBaseTotal - minNightlyAvailable))
   }
 
   return { selectedRooms, totalByCategory, overlappingByCategory }
