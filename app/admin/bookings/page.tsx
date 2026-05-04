@@ -26,6 +26,7 @@ interface Booking {
   adults: number
   rooms_booked: number
   total_amount: number
+  advance_amount?: number
   booking_status: string
   payment_status: string
   meal_plan: string
@@ -72,6 +73,13 @@ const SOURCE_LABEL: Record<string, string> = {
   walk_in: 'Walk-In',
   tour_operator: 'Tour Operator',
   lwweb: 'Website',
+}
+
+function realizedRevenue(booking: Booking) {
+  const paymentStatus = String(booking.payment_status || '').trim().toLowerCase()
+  if (paymentStatus === 'fully_paid' || paymentStatus === 'paid') return Number(booking.total_amount || 0)
+  if (paymentStatus === 'payment_processing') return Number((booking as any).advance_amount || 0)
+  return 0
 }
 
 export default function AdminBookingsPage() {
@@ -240,8 +248,7 @@ export default function AdminBookingsPage() {
     pending:   bookings.filter(b => b.booking_status === 'pending').length,
     confirmed: bookings.filter(b => b.booking_status === 'confirmed').length,
     checkedIn: bookings.filter(b => b.booking_status === 'checked_in').length,
-    revenue:   bookings.filter(b => ['payment_processing', 'fully_paid'].includes(b.payment_status))
-                       .reduce((s, b) => s + Number(b.total_amount || 0), 0),
+    revenue:   bookings.reduce((s, b) => s + realizedRevenue(b), 0),
   }
 
   if (loading) return (

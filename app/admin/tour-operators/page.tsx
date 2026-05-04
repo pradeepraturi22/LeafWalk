@@ -77,13 +77,7 @@ export default function TourOperatorsPage() {
       const { data, error } = await res.json()
       if (error) throw new Error(error)
 
-      const operatorsWithStats = data?.map((op: any) => ({
-        ...op,
-        total_bookings: op.bookings?.[0]?.count || 0,
-        total_revenue: op.bookings?.reduce((sum: number, b: any) => sum + (b.total_amount || 0), 0) || 0
-      })) || []
-
-      setOperators(operatorsWithStats)
+      setOperators((data || []) as TourOperator[])
     } catch (error) {
       console.error('Error loading operators:', error)
       toast.error('Failed to load tour operators')

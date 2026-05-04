@@ -625,7 +625,7 @@ export default function BookingDetailPage() {
           )}
 
           {/* Balance Payment Section — only for advance/partial-payment bookings */}
-          {booking.payment_status === 'payment_processing' && !['cancelled','no_show'].includes(booking.booking_status) && (
+          {Number(booking.balance_amount) > 0 && !['cancelled','no_show'].includes(booking.booking_status) && (
             <div className="mt-6 bg-orange-500/5 border border-orange-500/20 rounded-2xl p-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -648,7 +648,7 @@ export default function BookingDetailPage() {
                     setShowBalanceModal(true)
                   }}
                   className="px-5 py-2.5 bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 border border-orange-500/30 rounded-full text-sm font-semibold transition-all whitespace-nowrap">
-                  💰 Record Balance Payment
+                  {Number(booking.advance_amount || 0) > 0 ? '💰 Record Another Payment' : '💰 Record Payment'}
                 </button>
               </div>
             </div>

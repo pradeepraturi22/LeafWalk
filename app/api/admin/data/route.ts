@@ -20,6 +20,17 @@ type RoomInventoryRow = {
 
 const PROPERTY_ROOM_CAP = Math.max(1, Number(process.env.PROPERTY_TOTAL_ROOM_CAP || 10))
 
+function getRealizedBookingRevenue(booking: { payment_status?: string | null; total_amount?: number | string | null; advance_amount?: number | string | null }) {
+  const paymentStatus = String(booking.payment_status || '').trim().toLowerCase()
+  if (paymentStatus === 'fully_paid' || paymentStatus === 'paid') {
+    return Number(booking.total_amount || 0)
+  }
+  if (paymentStatus === 'payment_processing') {
+    return Number(booking.advance_amount || 0)
+  }
+  return 0
+}
+
 
 // ── Shared auth guard ────────────────────────────────────────────────────────
 function getJwtSubjectForLocalFallback(token: string) {
@@ -357,7 +368,7 @@ export async function GET(request: NextRequest) {
 
       const { data: allBookings } = await getSupabaseAdmin()
         .from('bookings')
-        .select('tour_operator_id, total_amount')
+        .select('tour_operator_id, total_amount, advance_amount, payment_status')
         .not('tour_operator_id', 'is', null)
         .in('booking_status', ['confirmed', 'checked_in', 'checked_out'])
 
@@ -366,7 +377,7 @@ export async function GET(request: NextRequest) {
         return {
           ...op,
           total_bookings: opBookings.length,
-          total_revenue: opBookings.reduce((sum, b) => sum + (Number(b.total_amount) || 0), 0)
+          total_revenue: opBookings.reduce((sum, b) => sum + getRealizedBookingRevenue(b), 0)
         }
       })
       return NextResponse.json({ data })

@@ -18,6 +18,13 @@ const isPaid = (b:any) => ['paid','fully_paid'].includes(b.payment_status)
 const isActive = (b:any) => !['cancelled','no_show'].includes(b.booking_status)
 const fmt = (n:any) => `₹${Number(n||0).toLocaleString()}`
 
+const realizedRevenue = (b:any) => {
+  const status = String(b.payment_status || '').trim().toLowerCase()
+  if (['paid', 'fully_paid'].includes(status)) return Number(b.total_amount || 0)
+  if (status === 'payment_processing') return Number(b.advance_amount || 0)
+  return 0
+}
+
 export default function AdminDashboard() {
   const router = useRouter()
   const [role, setRole] = useState('')
@@ -128,15 +135,15 @@ export default function AdminDashboard() {
 
     // Revenue — use total_amount for paid, advance_amount for partial
     const todayRev = all
-      .filter((b:any) => isPaid(b) && (b.advance_paid_at||b.created_at||'').startsWith(today))
-      .reduce((s:number,b:any) => s + Number(b.total_amount||0), 0)
+      .filter((b:any) => realizedRevenue(b) > 0 && (b.advance_paid_at||b.created_at||'').startsWith(today))
+      .reduce((s:number,b:any) => s + realizedRevenue(b), 0)
     const monthRev = all
-      .filter((b:any) => isPaid(b) && (b.advance_paid_at||b.created_at||'') >= mStart)
-      .reduce((s:number,b:any) => s + Number(b.total_amount||0), 0)
+      .filter((b:any) => realizedRevenue(b) > 0 && (b.advance_paid_at||b.created_at||'') >= mStart)
+      .reduce((s:number,b:any) => s + realizedRevenue(b), 0)
     const pendingBal = active
       .filter((b:any) => Number(b.balance_amount||0) > 0)
       .reduce((s:number,b:any) => s + Number(b.balance_amount||0), 0)
-    const totalSettled = active.filter(isPaid).reduce((s:number,b:any) => s + Number(b.total_amount||0), 0)
+    const totalSettled = active.reduce((s:number,b:any) => s + realizedRevenue(b), 0)
 
     setStats({
       total: active.length,
