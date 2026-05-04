@@ -62,6 +62,8 @@ export default function BookingDetailPage() {
   const [paymentLedger,    setPaymentLedger]    = useState<any[]>([])
   const [ledgerLoading,    setLedgerLoading]    = useState(false)
   const [dueDate,          setDueDate]          = useState('')
+  const [showCancelModal, setShowCancelModal] = useState(false)
+  const [cancellationReason, setCancellationReason] = useState('')
 
   useEffect(() => { checkAuthAndLoad() }, [])
 
@@ -116,12 +118,13 @@ export default function BookingDetailPage() {
     setLedgerLoading(false)
   }
 
-  async function updateStatus(newStatus: string) {
+  async function updateStatus(newStatus: string, reason?: string) {
     setUpdatingStatus(true)
     try {
       const body: any = { status: newStatus }
       if (newStatus === 'checked_in') body.checked_in_at = new Date().toISOString()
       if (newStatus === 'checked_out') body.checked_out_at = new Date().toISOString()
+      if (newStatus === 'cancelled') body.cancellation_reason = String(reason || '').trim()
 
       const res = await fetch(`/api/admin/data?type=booking-status&id=${bookingId}`, {
         method: 'PATCH',
@@ -470,10 +473,52 @@ export default function BookingDetailPage() {
                   </button>
                 )}
                 {!['cancelled', 'checked_out', 'no_show'].includes(booking.booking_status) && userRole === 'admin' && (
-                  <button onClick={() => { if (confirm('Cancel this booking?')) updateStatus('cancelled') }} disabled={updatingStatus} className="px-5 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-full text-sm font-medium transition-all disabled:opacity-50">
+                  <button onClick={() => { setCancellationReason(''); setShowCancelModal(true) }} disabled={updatingStatus} className="px-5 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-full text-sm font-medium transition-all disabled:opacity-50">
                     ✕ Cancel
                   </button>
                 )}
+              </div>
+            </div>
+          )}
+
+          {showCancelModal && (
+            <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-[#1a1a1a] border border-white/10 rounded-2xl p-6 w-full max-w-md">
+                <h3 className="text-white font-bold text-lg mb-2">Cancel Booking</h3>
+                <p className="text-white/45 text-sm mb-4">Cancellation reason required hai. Ye reason booking record me save hoga.</p>
+
+                <label className="text-white/60 text-sm mb-2 block">Cancellation Reason *</label>
+                <textarea
+                  value={cancellationReason}
+                  onChange={(e) => setCancellationReason(e.target.value)}
+                  rows={4}
+                  placeholder="Guest request, duplicate booking, date shift, etc."
+                  className="w-full px-4 py-3 bg-[#111] border border-white/20 rounded-lg text-white placeholder:text-white/20 resize-none"
+                />
+
+                <div className="flex gap-3 mt-5">
+                  <button
+                    onClick={async () => {
+                      const reason = cancellationReason.trim()
+                      if (!reason) {
+                        toast.error('Cancellation reason required hai')
+                        return
+                      }
+                      await updateStatus('cancelled', reason)
+                      setShowCancelModal(false)
+                    }}
+                    disabled={updatingStatus}
+                    className="flex-1 py-3 bg-red-600 hover:bg-red-500 text-white rounded-xl font-semibold transition-all disabled:opacity-50"
+                  >
+                    {updatingStatus ? 'Cancelling...' : 'Cancel Booking'}
+                  </button>
+                  <button
+                    onClick={() => { setShowCancelModal(false); setCancellationReason('') }}
+                    className="px-5 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-all"
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             </div>
           )}

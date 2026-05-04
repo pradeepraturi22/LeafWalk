@@ -208,12 +208,22 @@ export default function AdminBookingsPage() {
         return
       }
     }
-    if (!confirm(`Change booking status to "${status}"?`)) return
+    let cancellationReason = ''
+    if (status === 'cancelled') {
+      const provided = window.prompt('Cancellation reason likhiye', '')
+      if (provided === null) return
+      cancellationReason = provided.trim()
+      if (!cancellationReason) {
+        toast.error('Cancellation reason required hai')
+        return
+      }
+    } else if (!confirm(`Change booking status to "${status}"?`)) return
     const { data: { session } } = await supabase.auth.getSession()
     if (!session?.access_token) { toast.error('Session expired'); return }
     const payload: Record<string, string> = { booking_id: id, booking_status: status }
     if (status === 'checked_in') payload.checked_in_at = new Date().toISOString()
     if (status === 'checked_out') payload.checked_out_at = new Date().toISOString()
+    if (status === 'cancelled') payload.cancellation_reason = cancellationReason
 
     const res = await fetch('/api/admin/bookings', {
       method: 'PATCH',
