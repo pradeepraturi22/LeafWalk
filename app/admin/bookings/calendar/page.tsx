@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import AdminNavbar from '@/components/AdminNavbar'
 import { supabase } from '@/lib/supabaseClient'
 import { formatDate, toLocalDateString } from '@/lib/utils'
+import { getRoomCategoryLabel, getRoomCategoryOrder } from '@/lib/room-categories'
 
 type BookingHoverItem = {
   id: string
@@ -126,7 +127,7 @@ function getCellTone(day: RoomDay) {
 }
 
 function getSectionLabel(category: string) {
-  return category.charAt(0).toUpperCase() + category.slice(1)
+  return getRoomCategoryLabel(category)
 }
 
 function getDateDisplayLabel(date: string) {
@@ -224,8 +225,8 @@ export default function AdminBookingsCalendarPage() {
 
   const orderedSections = useMemo(() => {
     return [...sections].sort((left, right) => {
-      const leftOrder = left.category === 'deluxe' ? 0 : left.category === 'premium' ? 1 : 9
-      const rightOrder = right.category === 'deluxe' ? 0 : right.category === 'premium' ? 1 : 9
+      const leftOrder = getRoomCategoryOrder(left.category)
+      const rightOrder = getRoomCategoryOrder(right.category)
       return leftOrder - rightOrder
     })
   }, [sections])

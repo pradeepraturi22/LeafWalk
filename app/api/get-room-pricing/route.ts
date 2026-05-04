@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabaseServer'
 import { buildLwwebPricingMatrix, buildMealUnitTotals, getDateRange, type DateWiseRoomRate, type MealPriceRow } from '@/lib/lwweb-date-pricing'
 import { getStayTariffBreakdown, normalizeTariffRate, PUBLIC_WEB_RATE_TYPE } from '@/lib/public-tariff'
+import { isPublicRoomCategory } from '@/lib/room-categories'
 
 type PricingInput = {
   room_category?: string
@@ -134,6 +135,9 @@ async function buildPricingResponse(input: PricingInput) {
   const { room, roomCategory } = await resolveCategory(input)
   if (!roomCategory) {
     return NextResponse.json({ error: 'Room not found' }, { status: 404 })
+  }
+  if (!isPublicRoomCategory(roomCategory)) {
+    return NextResponse.json({ error: 'Room not available for website booking' }, { status: 404 })
   }
 
   const supabase = getSupabaseAdmin()

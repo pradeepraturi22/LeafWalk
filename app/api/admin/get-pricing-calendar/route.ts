@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabaseServer'
+import { isAdminRoomCategory } from '@/lib/room-categories'
 
 export async function GET(request: NextRequest) {
   try {
@@ -8,7 +9,7 @@ export async function GET(request: NextRequest) {
     const rateType = String(searchParams.get('rate_type') || 'lwweb').trim().toLowerCase()
     const month = String(searchParams.get('month') || '').trim()
 
-    if (!['deluxe', 'premium'].includes(roomCategory)) return NextResponse.json({ error: 'Valid room_category is required' }, { status: 400 })
+    if (!isAdminRoomCategory(roomCategory)) return NextResponse.json({ error: 'Valid room_category is required' }, { status: 400 })
     if (!['lwweb', 'ota'].includes(rateType)) return NextResponse.json({ error: 'rate_type must be lwweb or ota' }, { status: 400 })
     if (!/^\d{4}-\d{2}$/.test(month)) return NextResponse.json({ error: 'month must be YYYY-MM' }, { status: 400 })
 

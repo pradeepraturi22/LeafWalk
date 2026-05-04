@@ -3,15 +3,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 import { supabase } from '@/lib/supabaseClient'
+import { ADMIN_ROOM_CATEGORIES, getRoomCategoryLabel, type AdminRoomCategory } from '@/lib/room-categories'
 
 type DateRateType = 'lwweb' | 'ota' | 'b2c'
-type RoomCategory = 'deluxe' | 'premium'
 type TourMealPlan = 'EP' | 'CP' | 'MAP' | 'AP'
 
-type DateWiseRateRow = { id: string; room_category: RoomCategory; rate_type: DateRateType; rate_date: string; base_price: number; extra_bed_price: number; child_price: number }
+type DateWiseRateRow = { id: string; room_category: AdminRoomCategory; rate_type: DateRateType; rate_date: string; base_price: number; extra_bed_price: number; child_price: number }
 type MealPriceRow = { id: string; meal_type: 'breakfast' | 'lunch' | 'dinner'; price: number; applicable_from: string | null; applicable_to: string | null }
 type SeasonRow = { id: string; label: string; name: string; start_month: number; start_day: number; end_month: number; end_day: number; sort_order: number | null }
-type TourOperatorRateRow = { id: string; room_category: RoomCategory; season_id: string; meal_plan: TourMealPlan; rate_type: 'b2b'; price_per_night: number; extra_bed_price: number; child_5_12_price: number }
+type TourOperatorRateRow = { id: string; room_category: AdminRoomCategory; season_id: string; meal_plan: TourMealPlan; rate_type: 'b2b'; price_per_night: number; extra_bed_price: number; child_5_12_price: number }
 
 const INPUT = 'w-full rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-sm text-white focus:border-[#c9a14a] focus:outline-none'
 const DATE_TYPES: { key: DateRateType; label: string }[] = [
@@ -51,13 +51,13 @@ export default function AdminTariffForm() {
   const [mealPrices, setMealPrices] = useState<MealPriceRow[]>([])
   const [seasons, setSeasons] = useState<SeasonRow[]>([])
   const [tourRates, setTourRates] = useState<TourOperatorRateRow[]>([])
-  const [tourCategory, setTourCategory] = useState<RoomCategory>('deluxe')
+  const [tourCategory, setTourCategory] = useState<AdminRoomCategory>('deluxe')
   const [editingKey, setEditingKey] = useState('')
   const [tourPrice, setTourPrice] = useState('')
   const [tourExtraBed, setTourExtraBed] = useState('')
   const [tourChild, setTourChild] = useState('')
-  const [singleForm, setSingleForm] = useState({ room_category: 'deluxe' as RoomCategory, rate_type: 'lwweb' as DateRateType, rate_date: '', base_price: '', extra_bed_price: '', child_price: '' })
-  const [bulkForm, setBulkForm] = useState({ room_category: 'deluxe' as RoomCategory, rate_type: 'lwweb' as DateRateType, start_date: '', end_date: '', base_price: '', extra_bed_price: '', child_price: '' })
+  const [singleForm, setSingleForm] = useState({ room_category: 'deluxe' as AdminRoomCategory, rate_type: 'lwweb' as DateRateType, rate_date: '', base_price: '', extra_bed_price: '', child_price: '' })
+  const [bulkForm, setBulkForm] = useState({ room_category: 'deluxe' as AdminRoomCategory, rate_type: 'lwweb' as DateRateType, start_date: '', end_date: '', base_price: '', extra_bed_price: '', child_price: '' })
   const [mealForm, setMealForm] = useState({ meal_type: 'breakfast', price: '', applicable_from: '', applicable_to: '' })
 
   async function getToken() {
@@ -168,7 +168,7 @@ export default function AdminTariffForm() {
             }}>
               <h3 className="mb-4 text-lg font-semibold text-white">Single Date Update</h3>
               <div className="grid gap-4">
-                <select value={singleForm.room_category} onChange={(event) => setSingleForm((current) => ({ ...current, room_category: event.target.value as RoomCategory }))} className={INPUT}><option value="deluxe" style={{ background: '#111' }}>Deluxe</option><option value="premium" style={{ background: '#111' }}>Premium</option></select>
+                <select value={singleForm.room_category} onChange={(event) => setSingleForm((current) => ({ ...current, room_category: event.target.value as AdminRoomCategory }))} className={INPUT}>{ADMIN_ROOM_CATEGORIES.map((category) => <option key={category} value={category} style={{ background: '#111' }}>{getRoomCategoryLabel(category)}</option>)}</select>
                 <select value={singleForm.rate_type} onChange={(event) => setSingleForm((current) => ({ ...current, rate_type: event.target.value as DateRateType }))} className={INPUT}>{DATE_TYPES.map((type) => <option key={type.key} value={type.key} style={{ background: '#111' }}>{type.label}</option>)}</select>
                 <input type="date" value={singleForm.rate_date} onChange={(event) => setSingleForm((current) => ({ ...current, rate_date: event.target.value }))} className={INPUT} style={{ colorScheme: 'dark' }} />
                 <input type="number" min={1} placeholder="Base price (EP)" value={singleForm.base_price} onChange={(event) => setSingleForm((current) => ({ ...current, base_price: event.target.value }))} className={INPUT} />
@@ -190,7 +190,7 @@ export default function AdminTariffForm() {
                 <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-white/45">{bulkDates.length ? `${bulkDates.length} date(s)` : 'Select a range'}</span>
               </div>
               <div className="grid gap-4">
-                <select value={bulkForm.room_category} onChange={(event) => setBulkForm((current) => ({ ...current, room_category: event.target.value as RoomCategory }))} className={INPUT}><option value="deluxe" style={{ background: '#111' }}>Deluxe</option><option value="premium" style={{ background: '#111' }}>Premium</option></select>
+                <select value={bulkForm.room_category} onChange={(event) => setBulkForm((current) => ({ ...current, room_category: event.target.value as AdminRoomCategory }))} className={INPUT}>{ADMIN_ROOM_CATEGORIES.map((category) => <option key={category} value={category} style={{ background: '#111' }}>{getRoomCategoryLabel(category)}</option>)}</select>
                 <select value={bulkForm.rate_type} onChange={(event) => setBulkForm((current) => ({ ...current, rate_type: event.target.value as DateRateType }))} className={INPUT}>{DATE_TYPES.map((type) => <option key={type.key} value={type.key} style={{ background: '#111' }}>{type.label}</option>)}</select>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <input type="date" value={bulkForm.start_date} onChange={(event) => setBulkForm((current) => ({ ...current, start_date: event.target.value }))} className={INPUT} style={{ colorScheme: 'dark' }} />
@@ -230,7 +230,7 @@ export default function AdminTariffForm() {
             <p className="mt-1 text-sm text-white/45">B2B stays on a flat plan matrix. Set EP, CP, MAP, and AP season-wise from the same page.</p>
           </div>
           <div className="flex gap-2">
-            {(['deluxe', 'premium'] as const).map((category) => <button key={category} onClick={() => setTourCategory(category)} className={`rounded-xl px-4 py-2 text-sm font-semibold capitalize ${tourCategory === category ? 'bg-[#c9a14a] text-black' : 'border border-white/10 bg-white/5 text-white/60'}`}>{category}</button>)}
+            {ADMIN_ROOM_CATEGORIES.map((category) => <button key={category} onClick={() => setTourCategory(category)} className={`rounded-xl px-4 py-2 text-sm font-semibold ${tourCategory === category ? 'bg-[#c9a14a] text-black' : 'border border-white/10 bg-white/5 text-white/60'}`}>{getRoomCategoryLabel(category)}</button>)}
           </div>
         </div>
 
@@ -304,7 +304,7 @@ export default function AdminTariffForm() {
             <table className="w-full text-sm">
               <thead><tr className="border-b border-white/10 text-left text-white/45"><th className="px-3 py-3 font-medium">Date</th><th className="px-3 py-3 font-medium">Room</th><th className="px-3 py-3 font-medium">Source</th><th className="px-3 py-3 font-medium">Base</th></tr></thead>
               <tbody>
-                {loading ? <tr><td colSpan={4} className="px-3 py-8 text-center text-white/35">Loading pricing...</td></tr> : recentRows.length ? recentRows.map((rate) => <tr key={rate.id} className="border-b border-white/5 text-white/75"><td className="px-3 py-3">{rate.rate_date}</td><td className="px-3 py-3 capitalize">{rate.room_category}</td><td className="px-3 py-3 uppercase">{rate.rate_type}</td><td className="px-3 py-3">Rs. {Number(rate.base_price || 0).toLocaleString()}</td></tr>) : <tr><td colSpan={4} className="px-3 py-8 text-center text-white/35">No date-wise room prices saved yet.</td></tr>}
+                {loading ? <tr><td colSpan={4} className="px-3 py-8 text-center text-white/35">Loading pricing...</td></tr> : recentRows.length ? recentRows.map((rate) => <tr key={rate.id} className="border-b border-white/5 text-white/75"><td className="px-3 py-3">{rate.rate_date}</td><td className="px-3 py-3">{getRoomCategoryLabel(rate.room_category)}</td><td className="px-3 py-3 uppercase">{rate.rate_type}</td><td className="px-3 py-3">Rs. {Number(rate.base_price || 0).toLocaleString()}</td></tr>) : <tr><td colSpan={4} className="px-3 py-8 text-center text-white/35">No date-wise room prices saved yet.</td></tr>}
               </tbody>
             </table>
           </div>

@@ -13,6 +13,7 @@ import { buildBookingNumber } from '@/lib/reference-numbers'
 import { logDebug, logError } from '@/lib/logger'
 import { isLocalTestMode } from '@/lib/runtime-mode'
 import { parseJsonBody, sanitizeString } from '@/lib/security'
+import { isPublicRoomCategory } from '@/lib/room-categories'
 
 const EMAIL_RE = /^(?!.*\.\.)([A-Z0-9._%+-]+)@([A-Z0-9.-]+\.[A-Z]{2,})$/i
 const PUBLIC_MEAL_PLANS = ['EP', 'CP'] as const
@@ -113,6 +114,9 @@ export async function POST(request: NextRequest) {
 
     if (roomError || !roomData?.category) {
       return NextResponse.json({ error: 'Room not found' }, { status: 404 })
+    }
+    if (!isPublicRoomCategory(roomData.category)) {
+      return NextResponse.json({ error: 'Room not available for website booking' }, { status: 404 })
     }
 
     const { data: roomRates, error: ratesError } = await supabase

@@ -1,4 +1,5 @@
 import { getSupabaseAdmin } from '@/lib/supabaseServer'
+import { getRoomCategoryOrder } from '@/lib/room-categories'
 
 const PROPERTY_ROOM_CAP = Math.max(1, Number(process.env.PROPERTY_TOTAL_ROOM_CAP || 10))
 
@@ -179,12 +180,6 @@ function daysBetween(from: string, to: string) {
   return Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
 }
 
-function getCategoryOrder(category: string) {
-  if (category === 'premium') return 0
-  if (category === 'deluxe') return 1
-  return 10
-}
-
 function formatRoomLabel(index: number) {
   return `LW${String(index).padStart(2, '0')}`
 }
@@ -202,7 +197,7 @@ function getBookedRoomsForDate(bookings: RawBookingRow[], date: string, roomCate
 
 function getLabelInventory(totalsByCategory: Map<string, number>) {
   const categories = Array.from(totalsByCategory.keys()).sort((a, b) => {
-    const orderDelta = getCategoryOrder(a) - getCategoryOrder(b)
+    const orderDelta = getRoomCategoryOrder(a) - getRoomCategoryOrder(b)
     return orderDelta !== 0 ? orderDelta : a.localeCompare(b)
   })
 
@@ -670,7 +665,7 @@ export async function getAdminRoomAvailabilityCalendar(
 
   const sections = Array.from(totalsByCategory.keys())
     .sort((a, b) => {
-      const orderDelta = getCategoryOrder(a) - getCategoryOrder(b)
+      const orderDelta = getRoomCategoryOrder(a) - getRoomCategoryOrder(b)
       return orderDelta !== 0 ? orderDelta : a.localeCompare(b)
     })
     .map((category) => {

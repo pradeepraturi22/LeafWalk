@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { getCategoryAvailabilityForRoom } from '@/lib/server-availability'
 import { parseJsonBody, sanitizeString } from '@/lib/security'
 import { logError } from '@/lib/logger'
+import { isPublicRoomCategory } from '@/lib/room-categories'
 
 const availabilitySchema = z.object({
   roomId: z.string().uuid('Invalid room ID'),
@@ -26,6 +27,9 @@ export async function POST(req: Request) {
     }
 
     const availability = await getCategoryAvailabilityForRoom(roomId, checkIn, checkOut)
+    if (!isPublicRoomCategory(availability.room.category)) {
+      return NextResponse.json({ error: 'Room not available' }, { status: 404 })
+    }
 
     return NextResponse.json({
       availableRooms: availability.availableRooms,

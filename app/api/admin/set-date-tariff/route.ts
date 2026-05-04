@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabaseServer'
+import { isAdminRoomCategory } from '@/lib/room-categories'
 
 async function requireAdmin(request: NextRequest): Promise<{ userId: string; role: string } | null> {
   const token = request.headers.get('authorization')?.replace('Bearer ', '')
@@ -33,7 +34,7 @@ export async function POST(request: NextRequest) {
     const extraBedPrice = Number(body.extra_bed_price || 0)
     const childPrice = Number(body.child_price || 0)
 
-    if (!['deluxe', 'premium'].includes(roomCategory)) {
+    if (!isAdminRoomCategory(roomCategory)) {
       return NextResponse.json({ error: 'Valid room_category is required' }, { status: 400 })
     }
     if (!['EP', 'CP', 'MAP', 'AP'].includes(mealPlan)) {

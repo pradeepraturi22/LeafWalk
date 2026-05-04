@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from '@/lib/supabaseServer'
 import { getCategoryAvailabilityForRoom } from '@/lib/server-availability'
 import { buildLwwebPricingMatrix, buildMealUnitTotals, type DateWiseRoomRate, type MealPriceRow } from '@/lib/lwweb-date-pricing'
 import { sanitizeString } from '@/lib/security'
+import { isPublicRoomCategory } from '@/lib/room-categories'
 
 const EMAIL_RE = /^(?!.*\.\.)([A-Z0-9._%+-]+)@([A-Z0-9.-]+\.[A-Z]{2,})$/i
 export const PUBLIC_MEAL_PLANS = ['EP', 'CP'] as const
@@ -103,6 +104,9 @@ export async function prepareWebsiteBookingDraft(
 
   if (roomError || !roomData?.category) {
     throw new Error('Room not found')
+  }
+  if (!isPublicRoomCategory(roomData.category)) {
+    throw new Error('Room not available for website booking')
   }
 
   const { data: roomRates, error: ratesError } = await supabase

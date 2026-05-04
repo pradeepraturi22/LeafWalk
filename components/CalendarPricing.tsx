@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabaseClient'
 import { formatCurrency, toLocalDateString } from '@/lib/utils'
 import BulkEditModal from '@/components/BulkEditModal'
 import DateCell from '@/components/DateCell'
+import { ADMIN_ROOM_CATEGORIES, getRoomCategoryLabel, type AdminRoomCategory } from '@/lib/room-categories'
 
 type PricingEntry = {
   date: string
@@ -52,7 +53,7 @@ function rangeBetween(dates: string[], startDate: string, endDate: string) {
 }
 
 export default function CalendarPricing() {
-  const [roomCategory, setRoomCategory] = useState<'deluxe' | 'premium'>('deluxe')
+  const [roomCategory, setRoomCategory] = useState<AdminRoomCategory>('deluxe')
   const [currentMonth, setCurrentMonth] = useState(() => {
     const now = new Date()
     return new Date(now.getFullYear(), now.getMonth(), 1)
@@ -184,14 +185,14 @@ export default function CalendarPricing() {
           <div>
             <label className="mb-1.5 block text-xs font-medium text-white/50">Category</label>
             <div className="flex gap-2">
-              {(['deluxe', 'premium'] as const).map((value) => (
+              {ADMIN_ROOM_CATEGORIES.map((value) => (
                 <button
                   key={value}
                   type="button"
                   onClick={() => setRoomCategory(value)}
-                  className={`rounded-xl px-4 py-2.5 text-sm font-semibold capitalize transition-all ${roomCategory === value ? 'bg-[#c9a14a] text-black' : 'border border-white/15 bg-white/5 text-white/60 hover:text-white'}`}
+                  className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition-all ${roomCategory === value ? 'bg-[#c9a14a] text-black' : 'border border-white/15 bg-white/5 text-white/60 hover:text-white'}`}
                 >
-                  {value}
+                  {getRoomCategoryLabel(value)}
                 </button>
               ))}
             </div>
