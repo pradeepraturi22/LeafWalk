@@ -754,18 +754,9 @@ export async function POST(request: NextRequest) {
       if (error) throw error
 
       let welcomeEmailSent = false
-      let welcomeEmailSkipped = false
       if (data?.email) {
         try {
-          const alreadySent = await hasWelcomeEmailAlreadyBeenSentToAny(
-            [data.email, data.cc_email].filter(Boolean),
-            data.company_name || ''
-          )
-          if (!alreadySent) {
-            welcomeEmailSent = await sendTourOperatorWelcomeEmail(data)
-          } else {
-            welcomeEmailSkipped = true
-          }
+          welcomeEmailSent = await sendTourOperatorWelcomeEmail(data)
         } catch (emailError) {
           logError('tour operator welcome email failed:', emailError)
         }
@@ -773,7 +764,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         welcome_email_sent: welcomeEmailSent,
-        welcome_email_skipped: welcomeEmailSkipped,
+        welcome_email_skipped: false,
       })
     }
 
