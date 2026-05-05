@@ -16,6 +16,7 @@ type EmailAttachment = {
 type SendEmailInput = {
   to: string | string[]
   cc?: string | string[]
+  bcc?: string | string[]
   subject: string
   html: string
   text?: string
@@ -96,6 +97,19 @@ function getFromName(emailType: SendEmailInput['emailType'] = 'general') {
   if (emailType === 'checkin_reminder') return 'LeafWalk Reservations'
   if (emailType === 'booking_confirmation') return 'LeafWalk Bookings'
   return 'LeafWalk Resort'
+}
+
+function normalizeEmailList(value?: string | string[]) {
+  const items = Array.isArray(value) ? value : value ? [value] : []
+  return items
+    .map((entry) => String(entry || '').trim().toLowerCase())
+    .filter(Boolean)
+}
+
+function getGlobalAdminBcc(inputBcc?: string | string[]) {
+  const configured = process.env.ADMIN_NOTIFICATION_BCC || 'admin@leafwalk.in'
+  const merged = [...normalizeEmailList(inputBcc), ...normalizeEmailList(configured)]
+  return Array.from(new Set(merged))
 }
 
 function escapeHtml(value: string) {
@@ -184,6 +198,7 @@ async function sendWithSmtp(input: SendEmailInput): Promise<EmailProviderResult>
     from: `"${fromName}" <${fromEmail}>`,
     to: input.to,
     cc: input.cc,
+    bcc: getGlobalAdminBcc(input.bcc),
     subject: input.subject,
     html: input.html,
     text: input.text,
@@ -226,6 +241,7 @@ async function sendWithResend(input: SendEmailInput): Promise<EmailProviderResul
       from: fromEmail,
       to: Array.isArray(input.to) ? input.to : [input.to],
       cc: input.cc ? (Array.isArray(input.cc) ? input.cc : [input.cc]) : undefined,
+      bcc: getGlobalAdminBcc(input.bcc),
       subject: input.subject,
       html: input.html,
       text: input.text,
@@ -270,6 +286,7 @@ async function sendWithSendGrid(input: SendEmailInput): Promise<EmailProviderRes
       personalizations: [{
         to: (Array.isArray(input.to) ? input.to : [input.to]).map((email) => ({ email })),
         ...(input.cc ? { cc: (Array.isArray(input.cc) ? input.cc : [input.cc]).map((email) => ({ email })) } : {}),
+        ...(getGlobalAdminBcc(input.bcc).length ? { bcc: getGlobalAdminBcc(input.bcc).map((email) => ({ email })) } : {}),
       }],
       from: { email: fromEmail, name: fromName },
       subject: input.subject,
