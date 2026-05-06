@@ -12,7 +12,9 @@ import {
 import { buildBookingReceiptHtml } from '@/lib/booking-receipt-generator'
 import { renderHtmlToPdfBuffer } from '@/lib/html-pdf'
 import { logError } from '@/lib/logger'
+import { readFileSync } from 'fs'
 import { jsPDF } from 'jspdf'
+import { join } from 'path'
 
 export async function sendEmail(
   to: string,
@@ -233,7 +235,8 @@ function createCheckInPassPdf(booking: any) {
   const extraBeds = Number(booking?.extra_beds || 0)
   const issuedOn = formatPassDate(String(booking?.updated_at || booking?.created_at || new Date().toISOString()))
   const bookingSource = String(booking?.booking_source || '-').replace(/_/g, ' ').toUpperCase()
-  const resortContact = '+91-9368080535 | +91-8630227541'
+  const resortContact = '+91-8630227541'
+  const resortLogoDataUrl = `data:image/jpeg;base64,${readFileSync(join(process.cwd(), 'public', 'logo', 'leafwalk-logo.jpeg')).toString('base64')}`
   const drawBadge = (x: number, y: number, text: string, fill: [number, number, number], color: [number, number, number], width: number) => {
     doc.setFillColor(...fill)
     doc.roundedRect(x, y, width, 8, 4, 4, 'F')
@@ -279,16 +282,19 @@ function createCheckInPassPdf(booking: any) {
 
   doc.setFillColor(15, 28, 15)
   doc.roundedRect(10, 10, 190, 28, 4, 4, 'F')
+  doc.setFillColor(255, 255, 255)
+  doc.circle(18, 24, 8, 'F')
+  doc.addImage(resortLogoDataUrl, 'JPEG', 11.5, 17.5, 13, 13)
   doc.setTextColor(201, 161, 74)
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(19)
-  doc.text('LeafWalk Resort', 18, 23)
+  doc.text('LeafWalk Resort', 31, 23)
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8.5)
-  doc.text('STAY IN LAP OF NATURE · UTTARKASHI, UTTARAKHAND', 18, 31)
+  doc.text('STAY IN LAP OF NATURE · UTTARKASHI, UTTARAKHAND', 31, 31)
   doc.setTextColor(255, 255, 255)
   doc.setFontSize(7.5)
-  doc.text('+91-9368080535 | +91-8630227541', 192, 19, { align: 'right' })
+  doc.text(resortContact, 192, 19, { align: 'right' })
   doc.text('info@leafwalk.in', 192, 25, { align: 'right' })
   doc.text('www.leafwalk.in', 192, 31, { align: 'right' })
 
@@ -367,7 +373,7 @@ function createCheckInPassPdf(booking: any) {
   doc.setFontSize(8)
   doc.setTextColor(107, 114, 128)
   const roomSummary = `${booking?.rooms_booked || 1} room × ${nights} nights · ${fitText(mealPlan, 24)} · ${booking?.adults || 1} Adults${children > 0 ? ` · ${children} Child` : ''}${extraBeds > 0 ? ` · ${extraBeds} Extra Bed` : ''}`
-  doc.text(roomSummary, 22, 142)
+  doc.text(doc.splitTextToSize(roomSummary, 164), 22, 142)
 
   let y = 150
   doc.setFillColor(255, 253, 248)
@@ -380,7 +386,7 @@ function createCheckInPassPdf(booking: any) {
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8)
   doc.setTextColor(75, 85, 99)
-  doc.text('Please share this pass at the front desk during arrival. We are ready to welcome you for a smooth check-in experience.', 22, y + 14)
+  doc.text(doc.splitTextToSize('Please share this pass at the front desk during arrival. We are ready to welcome you for a smooth check-in experience.', 166), 22, y + 14)
 
   const leftRows: Array<[string, string]> = [
     ['Present At Front Desk', bookingRef],
@@ -399,18 +405,18 @@ function createCheckInPassPdf(booking: any) {
     ['Rooms', String(booking?.rooms_booked || 1)],
     ['Adults', String(booking?.adults || 1)],
   ]
-  const leftHeight = drawKeyValueBlock(18, 176, 92, 'Arrival Instructions', leftRows)
-  const rightHeight = drawKeyValueBlock(114, 176, 78, 'Booking Info', rightRows)
-  y = 176 + Math.max(leftHeight, rightHeight) + 6
+  const leftHeight = drawKeyValueBlock(18, 174, 92, 'Arrival Instructions', leftRows, 6.2)
+  const rightHeight = drawKeyValueBlock(114, 174, 78, 'Booking Info', rightRows, 6.2)
+  y = 174 + Math.max(leftHeight, rightHeight) + 5
 
   doc.setFillColor(249, 249, 247)
-  doc.roundedRect(18, y, 174, 36, 4, 4, 'FD')
+  doc.roundedRect(18, y, 174, 30, 4, 4, 'FD')
   doc.setTextColor(107, 114, 128)
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(8)
   doc.text('IMPORTANT INFORMATION', 22, y + 7)
   doc.setFont('helvetica', 'normal')
-  doc.setFontSize(7.5)
+  doc.setFontSize(6.8)
   const leftNotes = [
     'Check-in after 3:00 PM · Check-out before 11:00 AM',
     'Breakfast served 8:00 AM · Kitchen closes at 10 PM',
@@ -430,29 +436,29 @@ function createCheckInPassPdf(booking: any) {
     doc.setTextColor(201, 161, 74)
     doc.text('·', 22, noteY)
     doc.setTextColor(107, 114, 128)
-    doc.text(leftNotes[i], 25, noteY)
+    doc.text(doc.splitTextToSize(leftNotes[i], 80), 25, noteY)
     if (rightNotes[i]) {
       doc.setTextColor(201, 161, 74)
       doc.text('·', 110, noteY)
       doc.setTextColor(107, 114, 128)
-      doc.text(rightNotes[i], 113, noteY)
+      doc.text(doc.splitTextToSize(rightNotes[i], 76), 113, noteY)
     }
-    noteY += 5.3
+    noteY += 4.6
   }
 
-  doc.line(18, 272, 192, 272)
+  doc.line(18, 276, 192, 276)
   doc.setTextColor(201, 161, 74)
   doc.setFont('times', 'normal')
   doc.setFontSize(12)
-  doc.text('LeafWalk Resort', 18, 279)
+  doc.text('LeafWalk Resort', 18, 282)
   doc.setTextColor(156, 163, 175)
   doc.setFont('helvetica', 'normal')
-  doc.setFontSize(7.5)
-  doc.text('Vill- Banas, Narad Chatti, Hanuman Chatti', 18, 284)
-  doc.text('Yamunotri Road, Uttarkashi, Uttarakhand - 249193', 18, 288)
-  doc.text(resortContact, 192, 279, { align: 'right' })
-  doc.text('info@leafwalk.in · www.leafwalk.in', 192, 284, { align: 'right' })
-  doc.text('This is a computer generated check-in pass', 192, 288, { align: 'right' })
+  doc.setFontSize(7)
+  doc.text('Vill- Banas, Narad Chatti, Hanuman Chatti', 18, 286)
+  doc.text('Yamunotri Road, Uttarkashi, Uttarakhand - 249193', 18, 289.5)
+  doc.text(resortContact, 192, 282, { align: 'right' })
+  doc.text('info@leafwalk.in · www.leafwalk.in', 192, 286, { align: 'right' })
+  doc.text('This is a computer generated check-in pass', 192, 289.5, { align: 'right' })
 
   return Buffer.from(doc.output('arraybuffer'))
 }
