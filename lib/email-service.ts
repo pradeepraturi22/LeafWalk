@@ -232,6 +232,45 @@ function createCheckInPassPdf(booking: any) {
   const children = Number(booking?.children_5_to_12 || 0)
   const extraBeds = Number(booking?.extra_beds || 0)
   const issuedOn = formatPassDate(String(booking?.updated_at || booking?.created_at || new Date().toISOString()))
+  const bookingSource = String(booking?.booking_source || '-').replace(/_/g, ' ').toUpperCase()
+  const resortContact = '+91-9368080535 | +91-8630227541'
+  const drawBadge = (x: number, y: number, text: string, fill: [number, number, number], color: [number, number, number], width: number) => {
+    doc.setFillColor(...fill)
+    doc.roundedRect(x, y, width, 8, 4, 4, 'F')
+    doc.setTextColor(...color)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(8)
+    doc.text(text, x + width / 2, y + 5.2, { align: 'center' })
+  }
+  const drawKeyValueBlock = (
+    x: number,
+    y: number,
+    width: number,
+    title: string,
+    rows: Array<[string, string]>,
+    rowGap = 7
+  ) => {
+    const height = 12 + rows.length * rowGap + 8
+    doc.setFillColor(255, 255, 255)
+    doc.setDrawColor(229, 231, 235)
+    doc.roundedRect(x, y, width, height, 4, 4, 'FD')
+    doc.setTextColor(107, 114, 128)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(8)
+    doc.text(title.toUpperCase(), x + 4, y + 7)
+    let rowY = y + 14
+    for (const [label, value] of rows) {
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(8.5)
+      doc.setTextColor(107, 114, 128)
+      doc.text(label, x + 4, rowY)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(17, 24, 39)
+      doc.text(fitText(value, 28), x + width - 4, rowY, { align: 'right' })
+      rowY += rowGap
+    }
+    return height
+  }
 
   doc.setFillColor(250, 247, 241)
   doc.rect(0, 0, 210, 297, 'F')
@@ -239,151 +278,181 @@ function createCheckInPassPdf(booking: any) {
   doc.roundedRect(10, 10, 190, 277, 4, 4, 'F')
 
   doc.setFillColor(15, 28, 15)
-  doc.roundedRect(10, 10, 190, 38, 4, 4, 'F')
+  doc.roundedRect(10, 10, 190, 28, 4, 4, 'F')
   doc.setTextColor(201, 161, 74)
   doc.setFont('helvetica', 'bold')
-  doc.setFontSize(21)
-  doc.text('LeafWalk Resort', 24, 25)
+  doc.setFontSize(19)
+  doc.text('LeafWalk Resort', 18, 23)
   doc.setFont('helvetica', 'normal')
-  doc.setFontSize(10)
-  doc.text('Stay in Lap of Nature | Uttarkashi, Uttarakhand', 24, 34)
+  doc.setFontSize(8.5)
+  doc.text('STAY IN LAP OF NATURE · UTTARKASHI, UTTARAKHAND', 18, 31)
   doc.setTextColor(255, 255, 255)
-  doc.setFontSize(9)
-  doc.text('+91-9368080535 | info@leafwalk.in', 188, 25, { align: 'right' })
-  doc.text('www.leafwalk.in', 188, 34, { align: 'right' })
+  doc.setFontSize(7.5)
+  doc.text('+91-9368080535 | +91-8630227541', 192, 19, { align: 'right' })
+  doc.text('info@leafwalk.in', 192, 25, { align: 'right' })
+  doc.text('www.leafwalk.in', 192, 31, { align: 'right' })
 
   doc.setDrawColor(201, 161, 74)
   doc.setLineWidth(0.8)
-  doc.line(10, 51, 200, 51)
+  doc.line(10, 40, 200, 40)
 
   doc.setTextColor(17, 24, 39)
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(23)
-  doc.text('Check In Pass', 20, 67)
-  doc.setFontSize(9)
-  doc.setTextColor(107, 114, 128)
-  doc.text('Guest Arrival Copy', 20, 75)
+  doc.setFont('times', 'normal')
+  doc.setFontSize(18)
+  doc.text('Check In Pass', 18, 52)
   doc.setTextColor(107, 114, 128)
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8.5)
-  doc.text(`Issued On: ${issuedOn}`, 20, 81)
-
-  doc.setFillColor(240, 253, 244)
-  doc.roundedRect(145, 59, 43, 13, 3, 3, 'F')
-  doc.setTextColor(22, 101, 52)
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(8)
-  doc.text(passStatus, 166.5, 67.5, { align: 'center' })
-
-  doc.setFillColor(250, 247, 241)
-  doc.roundedRect(20, 88, 168, 34, 4, 4, 'F')
-  doc.setTextColor(107, 114, 128)
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(9)
-  doc.text('Guest Name', 28, 100)
-  doc.text('Booking Ref', 118, 100)
-  doc.text('Guest Email', 28, 116)
-  doc.text('Phone', 118, 116)
+  doc.text('Booking Ref', 122, 46)
+  doc.text('Issued', 122, 52)
+  doc.text('Source', 122, 58)
   doc.setTextColor(17, 24, 39)
   doc.setFont('helvetica', 'bold')
-  doc.setFontSize(13)
-  doc.text(guestName, 28, 109)
-  doc.text(bookingRef, 118, 109)
-  doc.setFontSize(10)
-  doc.text(guestEmail, 28, 120)
-  doc.text(guestPhone, 118, 120)
+  doc.text(bookingRef, 192, 46, { align: 'right' })
+  doc.text(issuedOn, 192, 52, { align: 'right' })
+  doc.text(bookingSource, 192, 58, { align: 'right' })
 
+  doc.setDrawColor(229, 231, 235)
+  doc.line(10, 62, 200, 62)
+  doc.line(10, 74, 200, 74)
+  drawBadge(18, 66, bookingStatus === 'confirmed' ? 'CONFIRMED' : bookingStatus.toUpperCase(), [220, 252, 231], [22, 101, 52], 22)
+  drawBadge(42, 66, passStatus === 'FULLY PAID' ? 'Fully Paid' : 'Advance Paid', [254, 243, 199], [146, 64, 14], 26)
+
+  doc.setTextColor(17, 24, 39)
+  doc.setFont('times', 'normal')
+  doc.setFontSize(16)
+  doc.text(guestName, 18, 92)
+  doc.setTextColor(107, 114, 128)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(8)
+  doc.text(guestPhone, 22, 99)
+  doc.text(guestEmail, 22, 106)
+
+  doc.setDrawColor(229, 231, 235)
+  doc.roundedRect(122, 84, 70, 18, 4, 4, 'S')
+  doc.line(143, 84, 143, 102)
+  doc.line(171, 84, 171, 102)
+  doc.setTextColor(156, 163, 175)
+  doc.setFontSize(7.5)
+  doc.text('CHECK-IN', 132.5, 89, { align: 'center' })
+  doc.text('CHECK-OUT', 181.5, 89, { align: 'center' })
+  doc.setFillColor(15, 28, 15)
+  doc.rect(143, 84, 28, 18, 'F')
+  doc.setTextColor(17, 24, 39)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(9.5)
+  doc.text(checkInDate, 132.5, 94.5, { align: 'center' })
+  doc.text(checkOutDate, 181.5, 94.5, { align: 'center' })
+  doc.setTextColor(201, 161, 74)
+  doc.setFontSize(16)
+  doc.text(String(nights || '-'), 157, 92.5, { align: 'center' })
+  doc.setFontSize(7)
+  doc.text('NIGHTS', 157, 98, { align: 'center' })
+  doc.setTextColor(107, 114, 128)
+  doc.text('After 3:00 PM', 132.5, 98.5, { align: 'center' })
+  doc.text('Before 11:00 AM', 181.5, 98.5, { align: 'center' })
+
+  doc.setTextColor(156, 163, 175)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(8)
+  doc.text('ROOM DETAILS', 18, 118)
   doc.setFillColor(255, 255, 255)
-  doc.roundedRect(20, 132, 168, 36, 4, 4, 'S')
-  doc.setTextColor(107, 114, 128)
+  doc.roundedRect(18, 121, 174, 22, 4, 4, 'S')
+  doc.text('DESCRIPTION', 184, 128, { align: 'right' })
+  doc.line(18, 131, 192, 131)
+  doc.setTextColor(17, 24, 39)
+  doc.setFontSize(10.5)
+  doc.text(fitText(roomName, 42), 22, 138)
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8)
-  doc.text('CHECK-IN', 30, 144)
-  doc.text('NIGHTS', 104, 144, { align: 'center' })
-  doc.text('CHECK-OUT', 152, 144)
-  doc.setTextColor(17, 24, 39)
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(12)
-  doc.text(checkInDate, 30, 156)
-  doc.setFontSize(22)
-  doc.text(String(nights || '-'), 104, 154, { align: 'center' })
-  doc.setFontSize(8)
   doc.setTextColor(107, 114, 128)
-  doc.text('NIGHT STAY', 104, 160, { align: 'center' })
-  doc.setTextColor(17, 24, 39)
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(12)
-  doc.text(checkOutDate, 152, 156)
+  const roomSummary = `${booking?.rooms_booked || 1} room × ${nights} nights · ${fitText(mealPlan, 24)} · ${booking?.adults || 1} Adults${children > 0 ? ` · ${children} Child` : ''}${extraBeds > 0 ? ` · ${extraBeds} Extra Bed` : ''}`
+  doc.text(roomSummary, 22, 142)
 
-  const rows: Array<[string, string]> = [
-    ['Room Type', fitText(roomName)],
+  let y = 150
+  doc.setFillColor(255, 253, 248)
+  doc.setDrawColor(232, 220, 194)
+  doc.roundedRect(18, y, 174, 20, 4, 4, 'FD')
+  doc.setTextColor(17, 24, 39)
+  doc.setFont('times', 'normal')
+  doc.setFontSize(15)
+  doc.text('Welcome to LeafWalk Resort', 22, y + 8)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(8)
+  doc.setTextColor(75, 85, 99)
+  doc.text('Please share this pass at the front desk during arrival. We are ready to welcome you for a smooth check-in experience.', 22, y + 14)
+
+  const leftRows: Array<[string, string]> = [
+    ['Present At Front Desk', bookingRef],
+    ['Check-in Time', 'After 3:00 PM'],
+    ['Check-out Time', 'Before 11:00 AM'],
+    ['ID Requirement', 'Valid government ID required'],
+    ['Front Desk', '+91-8630227541'],
+    ['Breakfast', '8:00 AM - 10:00 AM'],
+    ['Kitchen Closes', '10:00 PM'],
+    ['Resort Contact', resortContact],
+  ]
+  const rightRows: Array<[string, string]> = [
+    ['Booking No.', bookingRef],
+    ['Issued On', issuedOn],
+    ['Source', bookingSource],
     ['Rooms', String(booking?.rooms_booked || 1)],
     ['Adults', String(booking?.adults || 1)],
-    ['Children (6-12)', String(children)],
-    ['Extra Beds', String(extraBeds)],
-    ['Meal Plan', fitText(mealPlan)],
   ]
+  const leftHeight = drawKeyValueBlock(18, 176, 92, 'Arrival Instructions', leftRows)
+  const rightHeight = drawKeyValueBlock(114, 176, 78, 'Booking Info', rightRows)
+  y = 176 + Math.max(leftHeight, rightHeight) + 6
 
-  let y = 183
-  doc.setFillColor(248, 250, 252)
-  doc.roundedRect(20, y, 168, 18, 4, 4, 'F')
+  doc.setFillColor(249, 249, 247)
+  doc.roundedRect(18, y, 174, 36, 4, 4, 'FD')
+  doc.setTextColor(107, 114, 128)
   doc.setFont('helvetica', 'bold')
-  doc.setFontSize(14)
-  doc.setTextColor(17, 24, 39)
-  doc.text('Welcome to LeafWalk Resort', 28, y + 11)
+  doc.setFontSize(8)
+  doc.text('IMPORTANT INFORMATION', 22, y + 7)
   doc.setFont('helvetica', 'normal')
-  doc.setFontSize(8.5)
-  doc.setTextColor(75, 85, 99)
-  doc.text('Please keep this pass handy at arrival for a smooth front-desk check-in.', 28, y + 16)
-
-  y += 28
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(11)
-  doc.setTextColor(17, 24, 39)
-  doc.text('Room Details', 20, y)
-  y += 8
-  doc.setFontSize(10)
-  for (const [label, value] of rows) {
+  doc.setFontSize(7.5)
+  const leftNotes = [
+    'Check-in after 3:00 PM · Check-out before 11:00 AM',
+    'Breakfast served 8:00 AM · Kitchen closes at 10 PM',
+    'Cancellation charges as per reservation policy',
+    `Front desk support · ${resortContact}`,
+    'Outside food and alcohol are subject to resort policy',
+  ]
+  const rightNotes = [
+    'Valid government ID required at check-in',
+    'Lunch and dinner orders are served as per resort kitchen timings',
+    'No pets allowed in resort premises',
+    'Contact us 24/7 · +91-9368080535 | +91-8630227541',
+    'Please keep this pass ready at arrival for a faster check-in',
+  ]
+  let noteY = y + 13
+  for (let i = 0; i < leftNotes.length; i += 1) {
+    doc.setTextColor(201, 161, 74)
+    doc.text('·', 22, noteY)
     doc.setTextColor(107, 114, 128)
-    doc.setFont('helvetica', 'normal')
-    doc.text(label, 20, y)
-    doc.setTextColor(17, 24, 39)
-    doc.setFont('helvetica', 'bold')
-    doc.text(String(value), 72, y)
-    doc.setDrawColor(229, 231, 235)
-    doc.line(20, y + 5, 190, y + 5)
-    y += 13
+    doc.text(leftNotes[i], 25, noteY)
+    if (rightNotes[i]) {
+      doc.setTextColor(201, 161, 74)
+      doc.text('·', 110, noteY)
+      doc.setTextColor(107, 114, 128)
+      doc.text(rightNotes[i], 113, noteY)
+    }
+    noteY += 5.3
   }
 
-  y += 4
-  doc.setFillColor(250, 247, 241)
-  doc.roundedRect(20, y, 168, 48, 4, 4, 'F')
-  doc.setFont('helvetica', 'bold')
-  doc.setTextColor(17, 24, 39)
-  doc.setFontSize(11)
-  doc.text('Important Information', 28, y + 10)
+  doc.line(18, 272, 192, 272)
+  doc.setTextColor(201, 161, 74)
+  doc.setFont('times', 'normal')
+  doc.setFontSize(12)
+  doc.text('LeafWalk Resort', 18, 279)
+  doc.setTextColor(156, 163, 175)
   doc.setFont('helvetica', 'normal')
-  doc.setTextColor(75, 85, 99)
-  doc.setFontSize(9)
-  const notes = [
-    'Check-in after 3:00 PM and check-out before 11:00 AM.',
-    'Valid government ID is required at check-in.',
-    'Breakfast served 8:00 AM - 10:00 AM. Kitchen closes at 10:00 PM.',
-    'Front desk support: +91-8630227541.',
-    'Outside food and loud music are discouraged for a peaceful stay.',
-    'Please keep this pass ready at arrival for a faster check-in.',
-  ]
-  y += 20
-  for (const note of notes) {
-    doc.text(`- ${note}`, 28, y)
-    y += 7
-  }
-
-  doc.setFillColor(15, 28, 15)
-  doc.roundedRect(10, 270, 190, 17, 4, 4, 'F')
-  doc.setTextColor(255, 255, 255)
-  doc.setFontSize(9)
-  doc.text('LeafWalk Resort | Vill- Banas, Narad Chatti, Yamunotri Road, Uttarkashi | +91-9368080535', 105, 280, { align: 'center' })
+  doc.setFontSize(7.5)
+  doc.text('Vill- Banas, Narad Chatti, Hanuman Chatti', 18, 284)
+  doc.text('Yamunotri Road, Uttarkashi, Uttarakhand - 249193', 18, 288)
+  doc.text(resortContact, 192, 279, { align: 'right' })
+  doc.text('info@leafwalk.in · www.leafwalk.in', 192, 284, { align: 'right' })
+  doc.text('This is a computer generated check-in pass', 192, 288, { align: 'right' })
 
   return Buffer.from(doc.output('arraybuffer'))
 }
