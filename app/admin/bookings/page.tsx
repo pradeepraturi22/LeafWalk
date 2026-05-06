@@ -91,7 +91,7 @@ export default function AdminBookingsPage() {
   const [statusFilter, setStatusFilter]       = useState('all')
   const [payFilter, setPayFilter]             = useState('all')
   const [searchQuery, setSearchQuery]         = useState('')
-  const [dateFilter, setDateFilter]           = useState<'all' | 'upcoming' | 'current' | 'past'>('all')
+  const [dateFilter, setDateFilter]           = useState<'all' | 'upcoming' | 'current' | 'past'>('upcoming')
 
   useEffect(() => { init() }, [])
   useEffect(() => { applyFilters() }, [bookings, statusFilter, payFilter, searchQuery, dateFilter])
@@ -317,7 +317,7 @@ export default function AdminBookingsPage() {
               <option value="current">Currently Staying</option>
               <option value="past">Past</option>
             </select>
-            <button onClick={() => { setSearchQuery(''); setStatusFilter('all'); setPayFilter('all'); setDateFilter('all') }}
+            <button onClick={() => { setSearchQuery(''); setStatusFilter('all'); setPayFilter('all'); setDateFilter('upcoming') }}
               className="px-4 py-2 bg-white/8 hover:bg-white/15 border border-white/15 rounded-lg text-white/60 hover:text-white text-sm transition-all">
               Clear Filters
             </button>

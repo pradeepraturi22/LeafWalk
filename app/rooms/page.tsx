@@ -51,6 +51,34 @@ type AvailabilityQuote = {
   bookedRooms: number
 }
 
+const CLIENT_CACHE_TTL_MS = 5 * 60 * 1000
+const ROOMS_LIST_CACHE_KEY = 'leafwalk-rooms-list'
+const ROOMS_PRICING_CACHE_KEY = 'leafwalk-rooms-pricing'
+const ROOMS_AVAILABILITY_CACHE_KEY = 'leafwalk-rooms-availability'
+
+function readSessionCache<T>(key: string): T | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.sessionStorage.getItem(key)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as { ts?: number; data?: T }
+    if (!parsed?.ts || Date.now() - parsed.ts > CLIENT_CACHE_TTL_MS) {
+      window.sessionStorage.removeItem(key)
+      return null
+    }
+    return parsed.data ?? null
+  } catch {
+    return null
+  }
+}
+
+function writeSessionCache<T>(key: string, data: T) {
+  if (typeof window === 'undefined') return
+  try {
+    window.sessionStorage.setItem(key, JSON.stringify({ ts: Date.now(), data }))
+  } catch {}
+}
+
 const MEAL_PLAN_META: Record<MealPlan, { badge: string; subtitle: string; feature: string; whatsapp: string; accent: string }> = {
   EP: {
     badge: 'Room Only',
@@ -188,13 +216,23 @@ function RoomsContent() {
   useEffect(() => {
     const cat = searchParams.get('category')
     if (cat === 'deluxe' || cat === 'premium') setCategory(cat)
+
+    const cachedRooms = readSessionCache<Room[]>(ROOMS_LIST_CACHE_KEY)
+    if (cachedRooms) {
+      setRooms(cachedRooms)
+      setLoading(false)
+      return
+    }
+
     fetch('/api/rooms', { cache: 'force-cache' })
       .then(async (response) => {
         if (!response.ok) throw new Error('Failed to load rooms')
         return response.json()
       })
       .then((payload) => {
-        setRooms((payload.rooms || []) as Room[])
+        const nextRooms = (payload.rooms || []) as Room[]
+        setRooms(nextRooms)
+        writeSessionCache(ROOMS_LIST_CACHE_KEY, nextRooms)
       })
       .catch(() => {
         setRooms([])
@@ -209,6 +247,12 @@ function RoomsContent() {
       return
     }
 
+    const pricingCacheKey = `${ROOMS_PRICING_CACHE_KEY}:${checkInDate}:${checkOutDate}`
+    const cachedPricing = readSessionCache<Record<string, PricingQuote | null>>(pricingCacheKey)
+    if (cachedPricing) {
+      setPriceQuotes(cachedPricing)
+    }
+
     const representativeRooms = (['deluxe', 'premium'] as const)
       .map((category) => rooms.find((room) => room.category === category))
       .filter(Boolean) as Room[]
@@ -217,7 +261,7 @@ function RoomsContent() {
       return PUBLIC_MEAL_PLANS.map((meal) => ({ room, meal }))
     })
 
-    Promise.all(
+    if (!cachedPricing) Promise.all(
       availableCombos.map(async ({ room, meal }) => {
         const response = await fetch('/api/get-room-pricing', {
           method: 'POST',
@@ -234,12 +278,23 @@ function RoomsContent() {
         const quote = await response.json()
         return [`${room.id}:${meal}`, { totalPrice: Number(quote.total?.[meal] || 0), nights: Array.isArray(quote.nights) ? quote.nights.length : 0 }] as const
       })
-    ).then((entries) => setPriceQuotes(Object.fromEntries(entries)))
+    ).then((entries) => {
+      const nextPricing = Object.fromEntries(entries)
+      setPriceQuotes(nextPricing)
+      writeSessionCache(pricingCacheKey, nextPricing)
+    })
   }, [hasDates, checkInDate, checkOutDate, rooms])
 
   useEffect(() => {
     if (!hasDates || !checkInDate || !checkOutDate || rooms.length === 0) {
       setAvailabilityQuotes({})
+      return
+    }
+
+    const availabilityCacheKey = `${ROOMS_AVAILABILITY_CACHE_KEY}:${checkInDate}:${checkOutDate}`
+    const cachedAvailability = readSessionCache<Record<string, AvailabilityQuote | null>>(availabilityCacheKey)
+    if (cachedAvailability) {
+      setAvailabilityQuotes(cachedAvailability)
       return
     }
 
@@ -267,7 +322,11 @@ function RoomsContent() {
           bookedRooms: Number(data.bookedRooms || 0),
         }] as const
       })
-    ).then((entries) => setAvailabilityQuotes(Object.fromEntries(entries)))
+    ).then((entries) => {
+      const nextAvailability = Object.fromEntries(entries)
+      setAvailabilityQuotes(nextAvailability)
+      writeSessionCache(availabilityCacheKey, nextAvailability)
+    })
   }, [hasDates, checkInDate, checkOutDate, rooms])
 
   useEffect(() => {

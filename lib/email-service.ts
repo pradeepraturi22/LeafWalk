@@ -206,6 +206,16 @@ function createCheckInPassPdf(booking: any) {
     const year = date.getFullYear()
     return `${day}-${month}-${year}`
   }
+  const mealLabels: Record<string, string> = {
+    EP: 'Room Only (EP)',
+    CP: 'With Breakfast (CP)',
+    MAP: 'Breakfast + Dinner (MAP)',
+    AP: 'All Meals (AP)',
+  }
+  const fitText = (text: string, maxLength = 44) => {
+    const value = String(text || '-').trim()
+    return value.length > maxLength ? `${value.slice(0, maxLength - 1)}…` : value
+  }
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
   const bookingRef = booking?.booking_number || String(booking?.id || '').slice(0, 8).toUpperCase()
   const bookingStatus = String(booking?.booking_status || '').toLowerCase()
@@ -215,6 +225,13 @@ function createCheckInPassPdf(booking: any) {
   const nights = Number(booking?.nights || 0)
   const checkInDate = formatPassDate(String(booking?.check_in || ''))
   const checkOutDate = formatPassDate(String(booking?.check_out || ''))
+  const mealPlan = mealLabels[String(booking?.meal_plan || '')] || booking?.meal_plan || '-'
+  const guestName = fitText(booking?.guest_name || '-')
+  const guestEmail = fitText(booking?.guest_email || '-')
+  const guestPhone = fitText(booking?.guest_phone || '-')
+  const children = Number(booking?.children_5_to_12 || 0)
+  const extraBeds = Number(booking?.extra_beds || 0)
+  const issuedOn = formatPassDate(String(booking?.updated_at || booking?.created_at || new Date().toISOString()))
 
   doc.setFillColor(250, 247, 241)
   doc.rect(0, 0, 210, 297, 'F')
@@ -246,6 +263,10 @@ function createCheckInPassPdf(booking: any) {
   doc.setFontSize(9)
   doc.setTextColor(107, 114, 128)
   doc.text('Guest Arrival Copy', 20, 75)
+  doc.setTextColor(107, 114, 128)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(8.5)
+  doc.text(`Issued On: ${issuedOn}`, 20, 81)
 
   doc.setFillColor(240, 253, 244)
   doc.roundedRect(145, 59, 43, 13, 3, 3, 'F')
@@ -255,42 +276,67 @@ function createCheckInPassPdf(booking: any) {
   doc.text(passStatus, 166.5, 67.5, { align: 'center' })
 
   doc.setFillColor(250, 247, 241)
-  doc.roundedRect(20, 84, 168, 30, 4, 4, 'F')
+  doc.roundedRect(20, 88, 168, 34, 4, 4, 'F')
   doc.setTextColor(107, 114, 128)
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
-  doc.text('Guest Name', 28, 96)
-  doc.text('Booking Ref', 118, 96)
+  doc.text('Guest Name', 28, 100)
+  doc.text('Booking Ref', 118, 100)
+  doc.text('Guest Email', 28, 116)
+  doc.text('Phone', 118, 116)
   doc.setTextColor(17, 24, 39)
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(13)
-  doc.text(String(booking?.guest_name || '-'), 28, 106)
-  doc.text(bookingRef, 118, 106)
+  doc.text(guestName, 28, 109)
+  doc.text(bookingRef, 118, 109)
+  doc.setFontSize(10)
+  doc.text(guestEmail, 28, 120)
+  doc.text(guestPhone, 118, 120)
 
   doc.setFillColor(255, 255, 255)
-  doc.roundedRect(20, 124, 168, 36, 4, 4, 'S')
+  doc.roundedRect(20, 132, 168, 36, 4, 4, 'S')
   doc.setTextColor(107, 114, 128)
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8)
-  doc.text('CHECK-IN', 30, 136)
-  doc.text('NIGHTS', 99, 136, { align: 'center' })
-  doc.text('CHECK-OUT', 146, 136)
+  doc.text('CHECK-IN', 30, 144)
+  doc.text('NIGHTS', 104, 144, { align: 'center' })
+  doc.text('CHECK-OUT', 152, 144)
   doc.setTextColor(17, 24, 39)
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(12)
-  doc.text(checkInDate, 30, 148)
-  doc.text(String(nights || '-'), 99, 148, { align: 'center' })
-  doc.text(checkOutDate, 146, 148)
+  doc.text(checkInDate, 30, 156)
+  doc.setFontSize(22)
+  doc.text(String(nights || '-'), 104, 154, { align: 'center' })
+  doc.setFontSize(8)
+  doc.setTextColor(107, 114, 128)
+  doc.text('NIGHT STAY', 104, 160, { align: 'center' })
+  doc.setTextColor(17, 24, 39)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(12)
+  doc.text(checkOutDate, 152, 156)
 
   const rows: Array<[string, string]> = [
-    ['Room Type', roomName],
+    ['Room Type', fitText(roomName)],
     ['Rooms', String(booking?.rooms_booked || 1)],
     ['Adults', String(booking?.adults || 1)],
-    ['Meal Plan', booking?.meal_plan || '-'],
-    ['Phone', booking?.guest_phone || '-'],
+    ['Children (6-12)', String(children)],
+    ['Extra Beds', String(extraBeds)],
+    ['Meal Plan', fitText(mealPlan)],
   ]
 
-  let y = 176
+  let y = 183
+  doc.setFillColor(248, 250, 252)
+  doc.roundedRect(20, y, 168, 18, 4, 4, 'F')
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(14)
+  doc.setTextColor(17, 24, 39)
+  doc.text('Welcome to LeafWalk Resort', 28, y + 11)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(8.5)
+  doc.setTextColor(75, 85, 99)
+  doc.text('Please keep this pass handy at arrival for a smooth front-desk check-in.', 28, y + 16)
+
+  y += 28
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(11)
   doc.setTextColor(17, 24, 39)
@@ -311,7 +357,7 @@ function createCheckInPassPdf(booking: any) {
 
   y += 4
   doc.setFillColor(250, 247, 241)
-  doc.roundedRect(20, y, 168, 42, 4, 4, 'F')
+  doc.roundedRect(20, y, 168, 48, 4, 4, 'F')
   doc.setFont('helvetica', 'bold')
   doc.setTextColor(17, 24, 39)
   doc.setFontSize(11)
@@ -324,6 +370,7 @@ function createCheckInPassPdf(booking: any) {
     'Valid government ID is required at check-in.',
     'Breakfast served 8:00 AM - 10:00 AM. Kitchen closes at 10:00 PM.',
     'Front desk support: +91-8630227541.',
+    'Outside food and loud music are discouraged for a peaceful stay.',
     'Please keep this pass ready at arrival for a faster check-in.',
   ]
   y += 20

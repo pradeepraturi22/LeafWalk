@@ -27,6 +27,35 @@ type AvailabilityQuote = {
   blockedRooms?: number
 }
 
+const CLIENT_CACHE_TTL_MS = 5 * 60 * 1000
+const HOME_ROOMS_CACHE_KEY = 'leafwalk-home-rooms'
+const HOME_REVIEWS_CACHE_KEY = 'leafwalk-home-reviews'
+const HOME_PRICING_CACHE_KEY = 'leafwalk-home-pricing'
+const HOME_AVAILABILITY_CACHE_KEY = 'leafwalk-home-availability'
+
+function readSessionCache<T>(key: string): T | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.sessionStorage.getItem(key)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as { ts?: number; data?: T }
+    if (!parsed?.ts || Date.now() - parsed.ts > CLIENT_CACHE_TTL_MS) {
+      window.sessionStorage.removeItem(key)
+      return null
+    }
+    return parsed.data ?? null
+  } catch {
+    return null
+  }
+}
+
+function writeSessionCache<T>(key: string, data: T) {
+  if (typeof window === 'undefined') return
+  try {
+    window.sessionStorage.setItem(key, JSON.stringify({ ts: Date.now(), data }))
+  } catch {}
+}
+
 const FALLBACK_REVIEWS: ReviewCard[] = [
   { id: 'fallback-1', name: 'Priya Sharma', rating: 5, text: 'Absolutely stunning property. The mountain views from our room were breathtaking. Staff was incredibly warm and the food was delicious. Will definitely return!' },
   { id: 'fallback-2', name: 'Rahul Mehta', rating: 5, text: 'Perfect getaway from city life. The forest walks, bonfire evenings, and the cozy rooms made it a memorable trip for our family. Highly recommend.' },
@@ -95,6 +124,13 @@ export default function HomeClient({ pageName }: { pageName?: string }) {
   }, [hydrated, setDates, today, tomorrow])
 
   useEffect(() => {
+    const cachedRooms = readSessionCache<HomeRoom[]>(HOME_ROOMS_CACHE_KEY)
+    const cachedReviews = readSessionCache<ReviewCard[]>(HOME_REVIEWS_CACHE_KEY)
+
+    if (cachedRooms) setRooms(cachedRooms)
+    if (cachedReviews?.length) setReviews(cachedReviews)
+    if (cachedRooms && cachedReviews?.length) return
+
     Promise.all([
       fetch('/api/rooms', { cache: 'force-cache' }),
       fetch('/api/reviews', { cache: 'force-cache' }),
@@ -103,14 +139,16 @@ export default function HomeClient({ pageName }: { pageName?: string }) {
         const roomsPayload = roomsResponse.ok ? await roomsResponse.json() : { rooms: [] }
         const reviewsPayload = reviewsResponse.ok ? await reviewsResponse.json() : { reviews: [] }
 
-        setRooms((roomsPayload.rooms || []) as HomeRoom[])
-        if (reviewsPayload.reviews?.length) {
-          setReviews(reviewsPayload.reviews.slice(0, 3))
-        }
+        const nextRooms = (roomsPayload.rooms || []) as HomeRoom[]
+        const nextReviews = reviewsPayload.reviews?.length ? reviewsPayload.reviews.slice(0, 3) as ReviewCard[] : FALLBACK_REVIEWS
+        setRooms(nextRooms)
+        setReviews(nextReviews)
+        writeSessionCache(HOME_ROOMS_CACHE_KEY, nextRooms)
+        writeSessionCache(HOME_REVIEWS_CACHE_KEY, nextReviews)
       })
       .catch((error) => {
         console.error(error)
-        setRooms([])
+        if (!cachedRooms) setRooms([])
       })
   }, [])
 
@@ -124,6 +162,13 @@ export default function HomeClient({ pageName }: { pageName?: string }) {
   useEffect(() => {
     if (!hydrated || !pricingReady || featuredRooms.length === 0) {
       setPriceQuotes({})
+      return
+    }
+
+    const pricingCacheKey = `${HOME_PRICING_CACHE_KEY}:${effectiveCheckInDate}:${effectiveCheckOutDate}`
+    const cachedPricing = readSessionCache<Record<string, PricingQuote | null>>(pricingCacheKey)
+    if (cachedPricing) {
+      setPriceQuotes(cachedPricing)
       return
     }
 
@@ -144,12 +189,23 @@ export default function HomeClient({ pageName }: { pageName?: string }) {
         const quote = await response.json()
         return [room.id, { totalPrice: Number(quote.total?.EP || 0), nights: Array.isArray(quote.nights) ? quote.nights.length : 0 }] as const
       })
-    ).then((entries) => setPriceQuotes(Object.fromEntries(entries)))
+    ).then((entries) => {
+      const nextPricing = Object.fromEntries(entries)
+      setPriceQuotes(nextPricing)
+      writeSessionCache(pricingCacheKey, nextPricing)
+    })
   }, [effectiveCheckInDate, effectiveCheckOutDate, featuredRooms, hydrated, pricingReady])
 
   useEffect(() => {
     if (!hydrated || !pricingReady || featuredRooms.length === 0) {
       setAvailabilityQuotes({})
+      return
+    }
+
+    const availabilityCacheKey = `${HOME_AVAILABILITY_CACHE_KEY}:${effectiveCheckInDate}:${effectiveCheckOutDate}`
+    const cachedAvailability = readSessionCache<Record<string, AvailabilityQuote | null>>(availabilityCacheKey)
+    if (cachedAvailability) {
+      setAvailabilityQuotes(cachedAvailability)
       return
     }
 
@@ -174,7 +230,11 @@ export default function HomeClient({ pageName }: { pageName?: string }) {
           blockedRooms: Number(data.blockedRooms || 0),
         }] as const
       })
-    ).then((entries) => setAvailabilityQuotes(Object.fromEntries(entries)))
+    ).then((entries) => {
+      const nextAvailability = Object.fromEntries(entries)
+      setAvailabilityQuotes(nextAvailability)
+      writeSessionCache(availabilityCacheKey, nextAvailability)
+    })
   }, [effectiveCheckInDate, effectiveCheckOutDate, featuredRooms, hydrated, pricingReady])
 
   function getCategoryRoom(category: 'deluxe' | 'premium') {
