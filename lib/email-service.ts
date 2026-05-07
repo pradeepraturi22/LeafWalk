@@ -283,15 +283,18 @@ function createCheckInPassPdf(booking: any) {
   doc.setFillColor(15, 28, 15)
   doc.roundedRect(10, 10, 190, 28, 4, 4, 'F')
   doc.setFillColor(255, 255, 255)
-  doc.circle(18, 24, 8, 'F')
-  doc.addImage(resortLogoDataUrl, 'JPEG', 11.5, 17.5, 13, 13)
+  doc.circle(20, 24, 6.8, 'F')
+  doc.addImage(resortLogoDataUrl, 'JPEG', 15.8, 19.8, 8.4, 8.4)
+  doc.setDrawColor(255, 255, 255)
+  doc.setLineWidth(1.1)
+  doc.circle(20, 24, 6.8, 'S')
   doc.setTextColor(201, 161, 74)
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(19)
-  doc.text('LeafWalk Resort', 31, 23)
+  doc.text('LeafWalk Resort', 33, 23)
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8.5)
-  doc.text('STAY IN LAP OF NATURE · UTTARKASHI, UTTARAKHAND', 31, 31)
+  doc.text('STAY IN LAP OF NATURE · UTTARKASHI, UTTARAKHAND', 33, 31)
   doc.setTextColor(255, 255, 255)
   doc.setFontSize(7.5)
   doc.text(resortContact, 192, 19, { align: 'right' })
@@ -363,30 +366,30 @@ function createCheckInPassPdf(booking: any) {
   doc.setFontSize(8)
   doc.text('ROOM DETAILS', 18, 118)
   doc.setFillColor(255, 255, 255)
-  doc.roundedRect(18, 121, 174, 22, 4, 4, 'S')
+  doc.roundedRect(18, 121, 174, 20, 4, 4, 'S')
   doc.text('DESCRIPTION', 184, 128, { align: 'right' })
-  doc.line(18, 131, 192, 131)
+  doc.line(18, 129.5, 192, 129.5)
   doc.setTextColor(17, 24, 39)
   doc.setFontSize(10.5)
-  doc.text(fitText(roomName, 42), 22, 138)
+  doc.text(fitText(roomName, 42), 22, 136.5)
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8)
   doc.setTextColor(107, 114, 128)
   const roomSummary = `${booking?.rooms_booked || 1} room × ${nights} nights · ${fitText(mealPlan, 24)} · ${booking?.adults || 1} Adults${children > 0 ? ` · ${children} Child` : ''}${extraBeds > 0 ? ` · ${extraBeds} Extra Bed` : ''}`
-  doc.text(doc.splitTextToSize(roomSummary, 164), 22, 142)
+  doc.text(doc.splitTextToSize(roomSummary, 164), 22, 140)
 
-  let y = 150
+  let y = 146
   doc.setFillColor(255, 253, 248)
   doc.setDrawColor(232, 220, 194)
-  doc.roundedRect(18, y, 174, 20, 4, 4, 'FD')
+  doc.roundedRect(18, y, 174, 18, 4, 4, 'FD')
   doc.setTextColor(17, 24, 39)
   doc.setFont('times', 'normal')
   doc.setFontSize(15)
-  doc.text('Welcome to LeafWalk Resort', 22, y + 8)
+  doc.text('Welcome to LeafWalk Resort', 22, y + 7.5)
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8)
   doc.setTextColor(75, 85, 99)
-  doc.text(doc.splitTextToSize('Please share this pass at the front desk during arrival. We are ready to welcome you for a smooth check-in experience.', 166), 22, y + 14)
+  doc.text('Please share this pass at the front desk during arrival. We are ready to welcome you for a smooth check-in experience.', 22, y + 13)
 
   const leftRows: Array<[string, string]> = [
     ['Present At Front Desk', bookingRef],
@@ -405,60 +408,60 @@ function createCheckInPassPdf(booking: any) {
     ['Rooms', String(booking?.rooms_booked || 1)],
     ['Adults', String(booking?.adults || 1)],
   ]
-  const leftHeight = drawKeyValueBlock(18, 174, 92, 'Arrival Instructions', leftRows, 6.2)
-  const rightHeight = drawKeyValueBlock(114, 174, 78, 'Booking Info', rightRows, 6.2)
-  y = 174 + Math.max(leftHeight, rightHeight) + 5
+  const leftHeight = drawKeyValueBlock(18, 168, 92, 'Arrival Instructions', leftRows, 5.8)
+  const rightHeight = drawKeyValueBlock(114, 168, 78, 'Booking Info', rightRows, 5.8)
+  y = 168 + Math.max(leftHeight, rightHeight) + 4
 
   doc.setFillColor(249, 249, 247)
-  doc.roundedRect(18, y, 174, 30, 4, 4, 'FD')
+  doc.roundedRect(18, y, 174, 22, 4, 4, 'FD')
   doc.setTextColor(107, 114, 128)
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(8)
   doc.text('IMPORTANT INFORMATION', 22, y + 7)
   doc.setFont('helvetica', 'normal')
-  doc.setFontSize(6.8)
+  doc.setFontSize(6.2)
   const leftNotes = [
     'Check-in after 3:00 PM · Check-out before 11:00 AM',
-    'Breakfast served 8:00 AM · Kitchen closes at 10 PM',
+    'Breakfast 8:00 AM - 10:00 AM · Kitchen closes 10:00 PM',
     'Cancellation charges as per reservation policy',
     `Front desk support · ${resortContact}`,
-    'Outside food and alcohol are subject to resort policy',
   ]
   const rightNotes = [
     'Valid government ID required at check-in',
-    'Lunch and dinner orders are served as per resort kitchen timings',
+    'Dinner orders are served as per kitchen timings',
     'No pets allowed in resort premises',
-    'Contact us 24/7 · +91-9368080535 | +91-8630227541',
-    'Please keep this pass ready at arrival for a faster check-in',
+    'Keep this pass ready at arrival',
   ]
   let noteY = y + 13
-  for (let i = 0; i < leftNotes.length; i += 1) {
+  for (let i = 0; i < Math.max(leftNotes.length, rightNotes.length); i += 1) {
     doc.setTextColor(201, 161, 74)
-    doc.text('·', 22, noteY)
-    doc.setTextColor(107, 114, 128)
-    doc.text(doc.splitTextToSize(leftNotes[i], 80), 25, noteY)
+    if (leftNotes[i]) {
+      doc.text('·', 22, noteY)
+      doc.setTextColor(107, 114, 128)
+      doc.text(leftNotes[i], 25, noteY)
+    }
     if (rightNotes[i]) {
       doc.setTextColor(201, 161, 74)
       doc.text('·', 110, noteY)
       doc.setTextColor(107, 114, 128)
-      doc.text(doc.splitTextToSize(rightNotes[i], 76), 113, noteY)
+      doc.text(rightNotes[i], 113, noteY)
     }
-    noteY += 4.6
+    noteY += 4.1
   }
 
-  doc.line(18, 276, 192, 276)
+  doc.line(18, 283.5, 192, 283.5)
   doc.setTextColor(201, 161, 74)
   doc.setFont('times', 'normal')
-  doc.setFontSize(12)
-  doc.text('LeafWalk Resort', 18, 282)
+  doc.setFontSize(9.5)
+  doc.text('LeafWalk Resort', 18, 286.8)
   doc.setTextColor(156, 163, 175)
   doc.setFont('helvetica', 'normal')
-  doc.setFontSize(7)
-  doc.text('Vill- Banas, Narad Chatti, Hanuman Chatti', 18, 286)
-  doc.text('Yamunotri Road, Uttarkashi, Uttarakhand - 249193', 18, 289.5)
-  doc.text(resortContact, 192, 282, { align: 'right' })
-  doc.text('info@leafwalk.in · www.leafwalk.in', 192, 286, { align: 'right' })
-  doc.text('This is a computer generated check-in pass', 192, 289.5, { align: 'right' })
+  doc.setFontSize(5.2)
+  doc.text('Vill- Banas, Narad Chatti, Hanuman Chatti', 18, 289.8)
+  doc.text('Yamunotri Road, Uttarkashi, Uttarakhand - 249193', 18, 292.8)
+  doc.text(resortContact, 192, 286.8, { align: 'right' })
+  doc.text('info@leafwalk.in · www.leafwalk.in', 192, 289.8, { align: 'right' })
+  doc.text('This is a computer generated check-in pass', 192, 292.8, { align: 'right' })
 
   return Buffer.from(doc.output('arraybuffer'))
 }
