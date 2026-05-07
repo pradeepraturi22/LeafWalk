@@ -53,6 +53,7 @@ type BookingEmailTrigger =
   | 'public_booking_created'
   | 'admin_booking_created'
   | 'admin_status_changed'
+  | 'admin_payment_completed'
   | 'payment_verified'
 
 const BOOKING_EMAIL_SELECT = `
@@ -262,6 +263,10 @@ function shouldSendWalkInPaymentCompletionEmail(booking: BookingEmailContext, tr
   return trigger === 'admin_status_changed' && isWalkInBooking(booking) && normalize(booking.payment_status) === 'fully_paid'
 }
 
+function shouldSendGuestPaymentCompletionEmail(booking: BookingEmailContext, trigger: BookingEmailTrigger) {
+  return trigger === 'admin_payment_completed' && normalize(booking.payment_status) === 'fully_paid'
+}
+
 function resolveOperatorStatusType(booking: BookingEmailContext): 'registered' | 'hold' | 'confirmed' | 'cancelled' {
   const status = normalize(booking.booking_status)
   if (status === 'hold') return 'hold'
@@ -405,6 +410,19 @@ export async function sendBookingLifecycleEmails(bookingId: string, trigger: Boo
       eventType: 'payment_success',
       debugLabel: 'walk-in payment completion',
       attachments: booking.gst_invoice_requested ? [await generateReceiptAttachment(booking as any)] : undefined,
+    })
+  }
+
+  if (booking.guest_email && shouldSendGuestPaymentCompletionEmail(booking, trigger)) {
+    results.paymentSuccess = await sendTrackedGuestEmail({
+      booking,
+      recipient: booking.guest_email,
+      subject: `Final Payment Received - ${booking.booking_number || 'LeafWalk Resort'}`,
+      html: renderPaymentSuccessEmail(booking as any),
+      marker: `guest_payment_completed:${booking.booking_number || booking.id}`,
+      eventType: 'payment_success',
+      debugLabel: `${source || 'unknown'} guest payment completion`,
+      attachments: source === 'tour_operator' ? undefined : [await generateReceiptAttachment(booking as any)],
     })
   }
 

@@ -976,7 +976,16 @@ export async function PATCH(request: NextRequest) {
       if (error) throw error
       if (updateData.booking_status || updateData.payment_status) {
         try {
-          await sendBookingLifecycleEmails(id, 'admin_status_changed')
+          const bookingStatusChanged =
+            Object.prototype.hasOwnProperty.call(updateData, 'booking_status') &&
+            String(updateData.booking_status || '') !== String(existingBooking.booking_status || '')
+          const paymentBecameFullyPaid =
+            String(existingBooking.payment_status || '') !== 'fully_paid' &&
+            nextPaymentStatus === 'fully_paid'
+          const lifecycleTrigger =
+            paymentBecameFullyPaid && !bookingStatusChanged ? 'admin_payment_completed' : 'admin_status_changed'
+
+          await sendBookingLifecycleEmails(id, lifecycleTrigger)
         } catch (emailError) {
           logError('Booking status/payment updated but lifecycle email trigger failed:', {
             booking_id: id,

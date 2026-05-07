@@ -228,15 +228,6 @@ export default function BookingDetailPage() {
       const result = await res.json()
       if (!res.ok) throw new Error(result.error)
 
-      // Send WhatsApp receipt if fully paid now
-      if (isFullyPaid && booking.guest_phone) {
-        fetch('/api/admin/notify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await getToken()}`},
-          body: JSON.stringify({ type: 'booking_confirmation', booking_id: bookingId }),
-        }).catch(() => {})
-      }
-
       // Write to payment ledger
       const token2 = await getToken()
       await fetch('/api/admin/data?type=payment-ledger', {
@@ -744,7 +735,7 @@ export default function BookingDetailPage() {
 
                 {balancePayment.amount >= Number(booking.balance_amount) && (
                   <div className="mt-3 px-3 py-2 bg-green-500/10 border border-green-500/20 rounded-lg text-green-300 text-xs">
-                    ✅ Full payment — booking fully settled. Guest ko WhatsApp notification jaayega.
+                    ✅ Full payment — booking fully settled. Guest ko final payment confirmation mail jaayegi.
                   </div>
                 )}
 
