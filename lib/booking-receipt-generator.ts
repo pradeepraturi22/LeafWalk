@@ -4,6 +4,7 @@
 
 import { formatDate } from '@/lib/utils'
 import { getInvoicePartyMeta } from '@/lib/invoice-party'
+import { calculateGST, calculateGSTFromSubtotal } from '@/lib/gst-bill-service'
 
 const RESORT = {
   name:    'LeafWalk Resort',
@@ -76,9 +77,13 @@ export function buildBookingReceiptHtml(
   const bookingNo   = booking.booking_number || (booking.id || '').slice(0, 8).toUpperCase()
   const invoiceNo   = booking.invoice_number || `INV-${bookingNo}`
   const docTitle    = isCheckInPass ? 'Check In Pass' : isFullyPaid ? 'GST Tax Invoice' : 'Booking Receipt'
-  const taxable     = Number(booking.subtotal || (total ? Math.round((total / 1.05) * 100) / 100 : 0))
-  const cgst        = Number(booking.cgst ?? (taxable ? Math.round(taxable * 0.025 * 100) / 100 : 0))
-  const sgst        = Number(booking.sgst ?? (taxable ? Math.round(taxable * 0.025 * 100) / 100 : 0))
+  const storedSubtotal = Number(booking.subtotal || 0)
+  const gstMath = total > 0
+    ? calculateGST(total)
+    : calculateGSTFromSubtotal(storedSubtotal)
+  const taxable = gstMath.subtotal
+  const cgst = gstMath.cgst
+  const sgst = gstMath.sgst
   const roomItems   = booking.room_items || []
   const hasMulti    = roomItems.length > 1
   const invoiceParty = getInvoicePartyMeta(booking)

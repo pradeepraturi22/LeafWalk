@@ -2,6 +2,7 @@ import { jsPDF } from 'jspdf'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { getInvoicePartyMeta } from '@/lib/invoice-party'
+import { calculateGST, calculateGSTFromSubtotal } from '@/lib/gst-bill-service'
 import { formatDate } from '@/lib/utils'
 
 type ReceiptBooking = {
@@ -210,9 +211,13 @@ export function createStyledBookingReceiptPdf(booking: ReceiptBooking) {
   const adults = Number(booking.adults || 1)
   const mealLabel = MEAL_LABELS[String(booking.meal_plan || '').toUpperCase()] || clean(booking.meal_plan)
   const total = Number(booking.total_amount || 0)
-  const taxable = Number(booking.subtotal || (total ? total / 1.05 : 0))
-  const cgst = booking.cgst != null ? Number(booking.cgst) : Number((taxable * 0.025).toFixed(2))
-  const sgst = booking.sgst != null ? Number(booking.sgst) : Number((taxable * 0.025).toFixed(2))
+  const storedSubtotal = Number(booking.subtotal || 0)
+  const gstMath = total > 0
+    ? calculateGST(total)
+    : calculateGSTFromSubtotal(storedSubtotal)
+  const taxable = gstMath.subtotal
+  const cgst = gstMath.cgst
+  const sgst = gstMath.sgst
   const advance = Number(booking.advance_amount || 0)
   const balance = isFullyPaid ? 0 : Number(booking.balance_amount || 0)
   const source = String(booking.booking_source || 'direct').replace(/_/g, ' ').toUpperCase()

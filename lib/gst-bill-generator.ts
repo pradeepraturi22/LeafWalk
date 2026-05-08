@@ -1,6 +1,7 @@
 // lib/gst-bill-generator.ts - HTML Print-based GST Invoice
 
 import { formatDate } from '@/lib/utils'
+import { calculateGST, calculateGSTFromSubtotal } from '@/lib/gst-bill-service'
 
 const RESORT = {
   name: 'LeafWalk Resort',
@@ -67,11 +68,15 @@ export function generateGSTBill(booking: any): void {
     items.push({ desc: `Child (6-12 yrs) — ${mealLabel}`, rate: r, qty: q, nights, amount: r * q * nights })
   }
 
-  const subtotal = Number(booking.subtotal || 0)
-  const cgst = Number(booking.cgst || 0)
-  const sgst = Number(booking.sgst || 0)
-  const igst = cgst + sgst
   const total = Number(booking.total_amount || 0)
+  const storedSubtotal = Number(booking.subtotal || 0)
+  const gstMath = total > 0
+    ? calculateGST(total)
+    : calculateGSTFromSubtotal(storedSubtotal)
+  const subtotal = gstMath.subtotal
+  const cgst = gstMath.cgst
+  const sgst = gstMath.sgst
+  const igst = cgst + sgst
   const advance = Number(booking.advance_amount || 0)
   const rawBalance = Number(booking.balance_amount || 0)
   // Balance due sirf tab show karo jab actually pending ho
