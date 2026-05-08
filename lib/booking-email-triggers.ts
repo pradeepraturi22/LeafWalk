@@ -435,7 +435,30 @@ export async function sendBookingLifecycleEmails(bookingId: string, trigger: Boo
   }
 
   if (source === 'tour_operator' && booking.tour_operator?.email && trigger === 'admin_payment_completed') {
-    results.operatorStatus = await sendTourOperatorFinalPaymentReceivedEmail(booking as any, booking.tour_operator as any)
+    const finalPaymentAlreadySent = await hasNotificationMarker(
+      booking.id,
+      booking.tour_operator.email,
+      `tour_operator_final_payment_received:${booking.booking_number || booking.id}`,
+    )
+    if (!finalPaymentAlreadySent) {
+      results.operatorStatus = await sendTourOperatorFinalPaymentReceivedEmail(booking as any, booking.tour_operator as any)
+    }
+  }
+
+  if (
+    source === 'tour_operator' &&
+    booking.tour_operator?.email &&
+    trigger === 'admin_status_changed' &&
+    normalize(booking.payment_status) === 'fully_paid'
+  ) {
+    const finalPaymentAlreadySent = await hasNotificationMarker(
+      booking.id,
+      booking.tour_operator.email,
+      `tour_operator_final_payment_received:${booking.booking_number || booking.id}`,
+    )
+    if (!finalPaymentAlreadySent) {
+      results.operatorStatus = await sendTourOperatorFinalPaymentReceivedEmail(booking as any, booking.tour_operator as any)
+    }
   }
 
   if (booking.guest_email && trigger === 'payment_verified') {
