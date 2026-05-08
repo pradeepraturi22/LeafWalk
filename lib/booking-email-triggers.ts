@@ -265,6 +265,7 @@ function shouldSendWalkInPaymentCompletionEmail(booking: BookingEmailContext, tr
 }
 
 function shouldSendGuestPaymentUpdateEmail(booking: BookingEmailContext, trigger: BookingEmailTrigger) {
+  if (normalize(booking.booking_source) === 'tour_operator') return false
   const paymentStatus = normalize(booking.payment_status)
   if (trigger === 'admin_payment_completed') return paymentStatus === 'fully_paid'
   if (trigger === 'admin_payment_updated') return ['payment_processing', 'fully_paid'].includes(paymentStatus)
