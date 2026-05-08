@@ -485,13 +485,43 @@ export function renderBookingConfirmationEmail(booking: BookingLike) {
 }
 
 export function renderPaymentSuccessEmail(booking: BookingLike) {
+  const paymentStatus = String(booking.payment_status || '').toLowerCase()
+  const amountReceived = Number(booking.advance_amount || 0)
+  const balancePending = Number(booking.balance_amount || 0)
+  const isFinalPayment = paymentStatus === 'fully_paid' || balancePending <= 0
+  const heading = isFinalPayment ? 'Final payment received successfully' : 'Payment received successfully'
+  const intro = isFinalPayment
+    ? 'We have successfully received your final payment for the booking below.'
+    : 'We have successfully received your payment for the booking below.'
+  const closing = isFinalPayment
+    ? 'Your booking is now fully settled. Thank you for completing the payment.'
+    : `Thank you. Your remaining balance is ₹${balancePending.toLocaleString('en-IN')}. Please complete the pending amount before check-in.`
+
   return layoutEmail(
-    'Payment received successfully',
+    heading,
     `
       <p>Hi ${escapeHtml(booking.guest_name)},</p>
-      <p>We have successfully received your payment for the booking below.</p>
+      <p>${intro}</p>
       ${bookingFactsTable(booking, 'Stay Total')}
-      <p style="margin-top:20px">Your booking receipt is attached for quick reference.</p>
+      <div style="margin-top:22px">
+        <div style="font-size:12px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#6b7280;margin-bottom:10px">Payment Update</div>
+        <table style="width:100%;border-collapse:collapse">
+          ${[
+            ['Amount Received', `₹${amountReceived.toLocaleString('en-IN')}`],
+            ['Balance Pending', `₹${balancePending.toLocaleString('en-IN')}`],
+            ['Payment Status', isFinalPayment ? 'Fully Paid' : 'Advance Paid'],
+          ].map(([label, value]) => `
+            <tr>
+              <td style="padding:10px 0;border-bottom:1px solid #e5e7eb;color:#6b7280;font-size:13px;width:42%">${escapeHtml(label)}</td>
+              <td style="padding:10px 0;border-bottom:1px solid #e5e7eb;color:#111827;font-size:13px;font-weight:600">${escapeHtml(value)}</td>
+            </tr>
+          `).join('')}
+        </table>
+      </div>
+      <p style="margin-top:20px">${escapeHtml(closing)}</p>
+      ${String(booking.booking_source || '').toLowerCase() === 'tour_operator'
+        ? ''
+        : '<p style="margin-top:16px">Your updated booking receipt is attached for quick reference.</p>'}
     `
   )
 }

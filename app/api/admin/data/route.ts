@@ -982,8 +982,18 @@ export async function PATCH(request: NextRequest) {
           const paymentBecameFullyPaid =
             String(existingBooking.payment_status || '') !== 'fully_paid' &&
             nextPaymentStatus === 'fully_paid'
+          const paymentFieldsTouched =
+            Object.prototype.hasOwnProperty.call(updateData, 'payment_status') ||
+            Object.prototype.hasOwnProperty.call(updateData, 'advance_amount') ||
+            Object.prototype.hasOwnProperty.call(updateData, 'balance_amount') ||
+            Object.prototype.hasOwnProperty.call(updateData, 'payment_date') ||
+            Object.prototype.hasOwnProperty.call(updateData, 'transaction_number') ||
+            Object.prototype.hasOwnProperty.call(updateData, 'payment_notes')
+
           const lifecycleTrigger =
-            paymentBecameFullyPaid && !bookingStatusChanged ? 'admin_payment_completed' : 'admin_status_changed'
+            !bookingStatusChanged && paymentFieldsTouched
+              ? (paymentBecameFullyPaid ? 'admin_payment_completed' : 'admin_payment_updated')
+              : 'admin_status_changed'
 
           await sendBookingLifecycleEmails(id, lifecycleTrigger)
         } catch (emailError) {

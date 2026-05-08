@@ -53,6 +53,7 @@ type BookingEmailTrigger =
   | 'public_booking_created'
   | 'admin_booking_created'
   | 'admin_status_changed'
+  | 'admin_payment_updated'
   | 'admin_payment_completed'
   | 'payment_verified'
 
@@ -263,8 +264,11 @@ function shouldSendWalkInPaymentCompletionEmail(booking: BookingEmailContext, tr
   return trigger === 'admin_status_changed' && isWalkInBooking(booking) && normalize(booking.payment_status) === 'fully_paid'
 }
 
-function shouldSendGuestPaymentCompletionEmail(booking: BookingEmailContext, trigger: BookingEmailTrigger) {
-  return trigger === 'admin_payment_completed' && normalize(booking.payment_status) === 'fully_paid'
+function shouldSendGuestPaymentUpdateEmail(booking: BookingEmailContext, trigger: BookingEmailTrigger) {
+  const paymentStatus = normalize(booking.payment_status)
+  if (trigger === 'admin_payment_completed') return paymentStatus === 'fully_paid'
+  if (trigger === 'admin_payment_updated') return ['payment_processing', 'fully_paid'].includes(paymentStatus)
+  return false
 }
 
 function resolveOperatorStatusType(booking: BookingEmailContext): 'registered' | 'hold' | 'confirmed' | 'cancelled' {
@@ -413,15 +417,18 @@ export async function sendBookingLifecycleEmails(bookingId: string, trigger: Boo
     })
   }
 
-  if (booking.guest_email && shouldSendGuestPaymentCompletionEmail(booking, trigger)) {
+  if (booking.guest_email && shouldSendGuestPaymentUpdateEmail(booking, trigger)) {
+    const isFinalPayment = normalize(booking.payment_status) === 'fully_paid'
     results.paymentSuccess = await sendTrackedGuestEmail({
       booking,
       recipient: booking.guest_email,
-      subject: `Final Payment Received - ${booking.booking_number || 'LeafWalk Resort'}`,
+      subject: isFinalPayment
+        ? `Final Payment Received - ${booking.booking_number || 'LeafWalk Resort'}`
+        : `Payment Received - ${booking.booking_number || 'LeafWalk Resort'}`,
       html: renderPaymentSuccessEmail(booking as any),
-      marker: `guest_payment_completed:${booking.booking_number || booking.id}`,
+      marker: `${isFinalPayment ? 'guest_payment_completed' : 'guest_payment_received'}:${booking.booking_number || booking.id}:${booking.advance_amount || 0}`,
       eventType: 'payment_success',
-      debugLabel: `${source || 'unknown'} guest payment completion`,
+      debugLabel: `${source || 'unknown'} guest payment update`,
       attachments: source === 'tour_operator' ? undefined : [await generateReceiptAttachment(booking as any)],
     })
   }
