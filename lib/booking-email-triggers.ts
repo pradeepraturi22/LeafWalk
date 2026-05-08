@@ -2,7 +2,7 @@ import { generateCheckInCompletedEmail, generateCheckInPassAttachment, generateR
 import { logDebug, logError, logInfo } from '@/lib/logger'
 import { isLocalTestMode } from '@/lib/runtime-mode'
 import { getSupabaseAdmin } from '@/lib/supabaseServer'
-import { sendTourOperatorBookingStatusEmail } from '@/lib/tour-operator-notifications'
+import { sendTourOperatorBookingStatusEmail, sendTourOperatorFinalPaymentReceivedEmail } from '@/lib/tour-operator-notifications'
 import { buildWifiEmailPayload, getWifiQrCid } from '@/lib/wifi-email'
 
 type BookingEmailContext = {
@@ -432,6 +432,10 @@ export async function sendBookingLifecycleEmails(bookingId: string, trigger: Boo
       debugLabel: `${source || 'unknown'} guest payment update`,
       attachments: source === 'tour_operator' ? undefined : [await generateReceiptAttachment(booking as any)],
     })
+  }
+
+  if (source === 'tour_operator' && booking.tour_operator?.email && trigger === 'admin_payment_completed') {
+    results.operatorStatus = await sendTourOperatorFinalPaymentReceivedEmail(booking as any, booking.tour_operator as any)
   }
 
   if (booking.guest_email && trigger === 'payment_verified') {

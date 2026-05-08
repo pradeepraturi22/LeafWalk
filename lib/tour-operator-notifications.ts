@@ -215,6 +215,25 @@ function buildReminderHtml(booking: BookingLike, operator: TourOperatorLike, day
   )
 }
 
+function buildFinalPaymentReceivedHtml(booking: BookingLike, operator: TourOperatorLike) {
+  const total = Number(booking.total_amount || 0)
+  const received = Number(booking.advance_amount || 0)
+
+  return operatorLayout(
+    'Final Payment Received',
+    `
+      <p>Hi ${safe(operator.contact_person || operator.company_name)},</p>
+      <p>We have successfully received the final payment for the booking below.</p>
+      <p style="padding:14px 16px;border-radius:12px;background:#ecfdf5;border:1px solid #bbf7d0;color:#166534">
+        Full payment of <strong>INR ${received.toLocaleString('en-IN')}</strong> has been recorded against a booking total of
+        <strong>INR ${total.toLocaleString('en-IN')}</strong>. The booking is now fully settled.
+      </p>
+      ${bookingFacts(booking, operator)}
+      <p style="margin-top:18px">Please keep this email for your records. The updated receipt is attached for reference.</p>
+    `
+  )
+}
+
 function buildRecipientLogValue(primaryEmail?: string | null, ccEmail?: string | null) {
   const to = String(primaryEmail || '').trim()
   const cc = String(ccEmail || '').trim()
@@ -364,6 +383,35 @@ export async function sendTourOperatorBalanceReminderEmail(
     `tour_operator_balance_${daysLeft}d:${booking.booking_number || booking.id}`
   )
   return sent
+}
+
+export async function sendTourOperatorFinalPaymentReceivedEmail(
+  booking: BookingLike,
+  operator: TourOperatorLike
+) {
+  if (!operator.email) return false
+
+  const result = await sendEmailWithResult(
+    operator.email,
+    `Final Payment Received - ${booking.booking_number || 'LeafWalk Resort'}`,
+    buildFinalPaymentReceivedHtml(booking, operator),
+    [await generateReceiptAttachment(booking as any)],
+    {
+      cc: operator.cc_email || undefined,
+      emailType: 'payment_success',
+      fromEmail: process.env.FROM_EMAIL_PAYMENTS || 'payments@leafwalk.in',
+      fromName: 'LeafWalk Payments',
+    }
+  )
+
+  await logNotification(
+    booking.id,
+    buildRecipientLogValue(operator.email, operator.cc_email),
+    result.success ? 'sent' : 'failed',
+    `tour_operator_final_payment_received:${booking.booking_number || booking.id}`,
+    result.error
+  )
+  return result.success
 }
 
 export async function hasBalanceReminderBeenSent(bookingId: string, email: string, daysLeft: number) {
