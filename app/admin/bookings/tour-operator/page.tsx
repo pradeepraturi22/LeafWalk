@@ -56,13 +56,13 @@ function calcLine(
   const base = room + eb + child
   if (!options.calculateGst) return { room, eb, child, base, subtotal: base, cgst: 0, sgst: 0, total: base }
   if (options.priceIncludesTax) {
-    const subtotal = Math.round(base / 1.18 * 100) / 100
+    const subtotal = Math.round(base / 1.05 * 100) / 100
     const cgst = Math.round((base - subtotal) / 2 * 100) / 100
     return { room, eb, child, base, subtotal, cgst, sgst: Math.round((base - subtotal - cgst) * 100) / 100, total: base }
   }
   const subtotal = base
-  const cgst = Math.round(subtotal * 0.09 * 100) / 100
-  const sgst = Math.round(subtotal * 0.09 * 100) / 100
+  const cgst = Math.round(subtotal * 0.025 * 100) / 100
+  const sgst = Math.round(subtotal * 0.025 * 100) / 100
   return { room, eb, child, base, subtotal, cgst, sgst, total: subtotal + cgst + sgst }
 }
 

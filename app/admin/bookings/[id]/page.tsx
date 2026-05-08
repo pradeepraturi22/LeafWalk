@@ -374,8 +374,8 @@ export default function BookingDetailPage() {
                 {booking.child_rate_per_night > 0 && <Row label="Child Rate/Night" value={formatCurrency(booking.child_rate_per_night)} />}
                 <div className="border-t border-white/10 pt-3">
                   <Row label="Subtotal (excl. GST)" value={formatCurrency(booking.subtotal)} />
-                  <Row label="CGST @ 9%" value={formatCurrency(booking.cgst)} />
-                  <Row label="SGST @ 9%" value={formatCurrency(booking.sgst)} />
+                  <Row label="CGST @ 2.5%" value={formatCurrency(booking.cgst)} />
+                  <Row label="SGST @ 2.5%" value={formatCurrency(booking.sgst)} />
                 </div>
                 <div className="border-t border-white/10 pt-3">
                   <div className="flex justify-between">

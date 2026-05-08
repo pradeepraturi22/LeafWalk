@@ -316,7 +316,7 @@ export default function WalkInBooking() {
   const xbedAmt       = form.extra_bed_rate * form.extra_beds * nights
   const childAmt      = form.child_rate * form.children_5_to_12 * nights
   const grossAmt      = roomAmt + xbedAmt + childAmt
-  const subtotal      = Math.round(grossAmt / 1.18 * 100) / 100
+  const subtotal      = Math.round(grossAmt / 1.05 * 100) / 100
   const cgst          = Math.round((grossAmt - subtotal) / 2 * 100) / 100
   const sgst          = cgst
   const totalAmount   = grossAmt
@@ -744,9 +744,9 @@ export default function WalkInBooking() {
                   </div>
                 )}
                 <div className="border-t border-white/10 pt-2 space-y-1 text-xs text-white/40">
-                  <div className="flex justify-between"><span>Subtotal (excl. GST 18%)</span><span>₹{subtotal.toLocaleString()}</span></div>
-                  <div className="flex justify-between"><span>CGST @ 9%</span><span>₹{cgst.toLocaleString()}</span></div>
-                  <div className="flex justify-between"><span>SGST @ 9%</span><span>₹{sgst.toLocaleString()}</span></div>
+                  <div className="flex justify-between"><span>Subtotal (excl. GST 5%)</span><span>₹{subtotal.toLocaleString()}</span></div>
+                  <div className="flex justify-between"><span>CGST @ 2.5%</span><span>₹{cgst.toLocaleString()}</span></div>
+                  <div className="flex justify-between"><span>SGST @ 2.5%</span><span>₹{sgst.toLocaleString()}</span></div>
                 </div>
                 <div className="border-t border-white/10 pt-2 flex justify-between font-bold">
                   <span className="text-white">Total Amount</span>
