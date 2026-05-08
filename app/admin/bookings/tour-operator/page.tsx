@@ -643,8 +643,8 @@ export default function TourOperatorBooking() {
                 </div>
                 <div className="border-t border-white/10 pt-2 space-y-1">
                   <div className="flex justify-between text-white/40 text-xs"><span>Subtotal (excl. GST)</span><span>₹{grandSub.toFixed(2)}</span></div>
-                  <div className="flex justify-between text-white/40 text-xs"><span>CGST @ 9%</span><span>₹{grandCgst.toFixed(2)}</span></div>
-                  <div className="flex justify-between text-white/40 text-xs"><span>SGST @ 9%</span><span>₹{grandCgst.toFixed(2)}</span></div>
+                  <div className="flex justify-between text-white/40 text-xs"><span>CGST @ 2.5%</span><span>₹{grandCgst.toFixed(2)}</span></div>
+                  <div className="flex justify-between text-white/40 text-xs"><span>SGST @ 2.5%</span><span>₹{grandSgst.toFixed(2)}</span></div>
                 </div>
                 <div className="border-t border-white/10 pt-2 flex justify-between text-white font-bold">
                   <span>Total Booking Amount</span><span>₹{grandTotal.toLocaleString()}</span>
