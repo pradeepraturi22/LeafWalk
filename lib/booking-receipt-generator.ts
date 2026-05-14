@@ -761,6 +761,7 @@ ${includePrintTools ? `<div class="print-tools" style="position:fixed;right:18px
       </div>
     </div>
 
+    ${isInvoiceDocument ? '' : `
     <!-- Policies -->
     <div class="policies">
       <div class="pol-title">Important Information</div>
@@ -770,13 +771,13 @@ ${includePrintTools ? `<div class="print-tools" style="position:fixed;right:18px
           <div class="pol-item">Breakfast served 8–10 AM · Kitchen closes at 10 PM</div>
           <div class="pol-item">Lunch and dinner orders are served as per resort kitchen timings</div>
           <div class="pol-item">Cancellation charges as per reservation policy</div>
-          ${!isCheckInPass && !isInvoiceDocument && balance > 0 ? `<div class="pol-item" style="color:#dc2626">Balance ${curr(balance)} due 7 days before check-in</div>` : '<div class="pol-item">No pets allowed in resort premises</div>'}
+          ${!isCheckInPass && balance > 0 ? `<div class="pol-item" style="color:#dc2626">Balance ${curr(balance)} due 7 days before check-in</div>` : '<div class="pol-item">No pets allowed in resort premises</div>'}
           <div class="pol-item">Front desk support: +91-8630227541</div>
           <div class="pol-item">Contact us 24×7: ${RESORT.phone}</div>
           <div class="pol-item">Outside food and alcohol are subject to resort policy</div>
-          <div class="pol-item">${isCheckInPass ? 'Please keep this pass ready at arrival for a faster check-in' : 'Invoice generated against declared guest and stay details'}</div>
+          <div class="pol-item">${isCheckInPass ? 'Please keep this pass ready at arrival for a faster check-in' : 'Booking receipt generated against declared guest and stay details'}</div>
         </div>
-      </div>
+      </div>`}
 
   </div><!-- /body -->
 

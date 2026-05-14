@@ -2,9 +2,15 @@
 'use client'
 import { useState } from 'react'
 import toast from 'react-hot-toast'
+import { supabase } from '@/lib/supabaseClient'
 
 export default function GSTBillButton({ booking, disabled, primary }: { booking: any; disabled?: boolean; primary?: boolean }) {
   const [generating, setGenerating] = useState(false)
+
+  async function getToken() {
+    const { data: { session } } = await supabase.auth.getSession()
+    return session?.access_token || ''
+  }
 
   async function downloadBill() {
     if (booking.payment_status !== 'fully_paid') {
@@ -13,12 +19,31 @@ export default function GSTBillButton({ booking, disabled, primary }: { booking:
     }
     setGenerating(true)
     try {
-      const { generateBookingReceipt } = await import('@/lib/booking-receipt-generator')
-      generateBookingReceipt(booking)
-      toast.success('Invoice opened successfully')
+      const token = await getToken()
+      const res = await fetch(`/api/admin/invoice/${booking.id}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      if (!res.ok) {
+        const result = await res.json().catch(() => null)
+        throw new Error(result?.error || 'Invoice generate nahi hui')
+      }
+
+      const blob = await res.blob()
+      const url = window.URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = `leafwalk-gst-invoice-${booking.invoice_number || booking.booking_number || booking.id}.pdf`
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+      window.URL.revokeObjectURL(url)
+      toast.success('Invoice downloaded successfully')
     } catch (e) {
       console.error(e)
-      toast.error('Bill generate nahi hui')
+      toast.error(e instanceof Error ? e.message : 'Bill generate nahi hui')
     } finally {
       setGenerating(false)
     }
