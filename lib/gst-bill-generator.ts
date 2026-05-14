@@ -42,7 +42,7 @@ function fmt(n: number) {
   return Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-export function generateGSTBill(booking: any): void {
+export function buildGSTBillHtml(booking: any): string {
   const checkIn = formatDate(booking.check_in)
   const checkOut = formatDate(booking.check_out)
   const billDate = formatDate(new Date())
@@ -85,7 +85,7 @@ export function generateGSTBill(booking: any): void {
   const isFullyPaid = booking.payment_status === 'fully_paid'
   const balance = isFullyPaid ? 0 : rawBalance
 
-  const html = `<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
@@ -376,7 +376,10 @@ window.onload = function() {
 }
 <\/script>
 </body></html>`
+}
 
+export function generateGSTBill(booking: any): void {
+  const html = buildGSTBillHtml(booking)
   const win = window.open('', '_blank', 'width=960,height=800,toolbar=0,menubar=0')
   if (!win) { alert('Pop-up blocked! Please allow pop-ups for this site and try again.'); return }
   win.document.write(html)

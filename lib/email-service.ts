@@ -11,6 +11,7 @@ import {
   sendTransactionalEmail,
 } from '@/lib/email'
 import { buildBookingReceiptHtml } from '@/lib/booking-receipt-generator'
+import { buildGSTBillHtml } from '@/lib/gst-bill-generator'
 import { renderHtmlToPdfBuffer } from '@/lib/html-pdf'
 import { logError } from '@/lib/logger'
 import { readFileSync } from 'fs'
@@ -151,10 +152,12 @@ export async function generateReceiptAttachment(
     : `leafwalk-receipt-${safeReference}.pdf`
 
   try {
-    const html = buildBookingReceiptHtml(booking, {
-      includePrintTools: false,
-      documentMode: documentMode === 'auto' ? undefined : documentMode,
-    })
+    const html = isFullPaymentInvoice
+      ? buildGSTBillHtml(booking)
+      : buildBookingReceiptHtml(booking, {
+          includePrintTools: false,
+          documentMode: documentMode === 'auto' ? undefined : documentMode,
+        })
     return {
       filename,
       content: await renderHtmlToPdfBuffer(html),
