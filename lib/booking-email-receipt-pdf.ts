@@ -455,11 +455,6 @@ export function createStyledBookingReceiptPdf(
   const phone = `${booking.guest_phone_country || ''}${booking.guest_phone || ''}`.trim()
   const invoiceParty = getInvoicePartyMeta(booking)
 
-  if (isInvoiceDocument) {
-    createStructuredInvoicePdf(doc, booking, invoiceRef, issueDate)
-    return Buffer.from(doc.output('arraybuffer'))
-  }
-
   setFill(doc, COLORS.forest)
   doc.rect(0, 0, 210, 40, 'F')
   setFill(doc, COLORS.forest2)
