@@ -26,6 +26,19 @@ export type InvoicePartyBookingLike = {
   } | null
 }
 
+export type InvoicePartyMeta = {
+  name: string
+  email: string | null
+  phone: string | null
+  address: string | null
+  gstNumber: string | null
+  gstState: string | null
+  stateCode: string | null
+  panNumber?: string | null
+  usesCompanyName: boolean
+  isTourOperatorInvoice: boolean
+}
+
 function clean(value?: string | null) {
   return String(value || '').trim()
 }
@@ -57,7 +70,7 @@ export function getInvoicePartyName(booking: InvoicePartyBookingLike) {
   return getInvoicePartyMeta(booking).name
 }
 
-export function getInvoicePartyMeta(booking: InvoicePartyBookingLike) {
+export function getInvoicePartyMeta(booking: InvoicePartyBookingLike): InvoicePartyMeta {
   const guestName = clean(booking.guest_name) || 'Guest'
   const guestEmail = clean(booking.guest_email) || null
   const guestPhoneRaw = `${clean(booking.guest_phone_country)}${clean(booking.guest_phone)}`
@@ -87,6 +100,7 @@ export function getInvoicePartyMeta(booking: InvoicePartyBookingLike) {
       gstNumber: operatorGstNumber,
       gstState: operatorState,
       stateCode: operatorStateCode,
+      panNumber: clean(operator?.pan_number) || null,
       usesCompanyName: true,
       isTourOperatorInvoice: true,
     }
@@ -101,6 +115,7 @@ export function getInvoicePartyMeta(booking: InvoicePartyBookingLike) {
       gstNumber: clean(booking.gst_number) || null,
       gstState: clean(booking.gst_state) || null,
       stateCode: deriveStateCode(booking.gst_number),
+      panNumber: null,
       usesCompanyName: true,
       isTourOperatorInvoice: false,
     }
@@ -114,6 +129,7 @@ export function getInvoicePartyMeta(booking: InvoicePartyBookingLike) {
     gstNumber: null,
     gstState: null,
     stateCode: null,
+    panNumber: null,
     usesCompanyName: false,
     isTourOperatorInvoice: false,
   }
