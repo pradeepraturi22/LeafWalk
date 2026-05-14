@@ -36,7 +36,11 @@ export default function GSTBillButton({ booking, disabled, primary }: { booking:
       }
 
       const html = await res.text()
-      const previewWindow = window.open('', '_blank', 'noopener,noreferrer')
+      const previewWindow = window.open(
+        '',
+        'leafwalk-invoice-preview',
+        'width=1100,height=850,menubar=no,toolbar=no,location=no,status=no,scrollbars=yes,resizable=yes'
+      )
       if (!previewWindow) {
         throw new Error('Invoice preview open nahi hui. Browser pop-up allow kijiye.')
       }
