@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf'
 import { readFileSync } from 'fs'
 import { join } from 'path'
+import { COMPANY_DETAILS } from '@/lib/constants'
 import { getInvoicePartyMeta } from '@/lib/invoice-party'
 import { calculateGST, calculateGSTFromSubtotal } from '@/lib/gst-bill-service'
 import { formatDate } from '@/lib/utils'
@@ -114,6 +115,10 @@ function money(value?: number | null) {
   return `INR ${Number(value || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
+function fmt(value?: number | null) {
+  return Number(value || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
 function shortDate(value?: string | null) {
   return value ? formatDate(value) : '-'
 }
@@ -203,6 +208,220 @@ function tableRow(doc: jsPDF, label: string, value: string, x: number, y: number
   doc.text(value, x + width, y, { align: 'right' })
 }
 
+function createStructuredInvoicePdf(doc: jsPDF, booking: ReceiptBooking, invoiceRef: string, issueDate: string) {
+  const invoiceParty = getInvoicePartyMeta(booking)
+  const total = Number(booking.total_amount || 0)
+  const storedSubtotal = Number(booking.subtotal || 0)
+  const gstMath = total > 0 ? calculateGST(total) : calculateGSTFromSubtotal(storedSubtotal)
+  const taxable = gstMath.subtotal
+  const cgst = gstMath.cgst
+  const sgst = gstMath.sgst
+  const gstTotal = cgst + sgst
+  const nights = Number(booking.nights || 0)
+  const rooms = Number(booking.rooms_booked || 1)
+  const mealLabel = MEAL_LABELS[String(booking.meal_plan || '').toUpperCase()] || clean(booking.meal_plan)
+  const roomName = booking.room?.name || booking.room?.category || 'Accommodation'
+  const bookingRef = booking.booking_number || booking.id.slice(0, 8).toUpperCase()
+  const buyerStateCode = invoiceParty.stateCode || ''
+  const sellerStateCode = String(COMPANY_DETAILS.gstin || '').slice(0, 2)
+  const isIntraState = !buyerStateCode || !sellerStateCode || buyerStateCode === sellerStateCode
+  const taxRateLabel = isIntraState ? 'CGST 2.5% + SGST 2.5%' : 'IGST 5%'
+  const amountWords = `${clean(total ? `${Number(total).toLocaleString('en-IN', { maximumFractionDigits: 2, minimumFractionDigits: 2 })}` : '0.00')} INR`
+  const bankLines = [
+    COMPANY_DETAILS.bankAccountName ? `A/c Name: ${COMPANY_DETAILS.bankAccountName}` : '',
+    COMPANY_DETAILS.bankName ? `Bank Name: ${COMPANY_DETAILS.bankName}` : '',
+    COMPANY_DETAILS.accountNumber ? `A/c No.: ${COMPANY_DETAILS.accountNumber}` : '',
+    COMPANY_DETAILS.ifsc ? `IFSC Code: ${COMPANY_DETAILS.ifsc}` : '',
+    COMPANY_DETAILS.branch ? `Branch: ${COMPANY_DETAILS.branch}` : '',
+  ].filter(Boolean)
+
+  const leftX = 10
+  const pageW = 190
+  const rightColW = 72
+  const leftColW = pageW - rightColW
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(12)
+  setText(doc, COLORS.ink)
+  doc.text('Tax Invoice', 105, 10, { align: 'center' })
+
+  setDraw(doc, [0, 0, 0])
+  doc.rect(leftX, 14, leftColW, 48)
+  doc.rect(leftX + leftColW, 14, rightColW, 48)
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(9.5)
+  doc.text((COMPANY_DETAILS.name || RESORT.name).toUpperCase(), 12, 20)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(8.5)
+  const sellerLines = [
+    COMPANY_DETAILS.address || RESORT.address,
+    `${COMPANY_DETAILS.city || RESORT.city}, ${COMPANY_DETAILS.state || ''}${COMPANY_DETAILS.pincode ? ` - ${COMPANY_DETAILS.pincode}` : ''}`.trim(),
+    COMPANY_DETAILS.phone ? `M.NO.- ${COMPANY_DETAILS.phone}` : '',
+    COMPANY_DETAILS.gstin ? `GSTIN/UIN : ${COMPANY_DETAILS.gstin}` : '',
+    `State Name : ${COMPANY_DETAILS.state || '-'}${sellerStateCode ? `, Code : ${sellerStateCode}` : ''}`,
+    COMPANY_DETAILS.email ? `E-Mail : ${COMPANY_DETAILS.email}` : '',
+  ].filter(Boolean)
+  doc.text(sellerLines, 12, 25)
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(8.5)
+  doc.text('Buyer (Bill to)', 12, 44)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(8.5)
+  const buyerLines = [
+    invoiceParty.name,
+    invoiceParty.address || '',
+    invoiceParty.phone ? `M.NO.- ${invoiceParty.phone}` : '',
+    invoiceParty.email ? `E-Mail : ${invoiceParty.email}` : '',
+    invoiceParty.gstNumber ? `GSTIN/UIN : ${invoiceParty.gstNumber}` : '',
+    `State Name : ${invoiceParty.gstState || '-'}${buyerStateCode ? `, Code : ${buyerStateCode}` : ''}`,
+  ].filter(Boolean)
+  doc.text(buyerLines, 12, 49)
+
+  const rightX = leftX + leftColW
+  const rowH = 6
+  const rightRows: Array<[string, string]> = [
+    ['Invoice No.', invoiceRef],
+    ['Dated', issueDate],
+    ['Delivery Note', clean(String(booking.payment_method || '').replace(/_/g, ' ').toUpperCase())],
+    ['Reference No. & Date.', bookingRef],
+    ["Buyer's Order No.", bookingRef],
+    ['Dispatch Doc No.', ''],
+    ['Dispatched through', ''],
+    ['Destination', invoiceParty.gstState || ''],
+  ]
+  rightRows.forEach(([label, value], index) => {
+    const y = 14 + index * rowH
+    if (index > 0) doc.line(rightX, y, rightX + rightColW, y)
+    doc.line(rightX + 34, y, rightX + 34, y + rowH)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(7.5)
+    doc.text(label, rightX + 2, y + 4)
+    doc.setFont('helvetica', 'bold')
+    doc.text(value || '', rightX + 36, y + 4)
+  })
+
+  let tableY = 66
+  const cols = [8, 80, 22, 18, 20, 14, 14, 22]
+  const colX = [10]
+  for (let i = 0; i < cols.length - 1; i += 1) colX.push(colX[i] + cols[i])
+  const headerH = 8
+  doc.rect(10, tableY, 198, headerH)
+  colX.slice(1).forEach((x) => doc.line(x, tableY, x, tableY + 170))
+  const headers = ['Sl', 'Description of Goods / Services', 'HSN/SAC', 'Qty', 'Rate', 'Per', 'Disc.%', 'Amount']
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(7.2)
+  headers.forEach((header, idx) => {
+    const x = colX[idx] + 1.5
+    doc.text(header, x, tableY + 5)
+  })
+
+  const itemTop = tableY + headerH
+  const rowHeight = 10
+  const itemRows = [
+    {
+      desc: `${roomName} - ${mealLabel}`,
+      sac: COMPANY_DETAILS.sacCode || RESORT.sacCode,
+      qty: rooms * Math.max(nights, 1),
+      rate: taxable,
+      per: 'Stay',
+      discount: '0',
+      amount: taxable,
+    },
+  ]
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(8)
+  itemRows.forEach((item, index) => {
+    const y = itemTop + index * rowHeight
+    doc.line(10, y, 208, y)
+    const values = [
+      String(index + 1),
+      item.desc,
+      item.sac,
+      String(item.qty),
+      fmt(item.rate),
+      item.per,
+      item.discount,
+      fmt(item.amount),
+    ]
+    values.forEach((value, idx) => {
+      const x = colX[idx] + 1.5
+      const align = idx >= 2 && idx !== 5 ? 'right' : idx === 5 ? 'center' : 'left'
+      const renderX = align === 'right' ? colX[idx] + cols[idx] - 1.5 : align === 'center' ? colX[idx] + cols[idx] / 2 : x
+      doc.text(value, renderX, y + 6, { align: align as any })
+    })
+  })
+
+  const totalsBaseY = itemTop + 150
+  doc.line(10, totalsBaseY, 208, totalsBaseY)
+  doc.setFont('helvetica', 'bold')
+  doc.text('Total', 156, totalsBaseY + 6)
+  doc.text(`₹ ${fmt(taxable)}`, 206, totalsBaseY + 6, { align: 'right' })
+
+  const wordsY = totalsBaseY + 10
+  doc.rect(10, wordsY, 120, 12)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(7)
+  doc.text('Amount Chargeable (in words)', 12, wordsY + 4)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(8)
+  doc.text(`INR ${amountWords} Only`, 12, wordsY + 9)
+
+  doc.rect(130, wordsY, 78, 18)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(7)
+  doc.text('Taxable Value', 132, wordsY + 4)
+  doc.text('Rate', 162, wordsY + 4)
+  doc.text('GST Amount', 176, wordsY + 4)
+  doc.text('Total Tax Amount', 196, wordsY + 4, { align: 'right' })
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(8)
+  doc.text(fmt(taxable), 132, wordsY + 11)
+  doc.text(isIntraState ? '5%' : '5%', 163, wordsY + 11, { align: 'center' })
+  doc.text(fmt(gstTotal), 176, wordsY + 11)
+  doc.text(fmt(gstTotal), 206, wordsY + 11, { align: 'right' })
+  doc.setFont('helvetica', 'bold')
+  doc.text('Total', 168, wordsY + 16)
+  doc.text(fmt(gstTotal), 206, wordsY + 16, { align: 'right' })
+
+  const taxWordsY = wordsY + 20
+  doc.rect(10, taxWordsY, 198, 10)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(7)
+  doc.text('Tax Amount (in words)', 12, taxWordsY + 4)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(8)
+  doc.text(`INR ${clean(gstTotal ? `${fmt(gstTotal)}` : '0.00')} Only`, 42, taxWordsY + 4)
+
+  const declarationY = taxWordsY + 14
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(7)
+  doc.text('Declaration', 10, declarationY)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(7.2)
+  const declaration = doc.splitTextToSize(
+    'We declare that this invoice shows the actual price of the services described and that all particulars are true and correct.',
+    92
+  )
+  doc.text(declaration, 10, declarationY + 5)
+
+  if (bankLines.length) {
+    doc.setFont('helvetica', 'bold')
+    doc.text("Company's Bank Details", 110, declarationY)
+    doc.setFont('helvetica', 'normal')
+    doc.text(bankLines, 110, declarationY + 5)
+  }
+
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(7)
+  doc.text('This is a Computer Generated Invoice', 105, 292, { align: 'center' })
+  doc.setFont('helvetica', 'bold')
+  doc.text(`for ${clean(COMPANY_DETAILS.name || RESORT.name).toUpperCase()}`, 206, 284, { align: 'right' })
+  doc.setFont('helvetica', 'normal')
+  doc.text('Authorised Signatory', 206, 289, { align: 'right' })
+}
+
 export function createStyledBookingReceiptPdf(
   booking: ReceiptBooking,
   options: { documentMode?: 'receipt' | 'invoice' } = {}
@@ -235,6 +454,11 @@ export function createStyledBookingReceiptPdf(
   const roomName = booking.room?.name || booking.room?.category || 'Room'
   const phone = `${booking.guest_phone_country || ''}${booking.guest_phone || ''}`.trim()
   const invoiceParty = getInvoicePartyMeta(booking)
+
+  if (isInvoiceDocument) {
+    createStructuredInvoicePdf(doc, booking, invoiceRef, issueDate)
+    return Buffer.from(doc.output('arraybuffer'))
+  }
 
   setFill(doc, COLORS.forest)
   doc.rect(0, 0, 210, 40, 'F')
