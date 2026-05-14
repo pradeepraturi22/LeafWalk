@@ -11,11 +11,11 @@ export const COMPANY_DETAILS = {
   pan: process.env.COMPANY_PAN || "",
   website: process.env.COMPANY_WEBSITE || "www.leafwalk.in",
   sacCode: "996311",         // SAC for Hotel accommodation services
-  bankAccountName: process.env.COMPANY_BANK_ACCOUNT_NAME || "",
-  bankName: process.env.COMPANY_BANK_NAME || "",
-  accountNumber: process.env.COMPANY_ACCOUNT_NUMBER || "",
-  ifsc: process.env.COMPANY_IFSC || "",
-  branch: process.env.COMPANY_BANK_BRANCH || "",
+  bankAccountName: process.env.COMPANY_BANK_ACCOUNT_NAME || "LeafWalk Resorts",
+  bankName: process.env.COMPANY_BANK_NAME || "Punjab National Bank",
+  accountNumber: process.env.COMPANY_ACCOUNT_NUMBER || "6408002100001783",
+  ifsc: process.env.COMPANY_IFSC || "PUNB0640800",
+  branch: process.env.COMPANY_BANK_BRANCH || "Barkot",
 }
 
 // GST Rates

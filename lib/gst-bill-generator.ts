@@ -127,12 +127,12 @@ export function buildGSTBillHtml(booking: any): string {
   .rtag{color:#8b6914;font-size:9px;letter-spacing:3px;text-transform:uppercase;margin-top:3px}
   .rcontact{color:#777;font-size:10px;margin-top:7px;line-height:1.8}
   .rcontact .hl{color:#c9a14a;font-weight:500}
-  .inv-badge{background:rgba(201,161,74,.12);border:1px solid rgba(201,161,74,.35);border-radius:8px;padding:12px 16px;text-align:center;flex-shrink:0;min-width:130px}
+  .inv-badge{background:rgba(201,161,74,.12);border:1px solid rgba(201,161,74,.35);border-radius:12px;padding:12px 16px;text-align:center;flex-shrink:0;min-width:140px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.04)}
   .inv-badge-lbl{color:#8b6914;font-size:8px;letter-spacing:2px;text-transform:uppercase;font-weight:600}
   .inv-badge-no{color:#fff;font-size:13px;font-weight:700;margin-top:4px;font-family:'Playfair Display',serif}
   .inv-badge-dt{color:#666;font-size:10px;margin-top:3px}
   .gbar{height:3px;background:linear-gradient(90deg,#6b4f10,#c9a14a,#e6c87a,#c9a14a,#6b4f10)}
-  .meta{display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #ebebeb}
+  .meta{display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #ebebeb;background:linear-gradient(180deg,#fff 0%,#fcfbf7 100%)}
   .meta-cell{padding:13px 32px;border-right:1px solid #ebebeb}
   .meta-cell:last-child{border-right:none}
   .meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -146,12 +146,15 @@ export function buildGSTBillHtml(booking: any): string {
   .pd{color:#555;font-size:11.5px;line-height:1.75}
   .pgst{margin-top:7px;padding:5px 10px;background:#fffbf0;border:1px solid #f0e0a0;border-radius:4px;font-size:10.5px;color:#7a5a08;font-weight:500}
   .party-note{margin-top:7px;font-size:10px;color:#8b6914;letter-spacing:.8px;text-transform:uppercase;font-weight:700}
-  .sbar{background:#fafafa;border-bottom:1px solid #ebebeb;padding:11px 32px;display:flex;gap:0;align-items:stretch}
+  .sbar{background:linear-gradient(180deg,#fcfcfc 0%,#f7f5ef 100%);border-bottom:1px solid #ebebeb;padding:11px 32px;display:flex;gap:0;align-items:stretch}
   .si{flex:1;text-align:center;padding:0 12px;border-right:1px solid #e5e5e5}
   .si:last-child{border-right:none}
   .sil{font-size:8px;color:#aaa;letter-spacing:1px;text-transform:uppercase;margin-bottom:3px}
   .siv{font-size:12.5px;color:#1a1a1a;font-weight:600}
   .tbl-wrap{padding:18px 32px 10px}
+  .section-cap{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .section-cap-title{font-size:10px;letter-spacing:1.8px;text-transform:uppercase;color:#8b6914;font-weight:700}
+  .section-cap-sub{font-size:10px;color:#8b8b8b}
   table{width:100%;border-collapse:collapse}
   thead tr{background:#0a0a0a;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   thead th{padding:9px 10px;color:#c9a14a;font-size:9px;letter-spacing:1px;text-transform:uppercase;font-weight:600;text-align:left}
@@ -165,20 +168,23 @@ export function buildGSTBillHtml(booking: any): string {
   .idesc{font-weight:600;color:#1a1a1a}
   .isub{font-size:10px;color:#999;margin-top:2px}
   .totals-wrap{padding:8px 32px 18px;display:flex;gap:18px;align-items:flex-start}
-  .awords{flex:1;background:#fffcf0;border:1px solid #f0e0a0;border-radius:8px;padding:13px 15px}
-  .awl{font-size:8.5px;color:#8b6914;letter-spacing:1px;text-transform:uppercase;font-weight:600;margin-bottom:4px}
-  .awt{font-size:12px;color:#5a4010;font-style:italic;line-height:1.6}
-  .ttbl{width:210px;flex-shrink:0}
+  .awords{flex:1;background:linear-gradient(180deg,#fffdf6 0%,#fff8e6 100%);border:1px solid #f0e0a0;border-radius:12px;padding:14px 16px;box-shadow:0 8px 22px rgba(201,161,74,.08)}
+  .awords + .awords{margin-top:10px}
+  .awl{font-size:8.5px;color:#8b6914;letter-spacing:1.2px;text-transform:uppercase;font-weight:700;margin-bottom:6px}
+  .awt{font-size:12px;color:#5a4010;font-style:italic;line-height:1.7}
+  .words-col{flex:1;display:flex;flex-direction:column;gap:10px}
+  .ttbl{width:235px;flex-shrink:0;background:#fff;border:1px solid #f0ece2;border-radius:12px;padding:10px 14px}
   .ttbl td{padding:5px 0;font-size:12px;color:#444}
   .ttbl td.amt{text-align:right;font-weight:500}
   .ttbl tr.trow td{font-size:14px;font-weight:700;color:#c9a14a;padding-top:9px;border-top:2px solid #c9a14a}
   .ttbl tr.brow td{color:#c0392b;font-weight:600}
-  .ftr{margin:0 32px;border-top:1px solid #ebebeb;padding:14px 0 16px;display:flex;gap:18px;align-items:flex-start}
+  .ftr{margin:0 32px;border-top:1px solid #ebebeb;padding:16px 0 18px;display:flex;gap:18px;align-items:flex-start}
   .decl{flex:1}
   .bank{width:280px;flex-shrink:0;background:#fffcf4;border:1px solid #f0e0a0;border-radius:8px;padding:12px 14px}
   .block-title{font-size:8.5px;color:#aaa;letter-spacing:1px;text-transform:uppercase;font-weight:600;margin-bottom:6px}
   .block-body{font-size:10.5px;color:#666;line-height:1.7}
   .sig{text-align:right;font-size:10px;color:#444;margin-top:20px}
+  .sys-note{margin:8px 32px 18px;text-align:center;font-size:10px;color:#8a8a8a;letter-spacing:.4px}
   .tag-paid{display:inline-block;background:#27ae60;color:#fff;font-size:8.5px;padding:2px 8px;border-radius:3px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-left:6px;vertical-align:middle}
   .tag-partial{display:inline-block;background:#e67e22;color:#fff;font-size:8.5px;padding:2px 8px;border-radius:3px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-left:6px;vertical-align:middle}
   .wm{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-30deg);font-size:90px;color:rgba(201,161,74,.035);font-family:'Playfair Display',serif;font-weight:700;pointer-events:none;white-space:nowrap;z-index:0}
@@ -290,6 +296,10 @@ export function buildGSTBillHtml(booking: any): string {
 </div>
 
 <div class="tbl-wrap">
+  <div class="section-cap">
+    <div class="section-cap-title">Invoice Line Items</div>
+    <div class="section-cap-sub">${items.length} item${items.length === 1 ? '' : 's'} · ${nights} night${nights === 1 ? '' : 's'} stay</div>
+  </div>
   <table>
     <thead>
       <tr>
@@ -319,12 +329,14 @@ export function buildGSTBillHtml(booking: any): string {
 </div>
 
 <div class="totals-wrap">
-  <div class="awords">
-    <div class="awl">Amount in Words</div>
-    <div class="awt">
-      <strong>${numberToWords(Math.round(total))} Rupees Only</strong>
-      ${advance > 0 ? `<br><span style="font-size:11px;color:#888;">Advance: ${numberToWords(Math.round(advance))} Rupees</span>` : ''}
-      ${(!isFullyPaid && balance > 0) ? `<br><span style="color:#c0392b;">Balance Due: ${numberToWords(Math.round(balance))} Rupees</span>` : ''}
+  <div class="words-col">
+    <div class="awords">
+      <div class="awl">Amount in Words</div>
+      <div class="awt">
+        <strong>${numberToWords(Math.round(total))} Only</strong>
+        ${advance > 0 ? `<br><span style="font-size:11px;color:#888;">Advance: ${numberToWords(Math.round(advance))} Only</span>` : ''}
+        ${(!isFullyPaid && balance > 0) ? `<br><span style="color:#c0392b;">Balance Due: ${numberToWords(Math.round(balance))} Only</span>` : ''}
+      </div>
     </div>
   </div>
   <table class="ttbl">
@@ -358,6 +370,7 @@ export function buildGSTBillHtml(booking: any): string {
     </div>
   </div>
 </div>
+<div class="sys-note">This is a system generated invoice.</div>
 <div class="gbar" style="margin-top:10px"></div>
 </div>
 
