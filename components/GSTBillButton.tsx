@@ -20,10 +20,13 @@ export default function GSTBillButton({ booking, disabled, primary }: { booking:
     setGenerating(true)
     try {
       const token = await getToken()
-      const res = await fetch(`/api/admin/invoice/${booking.id}`, {
+      const res = await fetch('/api/admin/invoice', {
+        method: 'POST',
         headers: {
+          'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
+        body: JSON.stringify({ booking_id: booking.id }),
       })
 
       if (!res.ok) {
