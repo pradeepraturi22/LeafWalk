@@ -1,5 +1,5 @@
-// components/GSTBillButton.tsx
 'use client'
+
 import { useState } from 'react'
 import toast from 'react-hot-toast'
 import { supabase } from '@/lib/supabaseClient'
@@ -12,11 +12,12 @@ export default function GSTBillButton({ booking, disabled, primary }: { booking:
     return session?.access_token || ''
   }
 
-  async function downloadBill() {
+  async function openInvoicePreview() {
     if (booking.payment_status !== 'fully_paid') {
       toast.error('GST bill sirf fully paid bookings ke liye generate hoti hai')
       return
     }
+
     setGenerating(true)
     try {
       const token = await getToken()
@@ -26,7 +27,7 @@ export default function GSTBillButton({ booking, disabled, primary }: { booking:
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ booking_id: booking.id }),
+        body: JSON.stringify({ booking_id: booking.id, output: 'html' }),
       })
 
       if (!res.ok) {
@@ -34,19 +35,20 @@ export default function GSTBillButton({ booking, disabled, primary }: { booking:
         throw new Error(result?.error || 'Invoice generate nahi hui')
       }
 
-      const blob = await res.blob()
-      const url = window.URL.createObjectURL(blob)
-      const anchor = document.createElement('a')
-      anchor.href = url
-      anchor.download = `leafwalk-gst-invoice-${booking.invoice_number || booking.booking_number || booking.id}.pdf`
-      document.body.appendChild(anchor)
-      anchor.click()
-      anchor.remove()
-      window.URL.revokeObjectURL(url)
-      toast.success('Invoice downloaded successfully')
+      const html = await res.text()
+      const previewWindow = window.open('', '_blank', 'noopener,noreferrer')
+      if (!previewWindow) {
+        throw new Error('Invoice preview open nahi hui. Browser pop-up allow kijiye.')
+      }
+
+      previewWindow.document.open()
+      previewWindow.document.write(html)
+      previewWindow.document.close()
+      previewWindow.focus()
+      toast.success('Invoice preview opened successfully')
     } catch (e) {
       console.error(e)
-      toast.error(e instanceof Error ? e.message : 'Bill generate nahi hui')
+      toast.error(e instanceof Error ? e.message : 'Invoice preview open nahi hui')
     } finally {
       setGenerating(false)
     }
@@ -58,9 +60,9 @@ export default function GSTBillButton({ booking, disabled, primary }: { booking:
     <div>
       <button
         type="button"
-        onClick={downloadBill}
+        onClick={openInvoicePreview}
         disabled={disabled || generating || !canGenerate}
-        title={!canGenerate ? 'Only available after full payment' : 'Generate invoice'}
+        title={!canGenerate ? 'Only available after full payment' : 'Open invoice preview'}
         className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all
           ${canGenerate
             ? primary
@@ -70,8 +72,8 @@ export default function GSTBillButton({ booking, disabled, primary }: { booking:
           }`}
       >
         {generating
-          ? <><span className="animate-spin inline-block">⟳</span> Generating...</>
-          : <><span>📄</span> {canGenerate ? 'Generate Invoice' : 'Invoice (After Full Payment)'}</>
+          ? <><span className="animate-spin inline-block">O</span> Opening...</>
+          : <><span>D</span> {canGenerate ? 'Open Invoice' : 'Invoice (After Full Payment)'}</>
         }
       </button>
       {!canGenerate && (

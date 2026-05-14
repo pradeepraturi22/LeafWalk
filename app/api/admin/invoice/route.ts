@@ -4,11 +4,13 @@ import { generateReceiptAttachment } from '@/lib/email-service'
 import { getSupabaseAdmin } from '@/lib/supabaseServer'
 import { isLocalTestMode } from '@/lib/runtime-mode'
 import { logError } from '@/lib/logger'
+import { buildGSTBillHtml } from '@/lib/gst-bill-generator'
 
 export const runtime = 'nodejs'
 
 const schema = z.object({
   booking_id: z.string().uuid(),
+  output: z.enum(['pdf', 'html']).optional(),
 })
 
 function getJwtSubjectForLocalFallback(token: string) {
@@ -57,7 +59,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Valid booking_id is required' }, { status: 400 })
     }
 
-    const { booking_id } = parsed.data
+    const { booking_id, output = 'pdf' } = parsed.data
 
     const { data: booking, error } = await getSupabaseAdmin()
       .from('bookings')
@@ -81,6 +83,17 @@ export async function POST(request: NextRequest) {
 
     if (booking.payment_status !== 'fully_paid') {
       return NextResponse.json({ error: 'Invoice can be generated only after full payment' }, { status: 400 })
+    }
+
+    if (output === 'html') {
+      const html = buildGSTBillHtml(booking)
+      return new Response(html, {
+        status: 200,
+        headers: {
+          'Content-Type': 'text/html; charset=utf-8',
+          'Cache-Control': 'no-store',
+        },
+      })
     }
 
     const attachment = await generateReceiptAttachment(booking, { documentMode: 'invoice' })
