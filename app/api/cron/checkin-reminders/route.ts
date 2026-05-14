@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
       booking.guest_email,
       subject,
       renderCheckInReminderEmail(booking as any),
-      [await generateReceiptAttachment(booking as any)],
+      [await generateReceiptAttachment(booking as any, { documentMode: 'receipt' })],
       { emailType: 'checkin_reminder' }
     )
     await logReminder(booking.id, booking.guest_email, sent ? 'sent' : 'failed', `direct_balance_${daysLeft}d:${booking.booking_number || booking.id}`)

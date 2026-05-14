@@ -325,7 +325,7 @@ export async function sendTourOperatorBookingStatusEmail(
   const isCheckedIn = String(booking.booking_status || '').toLowerCase() === 'checked_in'
   const wifiPayload = isCheckedIn ? await buildWifiEmailPayload() : null
   const attachments = [
-    await generateReceiptAttachment(booking as any),
+    await generateReceiptAttachment(booking as any, { documentMode: 'receipt' }),
     await generateCheckInPassAttachment(booking as any),
     ...(wifiPayload?.qrAttachment ? [wifiPayload.qrAttachment] : []),
   ]
@@ -367,7 +367,7 @@ export async function sendTourOperatorBalanceReminderEmail(
     operator.email,
     `Balance Payment Reminder - ${booking.booking_number || 'LeafWalk Resort'} - ${daysLeft} day${daysLeft === 1 ? '' : 's'} left`,
     buildReminderHtml(booking, operator, daysLeft),
-    [await generateReceiptAttachment(booking as any)],
+    [await generateReceiptAttachment(booking as any, { documentMode: 'receipt' })],
     {
       cc: operator.cc_email || undefined,
       emailType: 'payment_success',
@@ -395,7 +395,7 @@ export async function sendTourOperatorFinalPaymentReceivedEmail(
     operator.email,
     `Final Payment Received - ${booking.booking_number || 'LeafWalk Resort'}`,
     buildFinalPaymentReceivedHtml(booking, operator),
-    [await generateReceiptAttachment(booking as any)],
+    [await generateReceiptAttachment(booking as any, { documentMode: 'receipt' })],
     {
       cc: operator.cc_email || undefined,
       emailType: 'payment_success',

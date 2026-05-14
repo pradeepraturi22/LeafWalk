@@ -2,6 +2,7 @@
 
 import { formatDate } from '@/lib/utils'
 import { calculateGST, calculateGSTFromSubtotal } from '@/lib/gst-bill-service'
+import { getInvoicePartyMeta } from '@/lib/invoice-party'
 
 const RESORT = {
   name: 'LeafWalk Resort',
@@ -51,6 +52,7 @@ export function generateGSTBill(booking: any): void {
     (booking.guest_state || '').toLowerCase().includes('uttarakhand')
 
   const operator = booking.tour_operator || null
+  const invoiceParty = getInvoicePartyMeta(booking)
   const nights = Number(booking.nights || 0)
   const invoiceNo = booking.invoice_number || booking.booking_number || ('INV-' + (booking.id || '').slice(0, 8).toUpperCase())
 
@@ -241,14 +243,16 @@ export function generateGSTBill(booking: any): void {
 </div>
 
 <!-- PARTY -->
-<div class="party">
+  <div class="party">
   <div class="party-cell">
-    <div class="ph">Bill To — Guest Details</div>
-    <div class="pn">${booking.guest_name}</div>
+    <div class="ph">Bill To</div>
+    <div class="pn">${invoiceParty.name}</div>
     <div class="pd">
-      ${booking.guest_phone ? '📞 ' + booking.guest_phone + '<br>' : ''}
-      ${booking.guest_email ? '✉ ' + booking.guest_email + '<br>' : ''}
-      ${booking.guest_id_type ? '🪪 ' + booking.guest_id_type.replace('_',' ').toUpperCase() + ': ' + (booking.guest_id_number || '—') : ''}
+      ${invoiceParty.phone ? '📞 ' + invoiceParty.phone + '<br>' : ''}
+      ${invoiceParty.email ? '✉ ' + invoiceParty.email + '<br>' : ''}
+      ${invoiceParty.address ? '📍 ' + invoiceParty.address + '<br>' : ''}
+      ${invoiceParty.gstNumber ? 'GSTIN: ' + invoiceParty.gstNumber + '<br>' : ''}
+      ${invoiceParty.gstState ? 'State: ' + invoiceParty.gstState + (invoiceParty.stateCode ? ' (' + invoiceParty.stateCode + ')' : '') : ''}
     </div>
   </div>
   <div class="party-cell">

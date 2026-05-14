@@ -331,7 +331,7 @@ export async function GET(request: NextRequest) {
       if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
       const { data, error } = await getSupabaseAdmin()
         .from('bookings')
-        .select(`*, room:rooms(name, category, featured_image), tour_operator:tour_operators(company_name, contact_person, email, phone)`)
+        .select(`*, room:rooms(name, category, featured_image), tour_operator:tour_operators(company_name, contact_person, email, cc_email, phone, gst_number, pan_number, address, city, state)`)
         .eq('id', id).single() as any
       if (error) return NextResponse.json({ error: error.message }, { status: 404 })
       return NextResponse.json({ data })

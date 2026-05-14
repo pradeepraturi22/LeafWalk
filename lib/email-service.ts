@@ -4,6 +4,7 @@ import {
   renderAdminWebsiteBookingAlertEmail,
   renderCheckInCompletedEmail,
   renderCheckInReminderEmail,
+  renderInvoiceDispatchEmail,
   renderPaymentSuccessEmail,
   renderOtpEmail,
   type EmailProviderResult,
@@ -127,7 +128,7 @@ export function generateOtpEmail(name: string, otp: string) {
   return renderOtpEmail(name, otp)
 }
 
-export { renderBookingConfirmationEmail, renderPaymentSuccessEmail, renderCheckInReminderEmail, renderCheckInCompletedEmail }
+export { renderBookingConfirmationEmail, renderPaymentSuccessEmail, renderCheckInReminderEmail, renderCheckInCompletedEmail, renderInvoiceDispatchEmail }
 export { renderAdminWebsiteBookingAlertEmail }
 
 function safeDocumentReference(value: string) {
@@ -137,8 +138,12 @@ function safeDocumentReference(value: string) {
     .slice(0, 80)
 }
 
-export async function generateReceiptAttachment(booking: any) {
-  const isFullPaymentInvoice = booking?.payment_status === 'fully_paid'
+export async function generateReceiptAttachment(
+  booking: any,
+  options: { documentMode?: 'receipt' | 'invoice' | 'auto' } = {}
+) {
+  const documentMode = options.documentMode || 'auto'
+  const isFullPaymentInvoice = documentMode === 'invoice' || (documentMode === 'auto' && booking?.payment_status === 'fully_paid')
   const reference = booking?.invoice_number || booking?.booking_number || booking?.id
   const safeReference = safeDocumentReference(String(reference || 'leafwalk-document'))
   const filename = isFullPaymentInvoice
@@ -146,7 +151,10 @@ export async function generateReceiptAttachment(booking: any) {
     : `leafwalk-receipt-${safeReference}.pdf`
 
   try {
-    const html = buildBookingReceiptHtml(booking, { includePrintTools: false })
+    const html = buildBookingReceiptHtml(booking, {
+      includePrintTools: false,
+      documentMode: documentMode === 'auto' ? undefined : documentMode,
+    })
     return {
       filename,
       content: await renderHtmlToPdfBuffer(html),
@@ -163,7 +171,9 @@ export async function generateReceiptAttachment(booking: any) {
 
   return {
     filename,
-    content: createBookingReceiptPdf(booking),
+    content: createBookingReceiptPdf(booking, {
+      documentMode: isFullPaymentInvoice ? 'invoice' : 'receipt',
+    }),
     contentType: 'application/pdf',
   }
 }

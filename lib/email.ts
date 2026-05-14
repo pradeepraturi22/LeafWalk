@@ -125,8 +125,11 @@ function getLogoUrl() {
   return `cid:${INLINE_LOGO_CID}`
 }
 
-export function createBookingReceiptPdf(booking: BookingLike) {
-  return createStyledBookingReceiptPdf(booking)
+export function createBookingReceiptPdf(
+  booking: BookingLike,
+  options?: { documentMode?: 'receipt' | 'invoice' }
+) {
+  return createStyledBookingReceiptPdf(booking, options)
 }
 
 function attachmentContentToBase64(content: Buffer | string) {
@@ -448,7 +451,7 @@ function bookingFactsTable(booking: BookingLike, amountLabel: string) {
 
 export function renderBookingConfirmationEmail(booking: BookingLike) {
   const isTourOperatorGuest = String(booking.booking_source || '').trim().toLowerCase() === 'tour_operator'
-  const documentLabel = booking.payment_status === 'fully_paid' ? 'GST invoice' : 'receipt'
+  const documentLabel = 'booking receipt'
   const bookingTable = isTourOperatorGuest
     ? `
       <table style="width:100%;border-collapse:collapse;margin-top:18px">
@@ -526,6 +529,33 @@ export function renderPaymentSuccessEmail(booking: BookingLike) {
   )
 }
 
+export function renderInvoiceDispatchEmail(booking: BookingLike, recipientName?: string) {
+  const reference = booking.invoice_number || booking.booking_number || booking.id.slice(0, 8).toUpperCase()
+  return layoutEmail(
+    'Your GST invoice is ready',
+    `
+      <p>Dear ${escapeHtml(recipientName || booking.guest_name || 'Guest')},</p>
+      <p>Please find attached the GST invoice for the booking below.</p>
+      <table style="width:100%;border-collapse:collapse;margin-top:18px">
+        ${[
+          ['Invoice Ref', reference],
+          ['Booking Ref', booking.booking_number || booking.id.slice(0, 8).toUpperCase()],
+          ['Guest', booking.guest_name],
+          ['Room', booking.room?.name || booking.room?.category || '-'],
+          ['Check-in', booking.check_in],
+          ['Check-out', booking.check_out],
+        ].map(([label, value]) => `
+          <tr>
+            <td style="padding:10px 0;border-bottom:1px solid #e5e7eb;color:#6b7280;font-size:13px;width:42%">${escapeHtml(String(label || '-'))}</td>
+            <td style="padding:10px 0;border-bottom:1px solid #e5e7eb;color:#111827;font-size:13px;font-weight:600">${escapeHtml(String(value || '-'))}</td>
+          </tr>
+        `).join('')}
+      </table>
+      <p style="margin-top:20px">If you need any clarification regarding billing, please reply to this email or contact the LeafWalk payments desk.</p>
+    `
+  )
+}
+
 export function renderAdminWebsiteBookingAlertEmail(booking: BookingLike) {
   return layoutEmail(
     'New website booking received',
@@ -551,9 +581,7 @@ export function renderCheckInReminderEmail(booking: BookingLike) {
 
 export function renderCheckInCompletedEmail(booking: BookingLike, wifi?: WifiEmailDetails) {
   const paymentStatus = String(booking.payment_status || 'pending').replace(/_/g, ' ').toUpperCase()
-  const receiptLabel = booking.payment_status === 'fully_paid'
-    ? (booking.gst_invoice_requested ? 'GST invoice' : 'booking receipt')
-    : 'booking receipt'
+  const receiptLabel = 'booking receipt'
   const showAttachmentNote = String(booking.booking_source || '').toLowerCase() !== 'tour_operator'
   const wifiName = String(wifi?.ssid || 'Leafwalk Resort')
   const wifiPassword = String(wifi?.password || 'Password-123456')

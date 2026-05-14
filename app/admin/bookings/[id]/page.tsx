@@ -7,6 +7,7 @@ import toast, { Toaster } from 'react-hot-toast'
 import Link from 'next/link'
 import GSTBillButton from '@/components/GSTBillButton'
 import ReceiptButton from '@/components/ReceiptButton'
+import SendInvoiceButton from '@/components/SendInvoiceButton'
 import { formatDate as formatDisplayDate } from '@/lib/utils'
 
 const MEAL_PLAN_LABELS: Record<string, string> = {
@@ -758,13 +759,14 @@ export default function BookingDetailPage() {
           {/* GST Bill + Receipt Download */}
           <div className="mt-6 bg-white/5 border border-white/10 rounded-2xl p-6">
             <h2 className="text-white font-semibold mb-1">Documents</h2>
-            <p className="text-white/40 text-xs mb-4">Download booking receipt anytime · GST invoice only after full payment</p>
+            <p className="text-white/40 text-xs mb-4">Download booking receipt anytime · GST invoice download/send only after full payment and manual admin click</p>
             <div className="flex flex-wrap gap-3">
               <ReceiptButton booking={booking} />
               {booking.booking_source === 'tour_operator' && (
                 <ReceiptButton booking={booking} variant="check_in_pass" />
               )}
               <GSTBillButton booking={booking} />
+              <SendInvoiceButton booking={booking} />
             </div>
             {booking.booking_source === 'tour_operator' && (
               <p className="mt-3 text-white/35 text-xs">

@@ -1,4 +1,5 @@
 import { COMPANY_DETAILS } from '@/lib/constants'
+import { getInvoicePartyMeta } from '@/lib/invoice-party'
 import { formatDate } from '@/lib/utils'
 
 interface GSTBillProps {
@@ -21,6 +22,22 @@ interface GSTBillProps {
     payment_status: string
     payment_id?: string
     created_at: string
+    booking_source?: string
+    guest_phone_country?: string
+    guest_address?: string
+    guest_district?: string
+    guest_state?: string
+    guest_country?: string
+    tour_operator?: {
+      company_name?: string
+      contact_person?: string
+      email?: string
+      phone?: string
+      gst_number?: string
+      address?: string
+      city?: string
+      state?: string
+    } | null
   }
 }
 
@@ -48,6 +65,7 @@ export default function GSTBill({ booking }: GSTBillProps) {
 
   const invoiceNumber = booking.invoice_number || booking.id.slice(0, 8).toUpperCase()
   const invoiceDate = formatDate(booking.created_at)
+  const invoiceParty = getInvoicePartyMeta(booking)
   const paymentStatusLabel = booking.payment_status.replace(/_/g, ' ').toUpperCase()
   const paymentStatusClass = booking.payment_status === 'fully_paid'
     ? 'text-green-600'
@@ -98,9 +116,12 @@ export default function GSTBill({ booking }: GSTBillProps) {
 
       <div className="border-2 border-black p-4 mb-6">
         <h3 className="font-bold mb-2">BILLING TO:</h3>
-        <p className="font-semibold">{booking.guest_name}</p>
-        <p className="text-sm">{booking.guest_email}</p>
-        <p className="text-sm">{booking.guest_phone}</p>
+        <p className="font-semibold">{invoiceParty.name}</p>
+        {invoiceParty.email && <p className="text-sm">{invoiceParty.email}</p>}
+        {invoiceParty.phone && <p className="text-sm">{invoiceParty.phone}</p>}
+        {invoiceParty.address && <p className="text-sm">{invoiceParty.address}</p>}
+        {invoiceParty.gstNumber && <p className="text-sm font-medium">GSTIN: {invoiceParty.gstNumber}</p>}
+        {invoiceParty.gstState && <p className="text-sm">State: {invoiceParty.gstState}{invoiceParty.stateCode ? ` (${invoiceParty.stateCode})` : ''}</p>}
       </div>
 
       <div className="border-2 border-black p-4 mb-6">

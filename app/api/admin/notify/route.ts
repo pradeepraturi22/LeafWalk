@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { sendEmail, generateBookingConfirmationEmail, generateTourOperatorBookingEmail, generateBalanceReminderEmail } from '@/lib/email-service'
+import { sendEmail, sendEmailWithResult, generateBookingConfirmationEmail, generateTourOperatorBookingEmail, generateBalanceReminderEmail, generateReceiptAttachment, renderInvoiceDispatchEmail } from '@/lib/email-service'
 import { sendSMS, bookingConfirmationSMS, balanceReminderSMS } from '@/lib/sms-service'
 import { sendWhatsApp, bookingConfirmationWhatsApp, holdConfirmationWhatsApp, balanceReminderWhatsApp } from '@/lib/whatsapp-service'
 import { hasBalanceReminderBeenSent, sendTourOperatorBalanceReminderEmail } from '@/lib/tour-operator-notifications'
@@ -9,7 +9,7 @@ import { parseJsonBody } from '@/lib/security'
 import { requireInternalSecret } from '@/lib/internal-auth'
 
 const notifySchema = z.object({
-  type: z.enum(['booking_confirmation', 'hold_confirmation', 'balance_reminder']),
+  type: z.enum(['booking_confirmation', 'hold_confirmation', 'balance_reminder', 'send_invoice']),
   booking_id: z.string().uuid(),
   channel: z.union([z.enum(['email', 'sms', 'whatsapp']), z.array(z.enum(['email', 'sms', 'whatsapp']))]).optional(),
   force: z.boolean().optional(),
@@ -36,6 +36,23 @@ async function log(bookingId: string, type: string, recipient: string, status: s
       sent_at: status === 'sent' ? new Date().toISOString() : null,
     })
   } catch {}
+}
+
+function getInvoiceTargets(booking: any) {
+  const operator = Array.isArray(booking.tour_operator) ? booking.tour_operator[0] : booking.tour_operator
+  if (booking.tour_operator_id && operator?.email) {
+    return {
+      to: operator.email,
+      cc: operator.cc_email || undefined,
+      recipientName: operator.company_name || operator.contact_person || booking.guest_name || 'Partner',
+    }
+  }
+
+  return {
+    to: booking.guest_email || null,
+    cc: undefined,
+    recipientName: booking.guest_name || 'Guest',
+  }
 }
 
 function getReminderTargets(booking: any) {
@@ -70,11 +87,13 @@ export async function POST(request: NextRequest) {
     const { data: booking, error } = await getSupabaseAdmin()
       .from('bookings')
       .select(`
-        id, booking_number, guest_name, guest_email, guest_phone, check_in, check_out, nights,
-        rooms_booked, adults, meal_plan, total_amount, advance_amount, balance_amount, payment_status, booking_status,
+        id, booking_number, invoice_number, guest_name, guest_email, guest_phone, guest_phone_country, guest_address, guest_district, guest_state, guest_country,
+        check_in, check_out, nights, rooms_booked, adults, meal_plan, total_amount, subtotal, cgst, sgst, gst_total,
+        advance_amount, balance_amount, payment_status, booking_status, payment_method, created_at,
+        gst_invoice_requested, gst_company_name, gst_number, gst_state,
         room:rooms(name, category),
         tour_operator_id,
-        tour_operator:tour_operators(company_name, contact_person, email, phone)
+        tour_operator:tour_operators(company_name, contact_person, email, cc_email, phone, gst_number, pan_number, address, city, state)
       `)
       .eq('id', booking_id)
       .single() as any
@@ -151,6 +170,40 @@ export async function POST(request: NextRequest) {
         results.whatsapp = await sendWhatsApp(targets.phone, balanceReminderWhatsApp(booking, daysLeft))
         await log(booking_id, 'whatsapp', targets.phone, results.whatsapp ? 'sent' : 'failed', `Balance reminder for ${targets.label}`)
       }
+    }
+
+    if (type === 'send_invoice') {
+      if (booking.payment_status !== 'fully_paid') {
+        return NextResponse.json({ error: 'Invoice can be sent only after full payment' }, { status: 400 })
+      }
+
+      const invoiceTargets = getInvoiceTargets(booking)
+      if (!invoiceTargets.to) {
+        return NextResponse.json({ error: 'No invoice email recipient found for this booking' }, { status: 400 })
+      }
+
+      const result = await sendEmailWithResult(
+        invoiceTargets.to,
+        `GST Invoice - ${booking.invoice_number || booking.booking_number || 'LeafWalk Resort'}`,
+        renderInvoiceDispatchEmail(booking, invoiceTargets.recipientName),
+        [await generateReceiptAttachment(booking as any, { documentMode: 'invoice' })],
+        {
+          cc: invoiceTargets.cc,
+          emailType: 'payment_success',
+          fromEmail: process.env.FROM_EMAIL_PAYMENTS || process.env.FROM_EMAIL_BOOKINGS || process.env.FROM_EMAIL || 'payments@leafwalk.in',
+          fromName: 'LeafWalk Payments',
+        }
+      )
+
+      await log(
+        booking_id,
+        'email',
+        `${invoiceTargets.to}${invoiceTargets.cc ? ` | cc:${invoiceTargets.cc}` : ''}`,
+        result.success ? 'sent' : 'failed',
+        `manual_invoice_sent:${booking.invoice_number || booking.booking_number || booking.id}`
+      )
+
+      return NextResponse.json({ success: result.success, email: result.success, error: result.error || null })
     }
 
     return NextResponse.json({ success: true, ...results })

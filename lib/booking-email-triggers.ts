@@ -208,7 +208,7 @@ async function buildCheckInEmailAssets(booking: BookingEmailContext) {
         await generateCheckInPassAttachment(booking as any),
       ]
     : [
-        await generateReceiptAttachment(booking as any),
+        await generateReceiptAttachment(booking as any, { documentMode: 'receipt' }),
         ...(wifiPayload?.qrAttachment ? [wifiPayload.qrAttachment] : []),
       ]
 
@@ -367,7 +367,7 @@ export async function sendBookingLifecycleEmails(bookingId: string, trigger: Boo
       debugLabel: `${source || 'unknown'} guest booking confirmation`,
       attachments: isTourOperatorGuest
         ? [await generateCheckInPassAttachment(booking as any)]
-        : [await generateReceiptAttachment(booking as any)],
+        : [await generateReceiptAttachment(booking as any, { documentMode: 'receipt' })],
     })
   }
 
@@ -414,7 +414,7 @@ export async function sendBookingLifecycleEmails(bookingId: string, trigger: Boo
       marker: `walk_in_payment_completed:${booking.booking_number || booking.id}`,
       eventType: 'payment_success',
       debugLabel: 'walk-in payment completion',
-      attachments: booking.gst_invoice_requested ? [await generateReceiptAttachment(booking as any)] : undefined,
+      attachments: [await generateReceiptAttachment(booking as any, { documentMode: 'receipt' })],
     })
   }
 
@@ -430,7 +430,7 @@ export async function sendBookingLifecycleEmails(bookingId: string, trigger: Boo
       marker: `${isFinalPayment ? 'guest_payment_completed' : 'guest_payment_received'}:${booking.booking_number || booking.id}:${booking.advance_amount || 0}`,
       eventType: 'payment_success',
       debugLabel: `${source || 'unknown'} guest payment update`,
-      attachments: source === 'tour_operator' ? undefined : [await generateReceiptAttachment(booking as any)],
+      attachments: source === 'tour_operator' ? undefined : [await generateReceiptAttachment(booking as any, { documentMode: 'receipt' })],
     })
   }
 
@@ -470,7 +470,7 @@ export async function sendBookingLifecycleEmails(bookingId: string, trigger: Boo
       marker: `guest_booking_confirmation:${booking.booking_number || booking.id}`,
       eventType: 'booking_confirmation',
       debugLabel: 'website payment-verified booking confirmation',
-      attachments: [await generateReceiptAttachment(booking as any)],
+      attachments: [await generateReceiptAttachment(booking as any, { documentMode: 'receipt' })],
     })
 
     if (source === 'website') {
@@ -483,7 +483,7 @@ export async function sendBookingLifecycleEmails(bookingId: string, trigger: Boo
         marker: `admin_website_booking_alert:${booking.booking_number || booking.id}`,
         eventType: 'booking_confirmation',
         debugLabel: 'website booking admin alert',
-        attachments: [await generateReceiptAttachment(booking as any)],
+        attachments: [await generateReceiptAttachment(booking as any, { documentMode: 'receipt' })],
       })
     }
   }

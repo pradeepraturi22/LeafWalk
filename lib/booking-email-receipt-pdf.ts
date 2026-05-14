@@ -9,6 +9,7 @@ type ReceiptBooking = {
   id: string
   booking_number?: string | null
   invoice_number?: string | null
+  booking_source?: string | null
   guest_name?: string | null
   gst_invoice_requested?: boolean | null
   gst_company_name?: string | null
@@ -42,11 +43,16 @@ type ReceiptBooking = {
   payment_method?: string | null
   payment_status?: string | null
   booking_status?: string | null
-  booking_source?: string | null
   confirmed_at?: string | null
   tour_operator?: {
     company_name?: string | null
     contact_person?: string | null
+    email?: string | null
+    phone?: string | null
+    gst_number?: string | null
+    address?: string | null
+    city?: string | null
+    state?: string | null
   } | null
 }
 
@@ -197,12 +203,16 @@ function tableRow(doc: jsPDF, label: string, value: string, x: number, y: number
   doc.text(value, x + width, y, { align: 'right' })
 }
 
-export function createStyledBookingReceiptPdf(booking: ReceiptBooking) {
+export function createStyledBookingReceiptPdf(
+  booking: ReceiptBooking,
+  options: { documentMode?: 'receipt' | 'invoice' } = {}
+) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
   const bookingRef = booking.booking_number || booking.id.slice(0, 8).toUpperCase()
   const invoiceRef = booking.invoice_number || `INV-${bookingRef}`
   const isFullyPaid = String(booking.payment_status || '').toLowerCase() === 'fully_paid'
-  const docTitle = isFullyPaid ? 'GST Tax Invoice' : 'Booking Receipt'
+  const isInvoiceDocument = options.documentMode === 'invoice' || (options.documentMode !== 'receipt' && isFullyPaid)
+  const docTitle = isInvoiceDocument ? 'GST Tax Invoice' : 'Booking Receipt'
   const issueDate = shortDate(booking.created_at || new Date().toISOString())
   const checkIn = shortDate(booking.check_in)
   const checkOut = shortDate(booking.check_out)
@@ -225,12 +235,6 @@ export function createStyledBookingReceiptPdf(booking: ReceiptBooking) {
   const roomName = booking.room?.name || booking.room?.category || 'Room'
   const phone = `${booking.guest_phone_country || ''}${booking.guest_phone || ''}`.trim()
   const invoiceParty = getInvoicePartyMeta(booking)
-  const address = [
-    booking.guest_address,
-    booking.guest_district,
-    booking.guest_state,
-    booking.guest_country && booking.guest_country !== 'India' ? booking.guest_country : null,
-  ].filter(Boolean).join(', ')
 
   setFill(doc, COLORS.forest)
   doc.rect(0, 0, 210, 40, 'F')
@@ -264,7 +268,7 @@ export function createStyledBookingReceiptPdf(booking: ReceiptBooking) {
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8.5)
   setText(doc, COLORS.muted)
-  if (isFullyPaid) {
+  if (isInvoiceDocument) {
     doc.text('Invoice No:', 128, 49)
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(7.8)
@@ -298,9 +302,23 @@ export function createStyledBookingReceiptPdf(booking: ReceiptBooking) {
   setDraw(doc, COLORS.border)
   doc.roundedRect(16, 83, 82, 38, 3, 3)
   doc.roundedRect(106, 83, 88, 38, 3, 3)
-  labelValue(doc, isFullyPaid && booking.gst_invoice_requested ? 'Invoice To' : 'Guest Name', clean(invoiceParty.name), 21, 92, 68)
-  labelValue(doc, 'Email', clean(booking.guest_email), 21, 104, 68)
-  labelValue(doc, 'Phone', clean(phone), 21, 116, 68)
+  labelValue(doc, isInvoiceDocument ? 'Bill To' : 'Guest Name', clean(invoiceParty.name), 21, 92, 68)
+  labelValue(
+    doc,
+    isInvoiceDocument ? 'Email / GSTIN' : 'Email',
+    clean(isInvoiceDocument ? [invoiceParty.email, invoiceParty.gstNumber ? `GSTIN: ${invoiceParty.gstNumber}` : null].filter(Boolean).join(' | ') : booking.guest_email),
+    21,
+    104,
+    68
+  )
+  labelValue(
+    doc,
+    isInvoiceDocument ? 'Phone / State' : 'Phone',
+    clean(isInvoiceDocument ? [invoiceParty.phone, invoiceParty.gstState ? `${invoiceParty.gstState}${invoiceParty.stateCode ? ` (${invoiceParty.stateCode})` : ''}` : null].filter(Boolean).join(' | ') : phone),
+    21,
+    116,
+    68
+  )
   labelValue(doc, 'Check-in', checkIn, 112, 92, 66)
   labelValue(doc, 'Check-out', checkOut, 112, 104, 66)
   labelValue(doc, 'Stay', `${nights} nights | ${rooms} room(s)`, 112, 116, 66)
@@ -325,7 +343,7 @@ export function createStyledBookingReceiptPdf(booking: ReceiptBooking) {
   doc.setFontSize(8.5)
   setText(doc, COLORS.muted)
   doc.text('DESCRIPTION', 21, 171)
-  if (isFullyPaid) {
+  if (isInvoiceDocument) {
     doc.text('SAC', 142, 171, { align: 'right' })
   }
   doc.text('AMOUNT', 188, 171, { align: 'right' })
@@ -340,7 +358,7 @@ export function createStyledBookingReceiptPdf(booking: ReceiptBooking) {
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(9.2)
   setText(doc, COLORS.ink)
-  if (isFullyPaid) {
+  if (isInvoiceDocument) {
     doc.text(RESORT.sacCode, 142, 184, { align: 'right' })
   }
   doc.setFont('helvetica', 'bold')
@@ -348,11 +366,11 @@ export function createStyledBookingReceiptPdf(booking: ReceiptBooking) {
   setText(doc, COLORS.ink)
   doc.text(money(total), 188, 184, { align: 'right' })
 
-  sectionLabel(doc, isFullyPaid ? 'GST Invoice Summary' : 'Payment Summary', 16, 207)
+  sectionLabel(doc, isInvoiceDocument ? 'GST Invoice Summary' : 'Payment Summary', 16, 207)
   setDraw(doc, COLORS.border)
   doc.roundedRect(16, 211, 86, 50, 3, 3)
   let y = 222
-  if (isFullyPaid) {
+  if (isInvoiceDocument) {
     tableRow(doc, 'Taxable Amount', money(taxable), 22, y, 72)
     y += 8
     tableRow(doc, 'CGST @ 2.5%', money(cgst), 22, y, 72)
@@ -378,7 +396,7 @@ export function createStyledBookingReceiptPdf(booking: ReceiptBooking) {
   setDraw(doc, COLORS.border)
   doc.roundedRect(111, 211, 83, 50, 3, 3)
   let infoY = 222
-  if (isFullyPaid) {
+  if (isInvoiceDocument) {
     tableRow(doc, 'Invoice No.', invoiceRef, 117, infoY, 70)
     infoY += 8
   }

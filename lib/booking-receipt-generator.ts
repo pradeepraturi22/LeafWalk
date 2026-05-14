@@ -44,10 +44,12 @@ const PAY_STATUS: Record<string, { color: string; bg: string; label: string }> =
 
 export function buildBookingReceiptHtml(
   booking: any,
-  options: { includePrintTools?: boolean; documentMode?: 'receipt' | 'check_in_pass' } = {}
+  options: { includePrintTools?: boolean; documentMode?: 'receipt' | 'check_in_pass' | 'invoice' } = {}
 ): string {
   const includePrintTools = options.includePrintTools !== false
   const isCheckInPass = options.documentMode === 'check_in_pass'
+  const isExplicitReceipt = options.documentMode === 'receipt'
+  const isExplicitInvoice = options.documentMode === 'invoice'
   const fmt = (d: string) => formatDate(d)
   const fmtLong = (d: string) => formatDate(d)
   const fmtPassDate = (d: string) => {
@@ -72,11 +74,12 @@ export function buildBookingReceiptHtml(
   const advance = Number(booking.advance_amount || 0)
   const balance = Number(booking.balance_amount || 0)
   const isFullyPaid = booking.payment_status === 'fully_paid'
-  const showSacCode = isFullyPaid && !isCheckInPass
+  const isInvoiceDocument = !isCheckInPass && (isExplicitInvoice || (!isExplicitReceipt && isFullyPaid))
+  const showSacCode = isInvoiceDocument
   const operator    = isCheckInPass ? null : booking.tour_operator || null
   const bookingNo   = booking.booking_number || (booking.id || '').slice(0, 8).toUpperCase()
   const invoiceNo   = booking.invoice_number || `INV-${bookingNo}`
-  const docTitle    = isCheckInPass ? 'Check In Pass' : isFullyPaid ? 'GST Tax Invoice' : 'Booking Receipt'
+  const docTitle    = isCheckInPass ? 'Check In Pass' : isInvoiceDocument ? 'GST Tax Invoice' : 'Booking Receipt'
   const storedSubtotal = Number(booking.subtotal || 0)
   const gstMath = total > 0
     ? calculateGST(total)
@@ -87,6 +90,7 @@ export function buildBookingReceiptHtml(
   const roomItems   = booking.room_items || []
   const hasMulti    = roomItems.length > 1
   const invoiceParty = getInvoicePartyMeta(booking)
+  const billToLabel = isInvoiceDocument ? 'Bill To' : 'Guest Name'
 
   /* ── room detail rows ─────────────────────────────────── */
   const roomRows = hasMulti
@@ -126,7 +130,7 @@ export function buildBookingReceiptHtml(
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>${docTitle} - ${isCheckInPass ? bookingNo : isFullyPaid ? invoiceNo : bookingNo}</title>
+<title>${docTitle} - ${isCheckInPass ? bookingNo : isInvoiceDocument ? invoiceNo : bookingNo}</title>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   * { margin:0; padding:0; box-sizing:border-box }
@@ -584,7 +588,7 @@ ${includePrintTools ? `<div class="print-tools" style="position:fixed;right:18px
   <div class="title-bar">
     <div class="doc-type">${docTitle}</div>
     <div class="doc-meta">
-      ${!isCheckInPass && isFullyPaid ? `<div class="meta-row"><span>Invoice No</span><strong>${invoiceNo}</strong></div>` : ''}
+      ${!isCheckInPass && isInvoiceDocument ? `<div class="meta-row"><span>Invoice No</span><strong>${invoiceNo}</strong></div>` : ''}
       <div class="meta-row"><span>Booking Ref</span><strong>${bookingNo}</strong></div>
       <div class="meta-row"><span>Issued</span><strong>${issuedOn}</strong></div>
       ${booking.booking_source ? `<div class="meta-row"><span>Source</span><strong>${booking.booking_source.replace('_',' ').toUpperCase()}</strong></div>` : ''}
@@ -604,22 +608,15 @@ ${includePrintTools ? `<div class="print-tools" style="position:fixed;right:18px
     <!-- Guest + Dates -->
     <div class="top-row">
       <div class="guest-block">
+        <div class="section-label" style="margin-bottom:8px">${billToLabel}</div>
         <div class="guest-name">${invoiceParty.name || '—'}</div>
         <div class="guest-contact">
-          ${booking.guest_phone ? `📞 ${booking.guest_phone}` : ''}
-          ${booking.guest_email ? `<br>✉ ${booking.guest_email}` : ''}
-          ${(() => {
-            const parts = [
-              booking.guest_address,
-              booking.guest_district,
-              booking.guest_state,
-              booking.guest_country && booking.guest_country !== 'India' ? booking.guest_country : null,
-            ].filter(Boolean)
-            return parts.length ? `<br>📍 ${parts.join(', ')}` : ''
-          })()}
-          ${booking.guest_id_type && booking.guest_id_number ? `<br>🪪 ${booking.guest_id_type.replace(/_/g,' ')}: ${booking.guest_id_number}` : ''}
-          ${!isCheckInPass && isFullyPaid && booking.gst_invoice_requested && invoiceParty.gstNumber ? `<br>GSTIN: ${invoiceParty.gstNumber}` : ''}
-          ${!isCheckInPass && isFullyPaid && booking.gst_invoice_requested && invoiceParty.gstState ? `<br>GST State: ${invoiceParty.gstState}` : ''}
+          ${invoiceParty.phone ? `📞 ${invoiceParty.phone}` : ''}
+          ${invoiceParty.email ? `<br>✉ ${invoiceParty.email}` : ''}
+          ${invoiceParty.address ? `<br>📍 ${invoiceParty.address}` : ''}
+          ${isInvoiceDocument && invoiceParty.gstNumber ? `<br>GSTIN: ${invoiceParty.gstNumber}` : ''}
+          ${isInvoiceDocument && invoiceParty.gstState ? `<br>State: ${invoiceParty.gstState}${invoiceParty.stateCode ? ` (${invoiceParty.stateCode})` : ''}` : ''}
+          ${!isInvoiceDocument && booking.guest_id_type && booking.guest_id_number ? `<br>🪪 ${booking.guest_id_type.replace(/_/g,' ')}: ${booking.guest_id_number}` : ''}
         </div>
         ${operator ? `
         <div style="margin-top:10px;padding:8px 10px;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;font-size:11px">
@@ -691,10 +688,10 @@ ${includePrintTools ? `<div class="print-tools" style="position:fixed;right:18px
         </div>
       </div>` : `
       <div>
-        <div class="section-label">${isFullyPaid ? 'GST Invoice Summary' : 'Payment Summary'}</div>
+        <div class="section-label">${isInvoiceDocument ? 'GST Invoice Summary' : 'Payment Summary'}</div>
         <div class="pay-box">
           <div class="pay-body">
-            ${isFullyPaid ? `
+            ${isInvoiceDocument ? `
             <div class="pay-row">
               <span class="label">Taxable Amount</span>
               <span class="value">${curr(taxable)}</span>
@@ -711,16 +708,16 @@ ${includePrintTools ? `<div class="print-tools" style="position:fixed;right:18px
               <span class="label">Total Amount</span>
               <span class="value">${curr(total)}</span>
             </div>
-            ${advance > 0 && !isFullyPaid ? `
+            ${advance > 0 && !isInvoiceDocument ? `
             <div class="pay-row paid-row">
               <span class="label">Advance Paid</span>
               <span class="value">${curr(advance)}</span>
             </div>` : ''}
-            ${!isFullyPaid && balance > 0 ? `
+            ${!isInvoiceDocument && balance > 0 ? `
             <div class="pay-row balance-row">
               <span class="label">Balance Due</span>
               <span class="value">${curr(balance)}</span>
-            </div>` : isFullyPaid ? `
+            </div>` : isInvoiceDocument ? `
             <div class="pay-row" style="background:#f0fdf4">
               <span style="color:#166534;font-size:11.5px">✓ All payments received</span>
               <span style="color:#166534;font-weight:600">NIL</span>
@@ -745,9 +742,10 @@ ${includePrintTools ? `<div class="print-tools" style="position:fixed;right:18px
         <div class="section-label">Booking Info</div>
         <div class="info-box">
           <div class="ib-body">
-            ${!isCheckInPass && isFullyPaid ? `<div class="ib-row"><span class="k">Invoice No.</span><span class="v">${invoiceNo}</span></div>` : ''}
-            ${!isCheckInPass && isFullyPaid && booking.gst_invoice_requested ? `<div class="ib-row"><span class="k">Invoice To</span><span class="v">${invoiceParty.name}</span></div>` : ''}
-            ${!isCheckInPass && isFullyPaid && booking.gst_invoice_requested && invoiceParty.gstNumber ? `<div class="ib-row"><span class="k">GSTIN</span><span class="v">${invoiceParty.gstNumber}</span></div>` : ''}
+            ${!isCheckInPass && isInvoiceDocument ? `<div class="ib-row"><span class="k">Invoice No.</span><span class="v">${invoiceNo}</span></div>` : ''}
+            ${!isCheckInPass && isInvoiceDocument ? `<div class="ib-row"><span class="k">Invoice To</span><span class="v">${invoiceParty.name}</span></div>` : ''}
+            ${!isCheckInPass && isInvoiceDocument && invoiceParty.gstNumber ? `<div class="ib-row"><span class="k">GSTIN</span><span class="v">${invoiceParty.gstNumber}</span></div>` : ''}
+            ${!isCheckInPass && isInvoiceDocument && invoiceParty.gstState ? `<div class="ib-row"><span class="k">State / Code</span><span class="v">${invoiceParty.gstState}${invoiceParty.stateCode ? ` (${invoiceParty.stateCode})` : ''}</span></div>` : ''}
             <div class="ib-row"><span class="k">Booking No.</span><span class="v">${bookingNo}</span></div>
             <div class="ib-row"><span class="k">Issued On</span><span class="v">${issuedOn}</span></div>
             ${booking.confirmed_at ? `<div class="ib-row"><span class="k">Confirmed</span><span class="v">${fmt(booking.confirmed_at)}</span></div>` : ''}
@@ -772,7 +770,7 @@ ${includePrintTools ? `<div class="print-tools" style="position:fixed;right:18px
           <div class="pol-item">Breakfast served 8–10 AM · Kitchen closes at 10 PM</div>
           <div class="pol-item">Lunch and dinner orders are served as per resort kitchen timings</div>
           <div class="pol-item">Cancellation charges as per reservation policy</div>
-          ${!isCheckInPass && !isFullyPaid && balance > 0 ? `<div class="pol-item" style="color:#dc2626">Balance ${curr(balance)} due 7 days before check-in</div>` : '<div class="pol-item">No pets allowed in resort premises</div>'}
+          ${!isCheckInPass && !isInvoiceDocument && balance > 0 ? `<div class="pol-item" style="color:#dc2626">Balance ${curr(balance)} due 7 days before check-in</div>` : '<div class="pol-item">No pets allowed in resort premises</div>'}
           <div class="pol-item">Front desk support: +91-8630227541</div>
           <div class="pol-item">Contact us 24×7: ${RESORT.phone}</div>
           <div class="pol-item">Outside food and alcohol are subject to resort policy</div>
@@ -802,7 +800,7 @@ ${includePrintTools ? `<div class="print-tools" style="position:fixed;right:18px
 
 <script>
 window.onload = function() {
-  document.title = '${isCheckInPass ? 'Check-In-Pass' : isFullyPaid ? 'GST-Invoice' : 'Receipt'}-${isCheckInPass ? bookingNo : isFullyPaid ? invoiceNo : bookingNo}';
+  document.title = '${isCheckInPass ? 'Check-In-Pass' : isInvoiceDocument ? 'GST-Invoice' : 'Receipt'}-${isCheckInPass ? bookingNo : isInvoiceDocument ? invoiceNo : bookingNo}';
 }
 <\/script>
 </body>
