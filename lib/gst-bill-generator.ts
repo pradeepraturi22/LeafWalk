@@ -1,25 +1,20 @@
-// lib/gst-bill-generator.ts - HTML Print-based GST Invoice
-
-import { formatDate } from '@/lib/utils'
+import { COMPANY_DETAILS } from '@/lib/constants'
 import { calculateGST, calculateGSTFromSubtotal } from '@/lib/gst-bill-service'
 import { getInvoicePartyMeta } from '@/lib/invoice-party'
-
-const RESORT = {
-  name: 'LeafWalk Resort',
-  gstin: '05AADFL1234R1Z5', // Replace with actual
-  pan: 'AADFL1234R',
-  address: 'Vill- Banas, Narad Chatti, Hanuman Chatti',
-  city: 'Yamunotri Road, Uttarkashi',
-  state: 'Uttarakhand - 249193',
-  phone: '+91-9368080535, +91-8630227541',
-  email: 'info@leafwalk.in',
-  website: 'www.leafwalk.in',
-  sacCode: '996311',
-}
+import { formatDate } from '@/lib/utils'
 
 const MEAL_LABELS: Record<string, string> = {
-  EP: 'Room Only (EP)', CP: 'Room + Breakfast (CP)',
-  MAP: 'Room + Breakfast + Dinner (MAP)', AP: 'All Meals Included (AP)',
+  EP: 'Room Only (EP)',
+  CP: 'Room + Breakfast (CP)',
+  MAP: 'Room + Breakfast + Dinner (MAP)',
+  AP: 'All Meals Included (AP)',
+}
+
+function fmt(n: number) {
+  return Number(n || 0).toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
 }
 
 function numberToWords(amount: number): string {
@@ -28,360 +23,322 @@ function numberToWords(amount: number): string {
   const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety']
   function convert(n: number): string {
     if (n < 20) return ones[n]
-    if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 ? ' ' + ones[n % 10] : '')
-    if (n < 1000) return ones[Math.floor(n / 100)] + ' Hundred' + (n % 100 ? ' ' + convert(n % 100) : '')
-    if (n < 100000) return convert(Math.floor(n / 1000)) + ' Thousand' + (n % 1000 ? ' ' + convert(n % 1000) : '')
-    if (n < 10000000) return convert(Math.floor(n / 100000)) + ' Lakh' + (n % 100000 ? ' ' + convert(n % 100000) : '')
-    return convert(Math.floor(n / 10000000)) + ' Crore' + (n % 10000000 ? ' ' + convert(n % 10000000) : '')
+    if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 ? ` ${ones[n % 10]}` : '')
+    if (n < 1000) return `${ones[Math.floor(n / 100)]} Hundred${n % 100 ? ` ${convert(n % 100)}` : ''}`
+    if (n < 100000) return `${convert(Math.floor(n / 1000))} Thousand${n % 1000 ? ` ${convert(n % 1000)}` : ''}`
+    if (n < 10000000) return `${convert(Math.floor(n / 100000))} Lakh${n % 100000 ? ` ${convert(n % 100000)}` : ''}`
+    return `${convert(Math.floor(n / 10000000))} Crore${n % 10000000 ? ` ${convert(n % 10000000)}` : ''}`
   }
-  const n = Math.round(amount)
-  return n === 0 ? 'Zero' : convert(n)
+  const rounded = Math.round(amount)
+  return rounded === 0 ? 'Zero' : convert(rounded)
 }
 
-function fmt(n: number) {
-  return Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+function normalizeOperator(booking: any) {
+  return Array.isArray(booking?.tour_operator) ? booking.tour_operator[0] : booking?.tour_operator
+}
+
+function sellerStateCode() {
+  const gstin = String(COMPANY_DETAILS.gstin || '').trim()
+  return gstin.length >= 2 ? gstin.slice(0, 2) : ''
+}
+
+function buildInvoiceRows(booking: any, mealLabel: string, nights: number) {
+  const rows: Array<{ desc: string; sac: string; qty: number; rate: number; unit: string; amount: number }> = []
+
+  const roomRate = Number(booking.rate_per_room_per_night || 0)
+  const rooms = Number(booking.rooms_booked || 1)
+  if (roomRate > 0) {
+    rows.push({
+      desc: `${booking.room?.name || 'Room'} - ${mealLabel}`,
+      sac: COMPANY_DETAILS.sacCode,
+      qty: rooms * Math.max(nights, 1),
+      rate: roomRate,
+      unit: 'Night',
+      amount: roomRate * rooms * Math.max(nights, 1),
+    })
+  }
+
+  if (Number(booking.extra_beds) > 0 && Number(booking.extra_bed_rate_per_night) > 0) {
+    const qty = Number(booking.extra_beds) * Math.max(nights, 1)
+    const rate = Number(booking.extra_bed_rate_per_night)
+    rows.push({
+      desc: `Extra Bed - ${mealLabel}`,
+      sac: COMPANY_DETAILS.sacCode,
+      qty,
+      rate,
+      unit: 'Night',
+      amount: qty * rate,
+    })
+  }
+
+  if (Number(booking.children_5_to_12) > 0 && Number(booking.child_rate_per_night) > 0) {
+    const qty = Number(booking.children_5_to_12) * Math.max(nights, 1)
+    const rate = Number(booking.child_rate_per_night)
+    rows.push({
+      desc: `Child (6-12 yrs) - ${mealLabel}`,
+      sac: COMPANY_DETAILS.sacCode,
+      qty,
+      rate,
+      unit: 'Night',
+      amount: qty * rate,
+    })
+  }
+
+  if (!rows.length) {
+    const total = Number(booking.total_amount || 0)
+    rows.push({
+      desc: `${booking.room?.name || 'Accommodation'} - ${mealLabel}`,
+      sac: COMPANY_DETAILS.sacCode,
+      qty: 1,
+      rate: total,
+      unit: 'Service',
+      amount: total,
+    })
+  }
+
+  return rows
 }
 
 export function buildGSTBillHtml(booking: any): string {
-  const checkIn = formatDate(booking.check_in)
-  const checkOut = formatDate(booking.check_out)
-  const billDate = formatDate(new Date())
-  const mealLabel = MEAL_LABELS[booking.meal_plan] || booking.meal_plan || '—'
-
-  const isIntraState = !booking.guest_state || booking.booking_source === 'walk_in' ||
-    (booking.guest_state || '').toLowerCase().includes('uttarakhand')
-
-  const operator = booking.tour_operator || null
+  const operator = normalizeOperator(booking)
   const invoiceParty = getInvoicePartyMeta(booking)
   const nights = Number(booking.nights || 0)
-  const invoiceNo = booking.invoice_number || booking.booking_number || ('INV-' + (booking.id || '').slice(0, 8).toUpperCase())
-
-  // Line items
-  const items: { desc: string; rate: number; qty: number; nights: number; amount: number }[] = []
-  const roomRate = Number(booking.rate_per_room_per_night || 0)
-  const roomQty = Number(booking.rooms_booked || 1)
-  if (roomRate > 0) items.push({ desc: `${booking.room?.name || 'Room'} — ${mealLabel}`, rate: roomRate, qty: roomQty, nights, amount: roomRate * roomQty * nights })
-  if (Number(booking.extra_beds) > 0 && Number(booking.extra_bed_rate_per_night) > 0) {
-    const r = Number(booking.extra_bed_rate_per_night), q = Number(booking.extra_beds)
-    items.push({ desc: `Extra Bed — ${mealLabel}`, rate: r, qty: q, nights, amount: r * q * nights })
-  }
-  if (Number(booking.children_5_to_12) > 0 && Number(booking.child_rate_per_night) > 0) {
-    const r = Number(booking.child_rate_per_night), q = Number(booking.children_5_to_12)
-    items.push({ desc: `Child (6-12 yrs) — ${mealLabel}`, rate: r, qty: q, nights, amount: r * q * nights })
-  }
-
+  const mealLabel = MEAL_LABELS[booking.meal_plan] || booking.meal_plan || '-'
+  const invoiceNo = booking.invoice_number || booking.booking_number || `INV-${String(booking.id || '').slice(0, 8).toUpperCase()}`
+  const invoiceDate = formatDate(new Date())
+  const bookingDate = formatDate(booking.created_at || new Date())
+  const checkIn = formatDate(booking.check_in)
+  const checkOut = formatDate(booking.check_out)
   const total = Number(booking.total_amount || 0)
   const storedSubtotal = Number(booking.subtotal || 0)
-  const gstMath = total > 0
-    ? calculateGST(total)
-    : calculateGSTFromSubtotal(storedSubtotal)
+  const gstMath = total > 0 ? calculateGST(total) : calculateGSTFromSubtotal(storedSubtotal)
   const subtotal = gstMath.subtotal
   const cgst = gstMath.cgst
   const sgst = gstMath.sgst
-  const igst = cgst + sgst
-  const advance = Number(booking.advance_amount || 0)
-  const rawBalance = Number(booking.balance_amount || 0)
-  // Balance due sirf tab show karo jab actually pending ho
-  const isFullyPaid = booking.payment_status === 'fully_paid'
-  const balance = isFullyPaid ? 0 : rawBalance
+  const gstTotal = cgst + sgst
+  const items = buildInvoiceRows(booking, mealLabel, nights)
+  const buyerStateCode = invoiceParty.stateCode || ''
+  const sellerCode = sellerStateCode()
+  const isIntraState = !buyerStateCode || !sellerCode || buyerStateCode === sellerCode
+  const taxLabel = isIntraState ? 'CGST @ 2.5%' : 'IGST @ 5%'
+  const taxValue = isIntraState ? gstTotal : gstTotal
+  const amountWords = numberToWords(total)
+  const taxWords = numberToWords(gstTotal)
+  const bankLines = [
+    COMPANY_DETAILS.bankAccountName ? `A/c Name : ${COMPANY_DETAILS.bankAccountName}` : '',
+    COMPANY_DETAILS.bankName ? `Bank Name : ${COMPANY_DETAILS.bankName}` : '',
+    COMPANY_DETAILS.accountNumber ? `A/c No. : ${COMPANY_DETAILS.accountNumber}` : '',
+    COMPANY_DETAILS.ifsc ? `IFSC Code : ${COMPANY_DETAILS.ifsc}` : '',
+    COMPANY_DETAILS.branch ? `Branch : ${COMPANY_DETAILS.branch}` : '',
+  ].filter(Boolean)
 
   return `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
-<title>LeafWalk Invoice ${invoiceNo}</title>
+<title>Tax Invoice ${invoiceNo}</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
-  *{margin:0;padding:0;box-sizing:border-box}
-  body{font-family:'Inter',Arial,Helvetica,sans-serif;background:#f0f0f0;color:#1a1a1a;font-size:13px}
-  .page{width:210mm;min-height:297mm;margin:10px auto;background:#fff;box-shadow:0 4px 30px rgba(0,0,0,0.15);position:relative;overflow:hidden}
-
-  /* Header */
-  .hdr{background:linear-gradient(135deg,#0a0a0a 0%,#151208 50%,#1e1a0a 100%);padding:24px 32px 20px;display:flex;align-items:center;gap:18px;position:relative;overflow:hidden;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  .hdr::before{content:'';position:absolute;top:-60px;right:-60px;width:220px;height:220px;background:radial-gradient(circle,rgba(201,161,74,.12) 0%,transparent 70%);border-radius:50%}
-  .logo-wrap{width:58px;height:58px;border:2px solid rgba(201,161,74,.7);border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(201,161,74,.08);flex-shrink:0}
-  .logo-emoji{font-size:24px}
-  .rinfo{flex:1}
-  .rname{font-family:'Playfair Display','Georgia',serif;font-size:24px;font-weight:700;color:#c9a14a;letter-spacing:2px;line-height:1}
-  .rtag{color:#8b6914;font-size:9px;letter-spacing:3px;text-transform:uppercase;margin-top:3px}
-  .rcontact{color:#777;font-size:10px;margin-top:7px;line-height:1.8}
-  .rcontact .hl{color:#c9a14a;font-weight:500}
-  .inv-badge{background:rgba(201,161,74,.12);border:1px solid rgba(201,161,74,.35);border-radius:8px;padding:12px 16px;text-align:center;flex-shrink:0;min-width:130px}
-  .inv-badge-lbl{color:#8b6914;font-size:8px;letter-spacing:2px;text-transform:uppercase;font-weight:600}
-  .inv-badge-no{color:#fff;font-size:13px;font-weight:700;margin-top:4px;font-family:'Playfair Display',serif}
-  .inv-badge-dt{color:#666;font-size:10px;margin-top:3px}
-
-  /* Gold bar */
-  .gbar{height:3px;background:linear-gradient(90deg,#6b4f10,#c9a14a,#e6c87a,#c9a14a,#6b4f10)}
-
-  /* Meta row */
-  .meta{display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #ebebeb}
-  .meta-cell{padding:13px 32px;border-right:1px solid #ebebeb}
-  .meta-cell:last-child{border-right:none}
-  .meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  .ml{font-size:8.5px;letter-spacing:1.5px;text-transform:uppercase;color:#aaa;font-weight:600;margin-bottom:2px}
-  .mv{font-size:12.5px;color:#1a1a1a;font-weight:600}
-
-  /* Party */
-  .party{display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #ebebeb}
-  .party-cell{padding:14px 32px;border-right:1px solid #ebebeb}
-  .party-cell:last-child{border-right:none}
-  .ph{font-size:8.5px;letter-spacing:1.5px;text-transform:uppercase;color:#c9a14a;font-weight:700;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid #f5ecd5}
-  .pn{font-size:15px;font-weight:700;color:#1a1a1a;margin-bottom:4px}
-  .pd{color:#555;font-size:11.5px;line-height:1.75}
-  .pgst{margin-top:7px;padding:5px 10px;background:#fffbf0;border:1px solid #f0e0a0;border-radius:4px;font-size:10.5px;color:#7a5a08;font-weight:500}
-
-  /* Stay bar */
-  .sbar{background:#fafafa;border-bottom:1px solid #ebebeb;padding:11px 32px;display:flex;gap:0;align-items:stretch}
-  .si{flex:1;text-align:center;padding:0 12px;border-right:1px solid #e5e5e5}
-  .si:last-child{border-right:none}
-  .sil{font-size:8px;color:#aaa;letter-spacing:1px;text-transform:uppercase;margin-bottom:3px}
-  .siv{font-size:12.5px;color:#1a1a1a;font-weight:600}
-
-  /* Table */
-  .tbl-wrap{padding:18px 32px 10px}
-  table{width:100%;border-collapse:collapse}
-  thead tr{background:#0a0a0a;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  thead th{padding:9px 10px;color:#c9a14a;font-size:9px;letter-spacing:1px;text-transform:uppercase;font-weight:600;text-align:left}
-  thead th.right{text-align:right}
-  thead th.center{text-align:center}
-  tbody tr{border-bottom:1px solid #f2f2f2}
-  tbody tr:last-child{border-bottom:2px solid #e0e0e0}
-  tbody td{padding:10px 10px;color:#333;font-size:12px;vertical-align:top}
-  td.right{text-align:right;font-weight:500}
-  td.center{text-align:center}
-  .idesc{font-weight:600;color:#1a1a1a}
-  .isub{font-size:10px;color:#999;margin-top:2px}
-
-  /* Totals */
-  .totals-wrap{padding:8px 32px 18px;display:flex;gap:18px;align-items:flex-start}
-  .awords{flex:1;background:#fffcf0;border:1px solid #f0e0a0;border-radius:8px;padding:13px 15px}
-  .awl{font-size:8.5px;color:#8b6914;letter-spacing:1px;text-transform:uppercase;font-weight:600;margin-bottom:4px}
-  .awt{font-size:12px;color:#5a4010;font-style:italic;line-height:1.6}
-  .ttbl{width:210px;flex-shrink:0}
-  .ttbl td{padding:5px 0;font-size:12px;color:#444}
-  .ttbl td.amt{text-align:right;font-weight:500}
-  .ttbl tr.trow td{font-size:14px;font-weight:700;color:#c9a14a;padding-top:9px;border-top:2px solid #c9a14a}
-  .ttbl tr.brow td{color:#c0392b;font-weight:600}
-
-  /* Footer */
-  .ftr{margin:0 32px;border-top:1px solid #ebebeb;padding:14px 0 16px;display:flex;gap:18px;align-items:flex-end}
-  .terms{flex:1}
-  .tml{font-size:8.5px;color:#aaa;letter-spacing:1px;text-transform:uppercase;font-weight:600;margin-bottom:6px}
-  .terms ol{padding-left:14px;color:#777;font-size:10.5px;line-height:1.9}
-  .sig{text-align:center;min-width:130px}
-  .sig-co{font-size:11px;font-weight:700;color:#1a1a1a;margin-bottom:22px;font-family:'Playfair Display',serif}
-  .sig-line{width:110px;border-top:1px solid #555;margin:0 auto 5px;padding-top:4px}
-  .sig-lbl{font-size:10px;color:#666}
-
-  /* Tag */
-  .tag-paid{display:inline-block;background:#27ae60;color:#fff;font-size:8.5px;padding:2px 8px;border-radius:3px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-left:6px;vertical-align:middle}
-  .tag-partial{display:inline-block;background:#e67e22;color:#fff;font-size:8.5px;padding:2px 8px;border-radius:3px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-left:6px;vertical-align:middle}
-
-  /* Watermark */
-  .wm{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-30deg);font-size:90px;color:rgba(201,161,74,0.035);font-family:'Playfair Display',serif;font-weight:700;pointer-events:none;white-space:nowrap;z-index:0}
-
-  @media print{
-    body{background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-    .page{box-shadow:none;width:100%;margin:0;min-height:auto}
-    @page{margin:8mm 10mm;size:A4}
-    .wm{display:none}
-  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#f3f3f3;font-family:Arial,Helvetica,sans-serif;color:#111}
+  .page{width:210mm;min-height:297mm;margin:0 auto;background:#fff;padding:10mm 8mm 8mm}
+  .center{text-align:center}
+  .title{font-weight:700;font-size:16px;margin-bottom:6px}
+  .top-grid{display:grid;grid-template-columns:1fr 58mm;gap:8px;align-items:start}
+  .small{font-size:11px;line-height:1.3}
+  .tiny{font-size:9px;line-height:1.25}
+  .label{font-weight:700}
+  .qr-box{border:1px solid #000;height:54mm;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:4px}
+  .qr-title{font-size:10px;font-weight:700;margin-bottom:4px}
+  .qr-note{font-size:10px;color:#444;text-align:center;padding:0 6px}
+  .box-grid{display:grid;grid-template-columns:1fr 74mm;gap:0;margin-top:6px;border:1px solid #000}
+  .cell{border-right:1px solid #000;min-height:56mm;padding:4px 5px}
+  .cell:last-child{border-right:none}
+  .buyer-block{margin-top:10px}
+  .section-head{font-size:10px;font-weight:700;margin-bottom:2px}
+  .meta-table{width:100%;border-collapse:collapse}
+  .meta-table td{border-bottom:1px solid #000;border-left:1px solid #000;padding:3px 4px;font-size:10px;vertical-align:top}
+  .meta-table tr:first-child td{border-top:none}
+  .meta-table td:first-child{width:52%;border-left:none}
+  .items{width:100%;border-collapse:collapse;margin-top:0;border:1px solid #000;border-top:none}
+  .items th,.items td{border:1px solid #000;padding:3px 4px;font-size:10px;vertical-align:top}
+  .items th{font-weight:700}
+  .right{text-align:right}
+  .left{text-align:left}
+  .centered{text-align:center}
+  .desc{min-height:88mm}
+  .spacer{height:78mm}
+  .totals-line td{font-weight:700}
+  .words-box,.tax-box{border:1px solid #000;border-top:none;padding:3px 4px;font-size:10px}
+  .summary{display:grid;grid-template-columns:1fr 66mm;gap:0}
+  .tax-summary{width:100%;border-collapse:collapse}
+  .tax-summary td,.tax-summary th{border:1px solid #000;padding:3px 4px;font-size:10px}
+  .bottom-grid{display:grid;grid-template-columns:1fr 78mm;gap:10px;margin-top:6px}
+  .declaration{font-size:10px;line-height:1.35}
+  .signature{font-size:10px;display:flex;flex-direction:column;justify-content:space-between;min-height:44mm}
+  .signature .sign-line{text-align:right;margin-top:20mm}
+  .footer{text-align:center;font-size:9px;margin-top:6px}
+  .muted{color:#444}
+  @page{size:A4;margin:0}
 </style>
 </head>
 <body>
-<div class="page">
-<div class="wm">LeafWalk Resort</div>
+  <div class="page">
+    <div class="center title">Tax Invoice</div>
 
-<!-- HEADER -->
-<div class="hdr">
-  <div class="logo-wrap"><span class="logo-emoji">🌿</span></div>
-  <div class="rinfo">
-    <div class="rname">LEAFWALK RESORT</div>
-    <div class="rtag">Stay in Lap of Nature</div>
-    <div class="rcontact">
-      ${RESORT.address}, ${RESORT.city}, ${RESORT.state}<br>
-      📞 ${RESORT.phone} &nbsp;|&nbsp; ✉ ${RESORT.email} &nbsp;|&nbsp; 🌐 ${RESORT.website}<br>
-      <span class="hl">GSTIN: ${RESORT.gstin}</span> &nbsp;|&nbsp; PAN: ${RESORT.pan} &nbsp;|&nbsp; SAC: ${RESORT.sacCode}
+    <div class="top-grid">
+      <div class="small">
+        ${operator?.irn ? `<div><span class="label">IRN</span> : ${operator.irn}</div>` : ''}
+        ${operator?.ack_no ? `<div><span class="label">Ack No.</span> : ${operator.ack_no}</div>` : ''}
+        ${operator?.ack_date ? `<div><span class="label">Ack Date</span> : ${operator.ack_date}</div>` : ''}
+      </div>
+      <div class="qr-box">
+        <div class="qr-title">e-Invoice</div>
+        <div class="qr-note">QR / IRN details available nahi hain, isliye yahan blank rakha gaya hai.</div>
+      </div>
     </div>
-  </div>
-  <div class="inv-badge">
-    <div class="inv-badge-lbl">Tax Invoice</div>
-    <div class="inv-badge-no">${invoiceNo}</div>
-    <div class="inv-badge-dt">${billDate}</div>
-  </div>
-</div>
-<div class="gbar"></div>
 
-<!-- META -->
-<div class="meta">
-  <div class="meta-cell">
-    <div class="meta-grid">
-      <div><div class="ml">Invoice No</div><div class="mv">${invoiceNo}</div></div>
-      <div><div class="ml">Date</div><div class="mv">${billDate}</div></div>
-      <div><div class="ml">Payment Mode</div><div class="mv">${(booking.payment_method || 'Cash').toUpperCase().replace('_',' ')}</div></div>
-      <div><div class="ml">Tax Type</div><div class="mv" style="font-size:11px">${isIntraState ? 'CGST + SGST' : 'IGST'}</div></div>
-    </div>
-  </div>
-  <div class="meta-cell">
-    <div class="meta-grid">
-      <div><div class="ml">Booking Ref</div><div class="mv">${booking.booking_number || '—'}</div></div>
-      <div><div class="ml">Source</div><div class="mv" style="font-size:11px">${(booking.booking_source || '').replace('_',' ').toUpperCase()}</div></div>
-      <div>
-        <div class="ml">Status</div>
-        <div class="mv">
-          ${booking.payment_status === 'fully_paid'
-            ? '<span class="tag-paid">Fully Paid</span>'
-            : ['advance_paid', 'payment_processing'].includes(booking.payment_status)
-            ? '<span class="tag-partial">Advance Paid</span>'
-            : (booking.payment_status || '').replace('_',' ')}
+    <div class="box-grid">
+      <div class="cell small">
+        <div class="section-head">COMPANY DETAILS</div>
+        <div class="label">${COMPANY_DETAILS.name.toUpperCase()}</div>
+        <div>${COMPANY_DETAILS.address}</div>
+        <div>${COMPANY_DETAILS.city}, ${COMPANY_DETAILS.state}${COMPANY_DETAILS.pincode ? ` - ${COMPANY_DETAILS.pincode}` : ''}</div>
+        ${COMPANY_DETAILS.phone ? `<div>M.NO.- ${COMPANY_DETAILS.phone}</div>` : ''}
+        ${COMPANY_DETAILS.gstin ? `<div>GSTIN/UIN : ${COMPANY_DETAILS.gstin}</div>` : ''}
+        <div>State Name : ${COMPANY_DETAILS.state}${sellerCode ? `, Code : ${sellerCode}` : ''}</div>
+        ${COMPANY_DETAILS.email ? `<div>E-Mail : ${COMPANY_DETAILS.email}</div>` : ''}
+
+        <div class="buyer-block">
+          <div class="section-head">Buyer (Bill to)</div>
+          <div class="label">${invoiceParty.name || '-'}</div>
+          ${invoiceParty.address ? `<div>${invoiceParty.address}</div>` : ''}
+          ${invoiceParty.phone ? `<div>M.NO.- ${invoiceParty.phone}</div>` : ''}
+          ${invoiceParty.email ? `<div>E-Mail : ${invoiceParty.email}</div>` : ''}
+          ${invoiceParty.gstNumber ? `<div>GSTIN/UIN : ${invoiceParty.gstNumber}</div>` : ''}
+          <div>State Name : ${invoiceParty.gstState || '-'}${buyerStateCode ? `, Code : ${buyerStateCode}` : ''}</div>
         </div>
       </div>
-      ${operator ? `<div><div class="ml">Partner</div><div class="mv" style="font-size:11px">${operator.company_name || 'Travel Partner'}</div></div>` : ''}
+
+      <div class="cell">
+        <table class="meta-table">
+          <tr><td>Invoice No.</td><td>${invoiceNo}</td></tr>
+          <tr><td>Dated</td><td>${invoiceDate}</td></tr>
+          <tr><td>Delivery Note</td><td>${booking.payment_method ? `Mode/Terms of Payment: ${String(booking.payment_method).replace(/_/g, ' ').toUpperCase()}` : ''}</td></tr>
+          <tr><td>Reference No. & Date.</td><td>${booking.booking_number || ''}</td></tr>
+          <tr><td>Buyer's Order No.</td><td>${booking.booking_number || ''}</td></tr>
+          <tr><td>Dispatch Doc No.</td><td></td></tr>
+          <tr><td>Dispatched through</td><td></td></tr>
+          <tr><td>Destination</td><td>${invoiceParty.gstState || ''}</td></tr>
+          <tr><td>Stay Dates</td><td>${checkIn} to ${checkOut}</td></tr>
+          <tr><td>Rooms / Nights</td><td>${booking.rooms_booked || 1} Room(s) / ${nights} Night(s)</td></tr>
+        </table>
+      </div>
     </div>
-  </div>
-</div>
 
-<!-- PARTY -->
-  <div class="party">
-  <div class="party-cell">
-    <div class="ph">Bill To</div>
-    <div class="pn">${invoiceParty.name}</div>
-    <div class="pd">
-      ${invoiceParty.phone ? '📞 ' + invoiceParty.phone + '<br>' : ''}
-      ${invoiceParty.email ? '✉ ' + invoiceParty.email + '<br>' : ''}
-      ${invoiceParty.address ? '📍 ' + invoiceParty.address + '<br>' : ''}
-      ${invoiceParty.gstNumber ? 'GSTIN: ' + invoiceParty.gstNumber + '<br>' : ''}
-      ${invoiceParty.gstState ? 'State: ' + invoiceParty.gstState + (invoiceParty.stateCode ? ' (' + invoiceParty.stateCode + ')' : '') : ''}
+    <table class="items">
+      <thead>
+        <tr>
+          <th style="width:18px">Sl No.</th>
+          <th>Description of Goods / Services</th>
+          <th style="width:48px">HSN/SAC</th>
+          <th style="width:42px">Quantity</th>
+          <th style="width:48px">Rate</th>
+          <th style="width:34px">Per</th>
+          <th style="width:38px">Disc. %</th>
+          <th style="width:72px">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${items.map((item, index) => `
+          <tr>
+            <td class="centered">${index + 1}</td>
+            <td>${item.desc}</td>
+            <td class="centered">${item.sac}</td>
+            <td class="centered">${item.qty}</td>
+            <td class="right">${fmt(item.rate)}</td>
+            <td class="centered">${item.unit}</td>
+            <td class="centered">0</td>
+            <td class="right">${fmt(item.amount)}</td>
+          </tr>
+        `).join('')}
+        <tr>
+          <td colspan="8" class="desc"></td>
+        </tr>
+        <tr class="totals-line">
+          <td colspan="3"></td>
+          <td class="centered">${items.reduce((sum, item) => sum + Number(item.qty || 0), 0)}</td>
+          <td colspan="3" class="right">Total</td>
+          <td class="right">₹ ${fmt(subtotal)}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="summary">
+      <div>
+        <div class="words-box">
+          <div class="tiny">Amount Chargeable (in words)</div>
+          <div class="small"><span class="label">INR ${amountWords} Only</span></div>
+        </div>
+        <div class="words-box">
+          <div class="tiny">Tax Amount (in words)</div>
+          <div class="small"><span class="label">INR ${taxWords} Only</span></div>
+        </div>
+      </div>
+      <div class="tax-box">
+        <table class="tax-summary">
+          <tr>
+            <th>Taxable Value</th>
+            <th>Rate</th>
+            <th>GST Amount</th>
+            <th>Total Tax Amount</th>
+          </tr>
+          <tr>
+            <td class="right">${fmt(subtotal)}</td>
+            <td class="centered">${isIntraState ? '5%' : '5%'}</td>
+            <td class="right">${fmt(taxValue)}</td>
+            <td class="right">${fmt(gstTotal)}</td>
+          </tr>
+          <tr>
+            <td colspan="3" class="right label">Total:</td>
+            <td class="right label">${fmt(gstTotal)}</td>
+          </tr>
+        </table>
+      </div>
     </div>
-  </div>
-  <div class="party-cell">
-    ${operator ? `
-    <div class="ph">Tour Operator Details</div>
-    <div class="pn">${operator.company_name}</div>
-    <div class="pd">
-      ${operator.contact_person ? 'Attn: ' + operator.contact_person + '<br>' : ''}
-      ${operator.address ? operator.address + (operator.city ? ', ' + operator.city : '') + (operator.state ? ', ' + operator.state : '') + '<br>' : ''}
-      ${operator.phone ? '📞 ' + operator.phone + '<br>' : ''}
-      ${operator.email ? '✉ ' + operator.email : ''}
+
+    <div class="bottom-grid">
+      <div class="declaration">
+        <div class="label tiny" style="margin-bottom:4px">Declaration</div>
+        <div>We declare that this invoice shows the actual price of the services described and that all particulars are true and correct.</div>
+      </div>
+
+      <div class="signature">
+        ${bankLines.length ? `
+          <div>
+            <div class="label tiny" style="margin-bottom:4px">Company's Bank Details</div>
+            ${bankLines.map((line) => `<div>${line}</div>`).join('')}
+          </div>
+        ` : '<div></div>'}
+        <div class="sign-line">
+          <div>for ${COMPANY_DETAILS.name.toUpperCase()}</div>
+          <div style="margin-top:18px">Authorised Signatory</div>
+        </div>
+      </div>
     </div>
-    ${operator.gst_number ? `<div class="pgst">GSTIN: ${operator.gst_number}${operator.pan_number ? ' &nbsp;|&nbsp; PAN: ' + operator.pan_number : ''}</div>` : ''}
-    ` : `
-    <div class="ph">Stay Information</div>
-    <div class="pd" style="margin-top:6px">
-      <strong>Room:</strong> ${booking.room?.name || '—'}<br>
-      <strong>Meal Plan:</strong> ${mealLabel}<br>
-      <strong>Guests:</strong> ${booking.adults || 1} Adult${Number(booking.adults || 1) > 1 ? 's' : ''}
-      ${Number(booking.children_below_5) > 0 ? ', ' + booking.children_below_5 + ' Child (0-5, complimentary)' : ''}
-      ${Number(booking.children_5_to_12) > 0 ? ', ' + booking.children_5_to_12 + ' Child (6-12)' : ''}
-      ${Number(booking.extra_beds) > 0 ? ', ' + booking.extra_beds + ' Extra Bed' : ''}
-    </div>
-    `}
+
+    <div class="footer">This is a Computer Generated Invoice</div>
   </div>
-</div>
-
-<!-- STAY BAR -->
-<div class="sbar">
-  <div class="si"><div class="sil">Check-in</div><div class="siv">${checkIn}</div></div>
-  <div class="si"><div class="sil">Check-out</div><div class="siv">${checkOut}</div></div>
-  <div class="si"><div class="sil">Nights</div><div class="siv">${nights}</div></div>
-  <div class="si"><div class="sil">Rooms</div><div class="siv">${booking.rooms_booked || 1}</div></div>
-  <div class="si"><div class="sil">Room Type</div><div class="siv">${booking.room?.name || '—'}</div></div>
-  <div class="si"><div class="sil">Meal Plan</div><div class="siv">${booking.meal_plan || '—'}</div></div>
-</div>
-
-<!-- TABLE -->
-<div class="tbl-wrap">
-  <table>
-    <thead>
-      <tr>
-        <th style="width:32px">#</th>
-        <th>Description of Services</th>
-        <th class="right" style="width:85px">Rate/Night</th>
-        <th class="center" style="width:45px">Qty</th>
-        <th class="center" style="width:50px">Nights</th>
-        <th class="right" style="width:90px">Amount</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${items.map((item, i) => `
-      <tr>
-        <td style="color:#bbb;font-size:11px">${i + 1}</td>
-        <td>
-          <div class="idesc">${item.desc}</div>
-          <div class="isub">SAC: ${RESORT.sacCode} &nbsp;·&nbsp; Hotel Accommodation Services &nbsp;·&nbsp; GST: 5%</div>
-        </td>
-        <td class="right">₹${fmt(item.rate)}</td>
-        <td class="center">${item.qty}</td>
-        <td class="center">${item.nights}</td>
-        <td class="right">₹${fmt(item.amount)}</td>
-      </tr>`).join('')}
-    </tbody>
-  </table>
-</div>
-
-<!-- TOTALS -->
-<div class="totals-wrap">
-  <div class="awords">
-    <div class="awl">Amount in Words</div>
-    <div class="awt">
-      <strong>${numberToWords(Math.round(total))} Rupees Only</strong>
-      ${advance > 0 ? `<br><span style="font-size:11px;color:#888;">Advance: ${numberToWords(Math.round(advance))} Rupees</span>` : ''}
-      ${(!isFullyPaid && balance > 0) ? `<br><span style="color:#c0392b;">Balance Due: ${numberToWords(Math.round(balance))} Rupees</span>` : ''}
-    </div>
-  </div>
-  <table class="ttbl">
-    <tr><td>Taxable Amount</td><td class="amt">₹${fmt(subtotal)}</td></tr>
-    ${isIntraState
-      ? `<tr><td>CGST @ 2.5%</td><td class="amt">₹${fmt(cgst)}</td></tr><tr><td>SGST @ 2.5%</td><td class="amt">₹${fmt(sgst)}</td></tr>`
-      : `<tr><td>IGST @ 5%</td><td class="amt">₹${fmt(igst)}</td></tr>`}
-    <tr class="trow"><td>Total Amount</td><td class="amt">₹${fmt(total)}</td></tr>
-    ${advance > 0 ? `<tr><td style="color:#666">Advance Received</td><td class="amt">₹${fmt(advance)}</td></tr>` : ''}
-    ${(!isFullyPaid && balance > 0) ? `<tr class="brow"><td>Balance Due</td><td class="amt">₹${fmt(balance)}</td></tr>` : (isFullyPaid ? `<tr><td style="color:#27ae60;font-weight:600">✓ Fully Settled</td><td class="amt" style="color:#27ae60">₹0.00</td></tr>` : '')}
-  </table>
-</div>
-
-<!-- FOOTER -->
-<div class="ftr">
-  <div class="terms">
-    <div class="tml">Terms & Conditions</div>
-    <ol>
-      <li>This is a system generated invoice — valid without physical signature.</li>
-      <li>Subject to Uttarkashi jurisdiction only.</li>
-      <li>Check-in: after 3:00 PM &nbsp;|&nbsp; Check-out: before 11:00 AM</li>
-      <li>Cancellation charges applicable as per reservation policy.</li>
-      <li>Tax: ${isIntraState ? 'CGST 2.5% + SGST 2.5% (Intra-State — Uttarakhand)' : 'IGST 5% (Inter-State)'} &nbsp;|&nbsp; SAC: ${RESORT.sacCode}</li>
-    </ol>
-  </div>
-  <div class="sig">
-    <div class="sig-co">For LeafWalk Resort</div>
-    <div class="sig-line"></div>
-    <div class="sig-lbl">Authorized Signatory</div>
-  </div>
-</div>
-<div class="gbar" style="margin-top:10px"></div>
-</div>
-
-<script>
-window.onload = function() {
-  document.title = 'LeafWalk-Invoice-${invoiceNo}';
-  // Wait for fonts to load before printing
-  if (document.fonts && document.fonts.ready) {
-    document.fonts.ready.then(function() {
-      setTimeout(function(){ window.print(); }, 400);
-    });
-  } else {
-    setTimeout(function(){ window.print(); }, 1200);
-  }
-}
-<\/script>
-</body></html>`
+</body>
+</html>`
 }
 
 export function generateGSTBill(booking: any): void {
   const html = buildGSTBillHtml(booking)
   const win = window.open('', '_blank', 'width=960,height=800,toolbar=0,menubar=0')
-  if (!win) { alert('Pop-up blocked! Please allow pop-ups for this site and try again.'); return }
+  if (!win) {
+    alert('Pop-up blocked! Please allow pop-ups for this site and try again.')
+    return
+  }
   win.document.write(html)
   win.document.close()
 }

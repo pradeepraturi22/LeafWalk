@@ -9,7 +9,13 @@ export const COMPANY_DETAILS = {
   email: process.env.COMPANY_EMAIL || "bookings@leafwalk.in",
   gstin: process.env.COMPANY_GSTIN || "",
   pan: process.env.COMPANY_PAN || "",
-  sacCode: "996311"         // SAC for Hotel accommodation services
+  website: process.env.COMPANY_WEBSITE || "www.leafwalk.in",
+  sacCode: "996311",         // SAC for Hotel accommodation services
+  bankAccountName: process.env.COMPANY_BANK_ACCOUNT_NAME || "",
+  bankName: process.env.COMPANY_BANK_NAME || "",
+  accountNumber: process.env.COMPANY_ACCOUNT_NUMBER || "",
+  ifsc: process.env.COMPANY_IFSC || "",
+  branch: process.env.COMPANY_BANK_BRANCH || "",
 }
 
 // GST Rates
