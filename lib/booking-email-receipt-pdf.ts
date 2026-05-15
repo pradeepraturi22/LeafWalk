@@ -34,15 +34,11 @@ type ReceiptBooking = {
   children_below_5?: number | null
   extra_beds?: number | null
   meal_plan?: string | null
-  rate_per_room_per_night?: number | null
-  extra_bed_rate_per_night?: number | null
-  child_rate_per_night?: number | null
   total_amount?: number | null
   subtotal?: number | null
   cgst?: number | null
   sgst?: number | null
   gst_total?: number | null
-  discount_amount?: number | null
   advance_amount?: number | null
   balance_amount?: number | null
   payment_method?: string | null
@@ -204,60 +200,6 @@ function isBillToIntraState(
   return true
 }
 
-function buildInvoiceItems(booking: ReceiptBooking, taxable: number) {
-  const nights = Math.max(1, Number(booking.nights || 0))
-  const rooms = Math.max(1, Number(booking.rooms_booked || 1))
-  const mealLabel = MEAL_LABELS[String(booking.meal_plan || '').toUpperCase()] || clean(booking.meal_plan)
-  const roomName = booking.room?.name || booking.room?.category || 'Room'
-  const items: Array<{ desc: string; sac: string; amount: number; qty: number; nights: number }> = []
-
-  const roomRate = Number(booking.rate_per_room_per_night || 0)
-  if (roomRate > 0) {
-    items.push({
-      desc: `${roomName} - ${mealLabel}`,
-      sac: COMPANY_DETAILS.sacCode || RESORT.sacCode,
-      amount: Math.round(roomRate * rooms * nights * 100) / 100,
-      qty: rooms,
-      nights,
-    })
-  }
-
-  const extraBedRate = Number(booking.extra_bed_rate_per_night || 0)
-  const extraBeds = Number(booking.extra_beds || 0)
-  if (extraBeds > 0 && extraBedRate > 0) {
-    items.push({
-      desc: `Extra Bed - ${mealLabel}`,
-      sac: COMPANY_DETAILS.sacCode || RESORT.sacCode,
-      amount: Math.round(extraBedRate * extraBeds * nights * 100) / 100,
-      qty: extraBeds,
-      nights,
-    })
-  }
-
-  const childRate = Number(booking.child_rate_per_night || 0)
-  const children = Number(booking.children_5_to_12 || 0)
-  if (children > 0 && childRate > 0) {
-    items.push({
-      desc: `Child (6-12 yrs) - ${mealLabel}`,
-      sac: COMPANY_DETAILS.sacCode || RESORT.sacCode,
-      amount: Math.round(childRate * children * nights * 100) / 100,
-      qty: children,
-      nights,
-    })
-  }
-
-  if (items.length === 0 && taxable > 0) {
-    items.push({
-      desc: `${roomName} - ${mealLabel}`,
-      sac: COMPANY_DETAILS.sacCode || RESORT.sacCode,
-      amount: taxable,
-      qty: rooms,
-      nights,
-    })
-  }
-
-  return items
-}
 
 function labelValue(doc: jsPDF, label: string, value: string, x: number, y: number, width: number) {
   doc.setFont('helvetica', 'bold')
@@ -520,10 +462,6 @@ export function createStyledBookingReceiptPdf(
   const taxable = gstMath.subtotal
   const cgst = gstMath.cgst
   const sgst = gstMath.sgst
-  const igst = cgst + sgst
-  const discount = Number(booking.discount_amount || 0)
-  const invoiceItems = buildInvoiceItems(booking, taxable)
-  const grossServiceValue = Math.round((invoiceItems.reduce((sum, item) => sum + item.amount, 0) || taxable + discount) * 100) / 100
   const advance = Number(booking.advance_amount || 0)
   const balance = isFullyPaid ? 0 : Number(booking.balance_amount || 0)
   const source = String(booking.booking_source || 'direct').replace(/_/g, ' ').toUpperCase()
@@ -630,7 +568,7 @@ export function createStyledBookingReceiptPdf(
   labelValue(doc, 'Guests', `${adults} adult(s)`, 126, 138, 24)
   labelValue(doc, 'Source', source, 162, 138, 24)
 
-  sectionLabel(doc, isInvoiceDocument ? 'Invoice Line Items' : 'Room Details', 16, 161)
+  sectionLabel(doc, 'Room Details', 16, 161)
   setDraw(doc, COLORS.border)
   doc.roundedRect(16, 165, 178, 31, 3, 3)
   setFill(doc, COLORS.faint)
@@ -643,46 +581,35 @@ export function createStyledBookingReceiptPdf(
     doc.text('SAC', 142, 171, { align: 'right' })
   }
   doc.text('AMOUNT', 188, 171, { align: 'right' })
-  const primaryItem = invoiceItems[0]
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(10.2)
   setText(doc, COLORS.ink)
-  doc.text(clean(primaryItem?.desc || roomName), 21, 181)
+  doc.text(clean(roomName), 21, 181)
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8.5)
   setText(doc, COLORS.muted)
-  doc.text(`${primaryItem?.qty || rooms} room x ${primaryItem?.nights || nights} nights | ${mealLabel} | ${adults} adult(s)`, 21, 187)
+  doc.text(`${rooms} room x ${nights} nights | ${mealLabel} | ${adults} adult(s)`, 21, 187)
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(9.2)
   setText(doc, COLORS.ink)
   if (isInvoiceDocument) {
-    doc.text(primaryItem?.sac || RESORT.sacCode, 142, 184, { align: 'right' })
+    doc.text(RESORT.sacCode, 142, 184, { align: 'right' })
   }
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(10.2)
   setText(doc, COLORS.ink)
-  doc.text(money(isInvoiceDocument ? Number(primaryItem?.amount || taxable) : total), 188, 184, { align: 'right' })
+  doc.text(money(total), 188, 184, { align: 'right' })
 
   sectionLabel(doc, isInvoiceDocument ? 'GST Invoice Summary' : 'Payment Summary', 16, 207)
   setDraw(doc, COLORS.border)
   doc.roundedRect(16, 211, 86, 50, 3, 3)
   let y = 222
   if (isInvoiceDocument) {
-    if (discount > 0) {
-      tableRow(doc, 'Gross Service Value', money(grossServiceValue), 22, y, 72)
-      y += 8
-      tableRow(doc, 'Less: Discount', money(discount), 22, y, 72)
-      y += 8
-    }
     tableRow(doc, 'Taxable Amount', money(taxable), 22, y, 72)
     y += 8
-    if (isBillToIntraState(invoiceParty, String(COMPANY_DETAILS.gstin || '').slice(0, 2) || '05')) {
-      tableRow(doc, 'CGST @ 2.5%', money(cgst), 22, y, 72)
-      y += 8
-      tableRow(doc, 'SGST @ 2.5%', money(sgst), 22, y, 72)
-    } else {
-      tableRow(doc, 'IGST @ 5%', money(igst), 22, y, 72)
-    }
+    tableRow(doc, 'CGST @ 2.5%', money(cgst), 22, y, 72)
+    y += 8
+    tableRow(doc, 'SGST @ 2.5%', money(sgst), 22, y, 72)
     y += 8
   } else {
     tableRow(doc, 'Booking Total', money(total), 22, y, 72)

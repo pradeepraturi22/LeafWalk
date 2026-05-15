@@ -41,7 +41,7 @@ export default function GSTBillButton({ booking, disabled, primary }: { booking:
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ booking_id: booking.id, output: 'pdf' }),
+        body: JSON.stringify({ booking_id: booking.id, output: 'html' }),
       })
 
       if (!res.ok) {
@@ -49,9 +49,10 @@ export default function GSTBillButton({ booking, disabled, primary }: { booking:
         throw new Error(result?.error || 'Invoice generate nahi hui')
       }
 
-      const pdfBlob = await res.blob()
-      const pdfUrl = URL.createObjectURL(pdfBlob)
-      previewWindow.location.href = pdfUrl
+      const html = await res.text()
+      previewWindow.document.open()
+      previewWindow.document.write(html)
+      previewWindow.document.close()
       previewWindow.focus()
       toast.success('Invoice preview opened successfully')
     } catch (e) {

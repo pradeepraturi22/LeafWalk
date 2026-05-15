@@ -88,8 +88,7 @@ export async function POST(request: NextRequest) {
       .from('bookings')
       .select(`
         id, booking_number, invoice_number, guest_name, guest_email, guest_phone, guest_phone_country, guest_address, guest_district, guest_state, guest_country,
-        check_in, check_out, nights, rooms_booked, adults, meal_plan, rate_per_room_per_night, extra_bed_rate_per_night, child_rate_per_night,
-        total_amount, subtotal, cgst, sgst, gst_total, discount_amount,
+        check_in, check_out, nights, rooms_booked, adults, meal_plan, total_amount, subtotal, cgst, sgst, gst_total,
         advance_amount, balance_amount, payment_status, booking_status, payment_method, created_at,
         gst_invoice_requested, gst_company_name, gst_number, gst_state,
         room:rooms(name, category),
