@@ -1,22 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { generateReceiptAttachment } from '@/lib/email-service'
 import { getSupabaseAdmin } from '@/lib/supabaseServer'
-import { isLocalTestMode } from '@/lib/runtime-mode'
 import { logError } from '@/lib/logger'
 
 export const runtime = 'nodejs'
-
-function getJwtSubjectForLocalFallback(token: string) {
-  try {
-    const payload = token.split('.')[1]
-    if (!payload) return null
-    const decoded = Buffer.from(payload.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8')
-    const parsed = JSON.parse(decoded)
-    return typeof parsed.sub === 'string' ? parsed.sub : null
-  } catch {
-    return null
-  }
-}
 
 async function requireAdmin(request: NextRequest): Promise<{ userId: string; role: string } | null> {
   const token = request.headers.get('authorization')?.replace('Bearer ', '').trim()
@@ -28,9 +15,8 @@ async function requireAdmin(request: NextRequest): Promise<{ userId: string; rol
     if (error || !user) return null
     userId = user.id
   } catch (error) {
-    if (!isLocalTestMode()) return null
-    userId = getJwtSubjectForLocalFallback(token)
-    logError('LOCAL TEST MODE invoice download auth.getUser failed; using local JWT subject fallback', error)
+    logError('Invoice download auth.getUser failed', error)
+    return null
   }
 
   if (!userId) return null

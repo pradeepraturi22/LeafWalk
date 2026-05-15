@@ -22,7 +22,7 @@ export default function PrivacyPage() {
 
           <section>
             <h2 className="font-playfair text-2xl text-white mb-4">1. Introduction</h2>
-            <p>LeafWalk Resort ("we", "us", "our") is committed to protecting your privacy. This policy explains how we collect, use, store, and protect your personal information when you use our website leafwalk.in or make a booking with us.</p>
+            <p>LeafWalk Resort (&quot;we&quot;, &quot;us&quot;, &quot;our&quot;) is committed to protecting your privacy. This policy explains how we collect, use, store, and protect your personal information when you use our website leafwalk.in or make a booking with us.</p>
           </section>
 
           <section>
@@ -100,13 +100,13 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="font-playfair text-2xl text-white mb-4">9. Children's Privacy</h2>
+            <h2 className="font-playfair text-2xl text-white mb-4">9. Children&apos;s Privacy</h2>
             <p>Our services are not directed at children under 18 years of age. We do not knowingly collect personal information from minors without parental consent.</p>
           </section>
 
           <section>
             <h2 className="font-playfair text-2xl text-white mb-4">10. WhatsApp Communication</h2>
-            <p>By providing your phone number during booking, you consent to receiving booking confirmations, reminders, and updates via WhatsApp from LeafWalk Resort. You can opt out at any time by replying "STOP".</p>
+            <p>By providing your phone number during booking, you consent to receiving booking confirmations, reminders, and updates via WhatsApp from LeafWalk Resort. You can opt out at any time by replying &quot;STOP&quot;.</p>
           </section>
 
           <section>

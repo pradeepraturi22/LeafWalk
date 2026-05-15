@@ -5,6 +5,8 @@ import { supabase } from '@/lib/supabaseClient'
 import Link from 'next/link'
 import toast, { Toaster } from 'react-hot-toast'
 import ReceiptButton from '@/components/ReceiptButton'
+import { INDIA_STATE_CODE_OPTIONS } from '@/lib/india-state-codes'
+import { getIndiaStateCodeByName } from '@/lib/india-state-codes'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const MEAL_PLANS = [
@@ -22,13 +24,15 @@ const COUNTRIES = [
   'South Korea','Sri Lanka','Thailand','UAE','UK','USA','Other',
 ]
 
+type SelectOption = string | { value: string; label: string }
+
 const S = 'w-full px-4 py-3 bg-[#1a1a1a] border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:border-[#c9a14a] placeholder:text-white/30'
 const LBL = 'block text-white/60 text-xs mb-1.5'
 const SEL = 'w-full px-4 py-3 bg-[#1a1a1a] border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:border-[#c9a14a] [&>option]:bg-[#1a1a1a]'
 
 // ── Searchable Dropdown ───────────────────────────────────────────────────────
 function SearchSelect({ options, value, onChange, placeholder, disabled = false }: {
-  options: string[], value: string, onChange: (v: string) => void,
+  options: SelectOption[], value: string, onChange: (v: string) => void,
   placeholder?: string, disabled?: boolean,
 }) {
   const [open, setOpen] = useState(false)
@@ -63,7 +67,10 @@ function SearchSelect({ options, value, onChange, placeholder, disabled = false 
     }
   }, [open])
 
-  const filtered = options.filter(o => o.toLowerCase().includes(q.toLowerCase()))
+  const normalizedOptions = options.map(option =>
+    typeof option === 'string' ? { value: option, label: option } : option
+  )
+  const filtered = normalizedOptions.filter(option => option.label.toLowerCase().includes(q.toLowerCase()))
 
   return (
     <div ref={ref} className="relative">
@@ -97,10 +104,10 @@ function SearchSelect({ options, value, onChange, placeholder, disabled = false 
           </div>
           <div className="max-h-52 overflow-y-auto">
             {filtered.map(opt => (
-              <div key={opt}
-                onClick={() => { onChange(opt); setOpen(false); setQ('') }}
-                className={`px-4 py-2.5 text-sm cursor-pointer transition-colors ${opt === value ? 'bg-[#c9a14a]/20 text-[#c9a14a]' : 'text-white/70 hover:bg-white/5 hover:text-white'}`}>
-                {opt}
+              <div key={opt.value}
+                onClick={() => { onChange(opt.value); setOpen(false); setQ('') }}
+                className={`px-4 py-2.5 text-sm cursor-pointer transition-colors ${opt.value === value ? 'bg-[#c9a14a]/20 text-[#c9a14a]' : 'text-white/70 hover:bg-white/5 hover:text-white'}`}>
+                {opt.label}
               </div>
             ))}
             {filtered.length === 0 && <div className="px-4 py-3 text-white/30 text-sm">No results</div>}
@@ -135,7 +142,7 @@ function NumInput({ value, onChange, min = 0, max, className = '', disabled = fa
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function WalkInBooking() {
   const [rooms,          setRooms]          = useState<any[]>([])
-  const [states,         setStates]         = useState<string[]>([])
+  const [states,         setStates]         = useState<{ value: string; label: string }[]>([])
   const [districts,      setDistricts]      = useState<string[]>([])
   const [submitting,     setSubmitting]     = useState(false)
   const [rateInfo,       setRateInfo]       = useState<any>(null)
@@ -196,8 +203,7 @@ export default function WalkInBooking() {
   }
 
   async function loadStates() {
-    const { data } = await supabase.from('indian_states').select('name').order('name')
-    setStates((data || []).map((s: any) => s.name))
+    setStates(INDIA_STATE_CODE_OPTIONS.map(option => ({ value: option.name, label: option.label })))
   }
 
   // ── Districts when state changes ──────────────────────────────────────────
@@ -319,8 +325,12 @@ export default function WalkInBooking() {
   const subtotal      = Math.round(grossAmt / 1.05 * 100) / 100
   const cgst          = Math.round((grossAmt - subtotal) / 2 * 100) / 100
   const sgst          = cgst
+  const gstTotal      = cgst + sgst
   const totalAmount   = grossAmt
   const balanceAmt    = Math.max(0, totalAmount - form.advance_amount)
+  const billToStateName = gstWanted && form.gst_company_name.trim() ? form.gst_state : form.guest_state
+  const billToStateCode = getIndiaStateCodeByName(billToStateName)
+  const isIntraStateBilling = !billToStateCode || billToStateCode === '05'
   const maxRoomsAllowed = Math.max(1, Number(availability?.available_rooms || selRoom?.total_rooms || 1))
   const maxAdultsAllowed = Math.max(1, form.rooms_booked * 4)
   const autoExtraBeds = Math.min(Math.max(0, form.adults - (form.rooms_booked * 2)), form.rooms_booked * 2)
@@ -394,7 +404,7 @@ export default function WalkInBooking() {
         booking_status: mode === 'walk_in' ? 'checked_in' : 'confirmed',
         rate_per_room_per_night: form.rate_per_room_per_night,
         extra_bed_rate_per_night: form.extra_bed_rate, child_rate_per_night: form.child_rate,
-        subtotal, cgst, sgst, gst_total: cgst + sgst, total_amount: totalAmount,
+        subtotal, cgst, sgst, gst_total: gstTotal, total_amount: totalAmount,
         payment_method: form.payment_method, payment_status: form.payment_status,
         advance_amount: form.advance_amount, balance_amount: balanceAmt,
         payment_ref: form.payment_ref || null, payment_date: form.payment_date || null,
@@ -745,8 +755,14 @@ export default function WalkInBooking() {
                 )}
                 <div className="border-t border-white/10 pt-2 space-y-1 text-xs text-white/40">
                   <div className="flex justify-between"><span>Subtotal (excl. GST 5%)</span><span>₹{subtotal.toLocaleString()}</span></div>
-                  <div className="flex justify-between"><span>CGST @ 2.5%</span><span>₹{cgst.toLocaleString()}</span></div>
-                  <div className="flex justify-between"><span>SGST @ 2.5%</span><span>₹{sgst.toLocaleString()}</span></div>
+                  {isIntraStateBilling ? (
+                    <>
+                      <div className="flex justify-between"><span>CGST @ 2.5%</span><span>₹{cgst.toLocaleString()}</span></div>
+                      <div className="flex justify-between"><span>SGST @ 2.5%</span><span>₹{sgst.toLocaleString()}</span></div>
+                    </>
+                  ) : (
+                    <div className="flex justify-between"><span>IGST @ 5%</span><span>₹{(cgst + sgst).toLocaleString()}</span></div>
+                  )}
                 </div>
                 <div className="border-t border-white/10 pt-2 flex justify-between font-bold">
                   <span className="text-white">Total Amount</span>
@@ -845,7 +861,7 @@ export default function WalkInBooking() {
 
             {canUseGstInvoice && gstWanted && !isWalkIn && !gstConfirmed && (
               <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl text-sm text-blue-300">
-                📋 GST details fill karne ke liye pehle <b>"Next: Enter GST Details"</b> click karo
+                📋 GST details fill karne ke liye pehle <b>&quot;Next: Enter GST Details&quot;</b> click karo
               </div>
             )}
 

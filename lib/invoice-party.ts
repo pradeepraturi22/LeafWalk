@@ -1,3 +1,5 @@
+import { getIndiaStateCodeByName } from '@/lib/india-state-codes'
+
 export type InvoicePartyBookingLike = {
   booking_source?: string | null
   guest_name?: string | null
@@ -49,8 +51,8 @@ function deriveStateCode(gstNumber?: string | null) {
   return match ? match[1] : null
 }
 
-function deriveUttarakhandFallbackStateCode(state?: string | null) {
-  return clean(state).toLowerCase().includes('uttarakhand') ? '05' : null
+function deriveStateCodeFromName(state?: string | null) {
+  return getIndiaStateCodeByName(state)
 }
 
 function buildGuestAddress(booking: InvoicePartyBookingLike) {
@@ -93,7 +95,7 @@ export function getInvoicePartyMeta(booking: InvoicePartyBookingLike): InvoicePa
   const operatorAddress = buildOperatorAddress(booking) || null
   const operatorGstNumber = clean(operator?.gst_number) || null
   const operatorState = clean(operator?.state) || null
-  const operatorStateCode = deriveStateCode(operatorGstNumber)
+  const operatorStateCode = deriveStateCode(operatorGstNumber) || deriveStateCodeFromName(operatorState)
 
   if (isFullyPaid && bookingSource === 'tour_operator' && operatorName) {
     return {
@@ -118,7 +120,7 @@ export function getInvoicePartyMeta(booking: InvoicePartyBookingLike): InvoicePa
       address: guestAddress,
       gstNumber: clean(booking.gst_number) || null,
       gstState: clean(booking.gst_state) || clean(booking.guest_state) || null,
-      stateCode: deriveStateCode(booking.gst_number) || deriveUttarakhandFallbackStateCode(booking.gst_state || booking.guest_state),
+      stateCode: deriveStateCode(booking.gst_number) || deriveStateCodeFromName(booking.gst_state || booking.guest_state),
       panNumber: null,
       usesCompanyName: true,
       isTourOperatorInvoice: false,
@@ -132,7 +134,7 @@ export function getInvoicePartyMeta(booking: InvoicePartyBookingLike): InvoicePa
     address: guestAddress,
     gstNumber: null,
     gstState: clean(booking.guest_state) || null,
-    stateCode: deriveUttarakhandFallbackStateCode(booking.guest_state),
+    stateCode: deriveStateCodeFromName(booking.guest_state),
     panNumber: null,
     usesCompanyName: false,
     isTourOperatorInvoice: false,

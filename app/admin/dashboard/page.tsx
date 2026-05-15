@@ -253,7 +253,7 @@ export default function AdminDashboard() {
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Today */}
           <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-            <h2 className="text-white font-semibold mb-4">Today's Activity</h2>
+            <h2 className="text-white font-semibold mb-4">Today&apos;s Activity</h2>
             {todayAct.checkIns?.length > 0 && <>
               <p className="text-green-400 text-xs font-semibold uppercase mb-2">Check-ins ({todayAct.checkIns.length})</p>
               {todayAct.checkIns.slice(0,4).map((b:any) => (

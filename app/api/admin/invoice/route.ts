@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { generateReceiptAttachment } from '@/lib/email-service'
 import { getSupabaseAdmin } from '@/lib/supabaseServer'
-import { isLocalTestMode } from '@/lib/runtime-mode'
 import { logError } from '@/lib/logger'
 import { buildGSTBillHtml } from '@/lib/gst-bill-generator'
 
@@ -12,18 +11,6 @@ const schema = z.object({
   booking_id: z.string().uuid(),
   output: z.enum(['pdf', 'html']).optional(),
 })
-
-function getJwtSubjectForLocalFallback(token: string) {
-  try {
-    const payload = token.split('.')[1]
-    if (!payload) return null
-    const decoded = Buffer.from(payload.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8')
-    const parsed = JSON.parse(decoded)
-    return typeof parsed.sub === 'string' ? parsed.sub : null
-  } catch {
-    return null
-  }
-}
 
 async function requireAdmin(request: NextRequest): Promise<{ userId: string; role: string } | null> {
   const token = request.headers.get('authorization')?.replace('Bearer ', '').trim()
@@ -35,9 +22,8 @@ async function requireAdmin(request: NextRequest): Promise<{ userId: string; rol
     if (error || !user) return null
     userId = user.id
   } catch (error) {
-    if (!isLocalTestMode()) return null
-    userId = getJwtSubjectForLocalFallback(token)
-    logError('LOCAL TEST MODE invoice POST auth.getUser failed; using local JWT subject fallback', error)
+    logError('Invoice POST auth.getUser failed', error)
+    return null
   }
 
   if (!userId) return null

@@ -10,7 +10,7 @@ type PlaywrightLike = {
 }
 
 async function loadPlaywright(): Promise<PlaywrightLike> {
-  const dynamicImport = new Function('specifier', 'return import(specifier)') as (specifier: string) => Promise<any>
+  const dynamicImport = (specifier: string) => import(/* webpackIgnore: true */ specifier)
 
   try {
     return await dynamicImport('playwright') as PlaywrightLike

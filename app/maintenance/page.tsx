@@ -126,10 +126,10 @@ export default function MaintenancePage() {
         {/* Heading + subtext */}
         <div className="mnt-fi3">
           <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 'clamp(1.5rem, 3.5vw, 2.1rem)', fontWeight: 400, fontStyle: 'italic', color: '#e8e2d8', textAlign: 'center', lineHeight: 1.3, marginBottom: '1rem' }}>
-            We're preparing something special
+            We&apos;re preparing something special
           </div>
           <p style={{ fontSize: '0.875rem', fontWeight: 300, color: '#ffffff55', textAlign: 'center', letterSpacing: '0.04em', maxWidth: 380, lineHeight: 1.7, margin: '0 auto 2rem' }}>
-            Our website is being refreshed with a new experience. We'll be back shortly — meantime, reach us directly for bookings.
+            Our website is being refreshed with a new experience. We&apos;ll be back shortly — meantime, reach us directly for bookings.
           </p>
         </div>
 

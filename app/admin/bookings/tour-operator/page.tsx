@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import toast, { Toaster } from 'react-hot-toast'
+import { getIndiaStateCodeByName } from '@/lib/india-state-codes'
 
 const MEAL_PLANS = [
   { value: 'EP', label: 'EP — Room Only' },
@@ -253,6 +254,8 @@ export default function TourOperatorBooking() {
   const grandCgst = calcs.reduce((s, c) => s + c.cgst, 0)
   const grandSgst = calcs.reduce((s, c) => s + c.sgst, 0)
   const grandGst = grandCgst + grandSgst
+  const selectedOperatorStateCode = getIndiaStateCodeByName(selectedOperator?.state)
+  const isIntraStateBilling = !selectedOperatorStateCode || selectedOperatorStateCode === '05'
   const commission = Math.round(grandTotal * form.commission_rate / 100 * 100) / 100
   const netAmt = grandTotal - commission
   const balance = Math.max(0, grandTotal - form.advance_amount)
@@ -640,11 +643,18 @@ export default function TourOperatorBooking() {
                 })}
                 <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-[11px] text-white/45">
                   Tax mode: {form.calculate_gst ? (form.price_includes_tax ? 'GST included in entered rates' : 'GST added over entered rates') : 'GST not calculated'}
+                  {form.calculate_gst ? ` · ${isIntraStateBilling ? 'Bill To state Uttarakhand: CGST + SGST' : 'Bill To outside Uttarakhand: IGST'}` : ''}
                 </div>
                 <div className="border-t border-white/10 pt-2 space-y-1">
                   <div className="flex justify-between text-white/40 text-xs"><span>Subtotal (excl. GST)</span><span>₹{grandSub.toFixed(2)}</span></div>
-                  <div className="flex justify-between text-white/40 text-xs"><span>CGST @ 2.5%</span><span>₹{grandCgst.toFixed(2)}</span></div>
-                  <div className="flex justify-between text-white/40 text-xs"><span>SGST @ 2.5%</span><span>₹{grandSgst.toFixed(2)}</span></div>
+                  {isIntraStateBilling ? (
+                    <>
+                      <div className="flex justify-between text-white/40 text-xs"><span>CGST @ 2.5%</span><span>₹{grandCgst.toFixed(2)}</span></div>
+                      <div className="flex justify-between text-white/40 text-xs"><span>SGST @ 2.5%</span><span>₹{grandSgst.toFixed(2)}</span></div>
+                    </>
+                  ) : (
+                    <div className="flex justify-between text-white/40 text-xs"><span>IGST @ 5%</span><span>₹{(grandCgst + grandSgst).toFixed(2)}</span></div>
+                  )}
                 </div>
                 <div className="border-t border-white/10 pt-2 flex justify-between text-white font-bold">
                   <span>Total Booking Amount</span><span>₹{grandTotal.toLocaleString()}</span>

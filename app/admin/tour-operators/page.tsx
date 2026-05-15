@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabaseClient'
 import AdminNavbar from '@/components/AdminNavbar'
 import toast, { Toaster } from 'react-hot-toast'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { INDIA_STATE_CODE_OPTIONS, getIndiaStateCodeByName } from '@/lib/india-state-codes'
 
 interface TourOperator {
   id: string
@@ -269,7 +270,12 @@ export default function TourOperatorsPage() {
                   </div>
                   <div>
                     <label className="block text-sm text-white/70 mb-2">State *</label>
-                    <input type="text" name="state" value={formData.state} onChange={handleInputChange} required className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#c9a14a]" />
+                    <select name="state" value={formData.state} onChange={handleInputChange} required className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#c9a14a]">
+                      <option value="">Select state</option>
+                      {INDIA_STATE_CODE_OPTIONS.map(option => (
+                        <option key={option.code} value={option.name}>{option.label}</option>
+                      ))}
+                    </select>
                   </div>
                   <div>
                     <label className="block text-sm text-white/70 mb-2">Commission Rate (%) *</label>
@@ -316,7 +322,7 @@ export default function TourOperatorsPage() {
                     <tr key={operator.id} className="border-b border-white/5 hover:bg-white/5">
                       <td className="px-6 py-4">
                         <p className="text-white font-medium">{operator.company_name}</p>
-                        <p className="text-white/50 text-sm">{operator.city}, {operator.state}</p>
+                        <p className="text-white/50 text-sm">{operator.city}, {operator.state}{getIndiaStateCodeByName(operator.state) ? ` (${getIndiaStateCodeByName(operator.state)})` : ''}</p>
                       </td>
                       <td className="px-6 py-4">
                         <p className="text-white text-sm">{operator.contact_person}</p>

@@ -23,7 +23,7 @@ export default function TermsPage() {
 
           <section>
             <h2 className="font-playfair text-2xl text-white mb-4">1. Acceptance of Terms</h2>
-            <p>By making a booking at LeafWalk Resort (hereinafter "the Resort") through our website leafwalk.in, by phone, WhatsApp, or any other channel, you agree to be bound by these Terms & Conditions. Please read them carefully before booking.</p>
+            <p>By making a booking at LeafWalk Resort (hereinafter &quot;the Resort&quot;) through our website leafwalk.in, by phone, WhatsApp, or any other channel, you agree to be bound by these Terms &amp; Conditions. Please read them carefully before booking.</p>
           </section>
 
           <section id="checkin">
@@ -112,7 +112,7 @@ export default function TermsPage() {
 
           <section>
             <h2 className="font-playfair text-2xl text-white mb-4">8. Liability</h2>
-            <p>LeafWalk Resort shall not be liable for any indirect, incidental, or consequential damages. Trekking, outdoor activities, and adventure sports are undertaken at the guest's own risk. The Resort recommends adequate travel insurance.</p>
+            <p>LeafWalk Resort shall not be liable for any indirect, incidental, or consequential damages. Trekking, outdoor activities, and adventure sports are undertaken at the guest&apos;s own risk. The Resort recommends adequate travel insurance.</p>
           </section>
 
           <section>

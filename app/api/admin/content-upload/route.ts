@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { randomUUID } from 'crypto'
 import { getSupabaseAdmin } from '@/lib/supabaseServer'
-import { isLocalTestMode } from '@/lib/runtime-mode'
 import { logError } from '@/lib/logger'
 
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024
@@ -15,18 +14,6 @@ type UploadInput = {
   bytes: Buffer
 }
 
-function getJwtSubjectForLocalFallback(token: string) {
-  try {
-    const payload = token.split('.')[1]
-    if (!payload) return null
-    const decoded = Buffer.from(payload.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8')
-    const parsed = JSON.parse(decoded)
-    return typeof parsed.sub === 'string' ? parsed.sub : null
-  } catch {
-    return null
-  }
-}
-
 async function requireAdmin(request: NextRequest): Promise<boolean> {
   const token = request.headers.get('authorization')?.replace('Bearer ', '').trim()
   if (!token) return false
@@ -37,9 +24,8 @@ async function requireAdmin(request: NextRequest): Promise<boolean> {
     if (error || !user) return false
     userId = user.id
   } catch (error) {
-    if (!isLocalTestMode()) return false
-    userId = getJwtSubjectForLocalFallback(token)
-    logError('LOCAL TEST MODE content upload auth.getUser failed; using local JWT subject fallback', error)
+    logError('Content upload auth.getUser failed', error)
+    return false
   }
 
   if (!userId) return false
