@@ -271,22 +271,12 @@ export function buildGSTBillHtml(booking: any): string {
     </div>
   </div>
   <div class="party-cell">
-    ${operator ? `
-    <div class="ph">Tour Operator Details</div>
-    <div class="pn">${operator.company_name}</div>
-    <div class="pd">
-      ${operator.contact_person ? 'Attn: ' + operator.contact_person + '<br>' : ''}
-      ${operator.address ? operator.address + (operator.city ? ', ' + operator.city : '') + (operator.state ? ', ' + operator.state : '') : ''}
-    </div>
-    ${operator.gst_number ? `<div class="pgst">GSTIN: ${operator.gst_number}${operator.state ? ' &nbsp;|&nbsp; State: ' + operator.state : ''}</div>` : ''}
-    ` : `
     <div class="ph">Stay Information</div>
     <div class="pd" style="margin-top:6px">
       <strong>Room:</strong> ${booking.room?.name || '-'}<br>
       <strong>Meal Plan:</strong> ${mealLabel}<br>
       <strong>Stay:</strong> ${nights} Night${nights === 1 ? '' : 's'} · ${booking.rooms_booked || 1} Room${Number(booking.rooms_booked || 1) === 1 ? '' : 's'}
     </div>
-    `}
   </div>
 </div>
 
