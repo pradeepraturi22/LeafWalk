@@ -117,10 +117,29 @@ export function buildGSTBillHtml(booking: any): string {
   const cgst = gstMath.cgst
   const sgst = gstMath.sgst
   const igst = cgst + sgst
+  const storedDiscount = Number(booking.discount_amount || 0)
   const advance = Number(booking.advance_amount || 0)
   const rawBalance = Number(booking.balance_amount || 0)
   const isFullyPaid = booking.payment_status === 'fully_paid'
   const balance = isFullyPaid ? 0 : rawBalance
+
+  const grossLineAmount = items.reduce((sum, item) => sum + Number(item.amount || 0), 0)
+  const derivedDiscount = grossLineAmount > subtotal ? Math.round((grossLineAmount - subtotal) * 100) / 100 : 0
+  const discountBeforeTax = storedDiscount > 0 ? storedDiscount : derivedDiscount
+
+  if (items.length === 0 && subtotal > 0) {
+    const fallbackQty = Math.max(1, roomQty)
+    const fallbackNights = Math.max(1, nights)
+    const fallbackAmount = subtotal
+    const fallbackRate = fallbackAmount / (fallbackQty * fallbackNights)
+    items.push({
+      desc: `${booking.room?.name || 'Room'} - ${mealLabel}`,
+      rate: Number.isFinite(fallbackRate) ? fallbackRate : fallbackAmount,
+      qty: fallbackQty,
+      nights: fallbackNights,
+      amount: fallbackAmount,
+    })
+  }
 
   const bankLines = [
     COMPANY_DETAILS.bankAccountName ? `Account Name: ${COMPANY_DETAILS.bankAccountName}` : '',
@@ -344,6 +363,8 @@ export function buildGSTBillHtml(booking: any): string {
     </div>
   </div>
   <table class="ttbl">
+    ${discountBeforeTax > 0 ? `<tr><td>Gross Service Value</td><td class="amt">Rs.${fmt(subtotal + discountBeforeTax)}</td></tr>` : ''}
+    ${discountBeforeTax > 0 ? `<tr><td>Less: Discount (Before Tax)</td><td class="amt">Rs.${fmt(discountBeforeTax)}</td></tr>` : ''}
     <tr><td>Taxable Amount</td><td class="amt">Rs.${fmt(subtotal)}</td></tr>
     ${isIntraState
       ? `<tr><td>CGST @ 2.5%</td><td class="amt">Rs.${fmt(cgst)}</td></tr><tr><td>SGST @ 2.5%</td><td class="amt">Rs.${fmt(sgst)}</td></tr>`
