@@ -145,7 +145,6 @@ export function buildGSTBillHtml(booking: any): string {
   .pn{font-size:15px;font-weight:700;color:#1a1a1a;margin-bottom:4px;line-height:1.35}
   .pd{color:#555;font-size:11.5px;line-height:1.75}
   .pgst{margin-top:7px;padding:5px 10px;background:#fffbf0;border:1px solid #f0e0a0;border-radius:4px;font-size:10.5px;color:#7a5a08;font-weight:500}
-  .party-note{margin-top:7px;font-size:10px;color:#8b6914;letter-spacing:.8px;text-transform:uppercase;font-weight:700}
   .sbar{background:linear-gradient(180deg,#fcfcfc 0%,#f7f5ef 100%);border-bottom:1px solid #ebebeb;padding:11px 32px;display:flex;gap:0;align-items:stretch}
   .si{flex:1;text-align:center;padding:0 12px;border-right:1px solid #e5e5e5}
   .si:last-child{border-right:none}
@@ -208,7 +207,7 @@ export function buildGSTBillHtml(booking: any): string {
     <div class="rcontact">
       ${RESORT.address}, ${RESORT.city}, ${RESORT.state}${RESORT.pincode ? ` - ${RESORT.pincode}` : ''}<br>
       Phone: ${RESORT.phone} &nbsp;|&nbsp; Email: ${RESORT.email} &nbsp;|&nbsp; Web: ${RESORT.website}<br>
-      <span class="hl">GSTIN: ${RESORT.gstin}</span> &nbsp;|&nbsp; PAN: ${RESORT.pan} &nbsp;|&nbsp; SAC: ${RESORT.sacCode}
+      <span class="hl">GSTIN: ${RESORT.gstin}</span> &nbsp;|&nbsp; SAC: ${RESORT.sacCode}
     </div>
   </div>
   <div class="inv-badge">
@@ -256,10 +255,8 @@ export function buildGSTBillHtml(booking: any): string {
       ${operatorInvoiceParty.email ? 'Email: ' + operatorInvoiceParty.email + '<br>' : ''}
       ${operatorInvoiceParty.address ? 'Address: ' + operatorInvoiceParty.address + '<br>' : ''}
       ${operatorInvoiceParty.gstNumber ? 'GSTIN: ' + operatorInvoiceParty.gstNumber + '<br>' : ''}
-      ${operatorInvoiceParty.gstState ? 'State: ' + operatorInvoiceParty.gstState + (operatorInvoiceParty.stateCode ? ` (${operatorInvoiceParty.stateCode})` : '') + '<br>' : ''}
-      ${operatorInvoiceParty.panNumber ? 'PAN: ' + operatorInvoiceParty.panNumber : ''}
+      ${operatorInvoiceParty.gstState ? 'State: ' + operatorInvoiceParty.gstState + (operatorInvoiceParty.stateCode ? ` (${operatorInvoiceParty.stateCode})` : '') : ''}
     </div>
-    ${booking.booking_source === 'tour_operator' ? '<div class="party-note">Tour Operator Billing Party</div>' : ''}
   </div>
   <div class="party-cell">
     ${operator ? `
@@ -267,20 +264,15 @@ export function buildGSTBillHtml(booking: any): string {
     <div class="pn">${operator.company_name}</div>
     <div class="pd">
       ${operator.contact_person ? 'Attn: ' + operator.contact_person + '<br>' : ''}
-      ${operator.address ? operator.address + (operator.city ? ', ' + operator.city : '') + (operator.state ? ', ' + operator.state : '') + '<br>' : ''}
-      ${operator.phone ? 'Phone: ' + operator.phone + '<br>' : ''}
-      ${operator.email ? 'Email: ' + operator.email : ''}
+      ${operator.address ? operator.address + (operator.city ? ', ' + operator.city : '') + (operator.state ? ', ' + operator.state : '') : ''}
     </div>
-    ${operator.gst_number ? `<div class="pgst">GSTIN: ${operator.gst_number}${operator.pan_number ? ' &nbsp;|&nbsp; PAN: ' + operator.pan_number : ''}</div>` : ''}
+    ${operator.gst_number ? `<div class="pgst">GSTIN: ${operator.gst_number}${operator.state ? ' &nbsp;|&nbsp; State: ' + operator.state : ''}</div>` : ''}
     ` : `
     <div class="ph">Stay Information</div>
     <div class="pd" style="margin-top:6px">
       <strong>Room:</strong> ${booking.room?.name || '-'}<br>
       <strong>Meal Plan:</strong> ${mealLabel}<br>
-      <strong>Guests:</strong> ${booking.adults || 1} Adult${Number(booking.adults || 1) > 1 ? 's' : ''}
-      ${Number(booking.children_below_5) > 0 ? ', ' + booking.children_below_5 + ' Child (0-5, complimentary)' : ''}
-      ${Number(booking.children_5_to_12) > 0 ? ', ' + booking.children_5_to_12 + ' Child (6-12)' : ''}
-      ${Number(booking.extra_beds) > 0 ? ', ' + booking.extra_beds + ' Extra Bed' : ''}
+      <strong>Stay:</strong> ${nights} Night${nights === 1 ? '' : 's'} · ${booking.rooms_booked || 1} Room${Number(booking.rooms_booked || 1) === 1 ? '' : 's'}
     </div>
     `}
   </div>

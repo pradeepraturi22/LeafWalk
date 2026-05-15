@@ -18,6 +18,20 @@ export default function GSTBillButton({ booking, disabled, primary }: { booking:
       return
     }
 
+    const previewWindow = window.open(
+      '',
+      'leafwalk-invoice-preview',
+      'width=1100,height=850,menubar=no,toolbar=no,location=no,status=no,scrollbars=yes,resizable=yes'
+    )
+    if (!previewWindow) {
+      toast.error('Invoice preview open nahi hui. Browser pop-up allow kijiye.')
+      return
+    }
+
+    previewWindow.document.open()
+    previewWindow.document.write('<!DOCTYPE html><html><head><title>Opening Invoice...</title></head><body style="font-family:Arial,sans-serif;padding:24px;color:#555">Opening invoice preview...</body></html>')
+    previewWindow.document.close()
+
     setGenerating(true)
     try {
       const token = await getToken()
@@ -36,21 +50,13 @@ export default function GSTBillButton({ booking, disabled, primary }: { booking:
       }
 
       const html = await res.text()
-      const previewWindow = window.open(
-        '',
-        'leafwalk-invoice-preview',
-        'width=1100,height=850,menubar=no,toolbar=no,location=no,status=no,scrollbars=yes,resizable=yes'
-      )
-      if (!previewWindow) {
-        throw new Error('Invoice preview open nahi hui. Browser pop-up allow kijiye.')
-      }
-
       previewWindow.document.open()
       previewWindow.document.write(html)
       previewWindow.document.close()
       previewWindow.focus()
       toast.success('Invoice preview opened successfully')
     } catch (e) {
+      previewWindow.close()
       console.error(e)
       toast.error(e instanceof Error ? e.message : 'Invoice preview open nahi hui')
     } finally {
@@ -76,8 +82,8 @@ export default function GSTBillButton({ booking, disabled, primary }: { booking:
           }`}
       >
         {generating
-          ? <><span className="animate-spin inline-block">O</span> Opening...</>
-          : <><span>D</span> {canGenerate ? 'Open Invoice' : 'Invoice (After Full Payment)'}</>
+          ? <>Opening...</>
+          : <>{canGenerate ? 'Open Invoice' : 'Invoice (After Full Payment)'}</>
         }
       </button>
       {!canGenerate && (

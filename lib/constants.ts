@@ -7,7 +7,7 @@ export const COMPANY_DETAILS = {
   pincode: process.env.COMPANY_PINCODE || "249130",
   phone: process.env.COMPANY_PHONE || "+91 8630227541",
   email: process.env.COMPANY_EMAIL || "bookings@leafwalk.in",
-  gstin: process.env.COMPANY_GSTIN || "",
+  gstin: process.env.COMPANY_GSTIN || "05BFOPR6010R1ZU",
   pan: process.env.COMPANY_PAN || "",
   website: process.env.COMPANY_WEBSITE || "www.leafwalk.in",
   sacCode: "996311",         // SAC for Hotel accommodation services
