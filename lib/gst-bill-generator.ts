@@ -44,6 +44,20 @@ function fmt(n: number) {
   return Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
+function isUttarakhandState(value?: string | null) {
+  return String(value || '').trim().toLowerCase().includes('uttarakhand')
+}
+
+function isBillToIntraState(
+  billTo: { stateCode?: string | null; gstState?: string | null },
+  sellerStateCode: string
+) {
+  const buyerStateCode = String(billTo.stateCode || '').trim()
+  if (buyerStateCode) return buyerStateCode === sellerStateCode
+  if (billTo.gstState) return isUttarakhandState(billTo.gstState)
+  return true
+}
+
 export function buildGSTBillHtml(booking: any): string {
   const checkIn = formatDate(booking.check_in)
   const checkOut = formatDate(booking.check_out)
@@ -68,10 +82,8 @@ export function buildGSTBillHtml(booking: any): string {
       }
     : invoiceParty
 
-  const isIntraState = booking.booking_source === 'tour_operator'
-    ? !(operatorInvoiceParty.stateCode && String(operatorInvoiceParty.stateCode) !== '05')
-    : (!booking.guest_state || booking.booking_source === 'walk_in' ||
-      String(booking.guest_state || '').toLowerCase().includes('uttarakhand'))
+  const sellerStateCode = String(RESORT.gstin || '').slice(0, 2) || '05'
+  const isIntraState = isBillToIntraState(operatorInvoiceParty, sellerStateCode)
 
   const items: { desc: string; rate: number; qty: number; nights: number; amount: number }[] = []
   const roomRate = Number(booking.rate_per_room_per_night || 0)

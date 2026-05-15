@@ -186,6 +186,20 @@ function sectionLabel(doc: jsPDF, label: string, x: number, y: number) {
   doc.text(label.toUpperCase(), x, y)
 }
 
+function isUttarakhandState(value?: string | null) {
+  return String(value || '').trim().toLowerCase().includes('uttarakhand')
+}
+
+function isBillToIntraState(
+  billTo: { stateCode?: string | null; gstState?: string | null },
+  sellerStateCode: string
+) {
+  const buyerStateCode = String(billTo.stateCode || '').trim()
+  if (buyerStateCode) return buyerStateCode === sellerStateCode
+  if (billTo.gstState) return isUttarakhandState(billTo.gstState)
+  return true
+}
+
 function labelValue(doc: jsPDF, label: string, value: string, x: number, y: number, width: number) {
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(7.5)
@@ -223,8 +237,8 @@ function createStructuredInvoicePdf(doc: jsPDF, booking: ReceiptBooking, invoice
   const roomName = booking.room?.name || booking.room?.category || 'Accommodation'
   const bookingRef = booking.booking_number || booking.id.slice(0, 8).toUpperCase()
   const buyerStateCode = invoiceParty.stateCode || ''
-  const sellerStateCode = String(COMPANY_DETAILS.gstin || '').slice(0, 2)
-  const isIntraState = !buyerStateCode || !sellerStateCode || buyerStateCode === sellerStateCode
+  const sellerStateCode = String(COMPANY_DETAILS.gstin || '').slice(0, 2) || '05'
+  const isIntraState = isBillToIntraState(invoiceParty, sellerStateCode)
   const taxRateLabel = isIntraState ? 'CGST 2.5% + SGST 2.5%' : 'IGST 5%'
   const amountWords = `${clean(total ? `${Number(total).toLocaleString('en-IN', { maximumFractionDigits: 2, minimumFractionDigits: 2 })}` : '0.00')} INR`
   const bankLines = [

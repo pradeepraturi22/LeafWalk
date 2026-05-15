@@ -49,6 +49,10 @@ function deriveStateCode(gstNumber?: string | null) {
   return match ? match[1] : null
 }
 
+function deriveUttarakhandFallbackStateCode(state?: string | null) {
+  return clean(state).toLowerCase().includes('uttarakhand') ? '05' : null
+}
+
 function buildGuestAddress(booking: InvoicePartyBookingLike) {
   return [
     clean(booking.guest_address),
@@ -113,8 +117,8 @@ export function getInvoicePartyMeta(booking: InvoicePartyBookingLike): InvoicePa
       phone: guestPhone,
       address: guestAddress,
       gstNumber: clean(booking.gst_number) || null,
-      gstState: clean(booking.gst_state) || null,
-      stateCode: deriveStateCode(booking.gst_number),
+      gstState: clean(booking.gst_state) || clean(booking.guest_state) || null,
+      stateCode: deriveStateCode(booking.gst_number) || deriveUttarakhandFallbackStateCode(booking.gst_state || booking.guest_state),
       panNumber: null,
       usesCompanyName: true,
       isTourOperatorInvoice: false,
@@ -127,8 +131,8 @@ export function getInvoicePartyMeta(booking: InvoicePartyBookingLike): InvoicePa
     phone: guestPhone,
     address: guestAddress,
     gstNumber: null,
-    gstState: null,
-    stateCode: null,
+    gstState: clean(booking.guest_state) || null,
+    stateCode: deriveUttarakhandFallbackStateCode(booking.guest_state),
     panNumber: null,
     usesCompanyName: false,
     isTourOperatorInvoice: false,
