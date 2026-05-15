@@ -1,6 +1,7 @@
 import { formatDate } from '@/lib/utils'
 import { calculateGST, calculateGSTFromSubtotal } from '@/lib/gst-bill-service'
 import { getInvoicePartyMeta } from '@/lib/invoice-party'
+import { getIndiaStateCodeByName } from '@/lib/india-state-codes'
 import { COMPANY_DETAILS } from '@/lib/constants'
 
 const RESORT = {
@@ -48,6 +49,12 @@ function isUttarakhandState(value?: string | null) {
   return String(value || '').trim().toLowerCase().includes('uttarakhand')
 }
 
+function deriveStateCode(gstNumber?: string | null) {
+  const normalized = String(gstNumber || '').trim()
+  const match = normalized.match(/^(\d{2})/)
+  return match ? match[1] : null
+}
+
 function isBillToIntraState(
   billTo: { stateCode?: string | null; gstState?: string | null },
   sellerStateCode: string
@@ -77,7 +84,10 @@ export function buildGSTBillHtml(booking: any): string {
         address: [operator.address, operator.city, operator.state].filter(Boolean).join(', ') || invoiceParty.address,
         gstNumber: String(operator.gst_number || '').trim() || invoiceParty.gstNumber,
         gstState: String(operator.state || '').trim() || invoiceParty.gstState,
-        stateCode: String(operator.gst_number || '').trim().slice(0, 2) || invoiceParty.stateCode,
+        stateCode:
+          getIndiaStateCodeByName(String(operator.state || '').trim()) ||
+          deriveStateCode(String(operator.gst_number || '').trim()) ||
+          invoiceParty.stateCode,
         panNumber: String(operator.pan_number || '').trim() || invoiceParty.panNumber || null,
       }
     : invoiceParty
@@ -339,10 +349,9 @@ export function buildGSTBillHtml(booking: any): string {
       ? `<tr><td>CGST @ 2.5%</td><td class="amt">Rs.${fmt(cgst)}</td></tr><tr><td>SGST @ 2.5%</td><td class="amt">Rs.${fmt(sgst)}</td></tr>`
       : `<tr><td>IGST @ 5%</td><td class="amt">Rs.${fmt(igst)}</td></tr>`}
     <tr class="trow"><td>Total Amount</td><td class="amt">Rs.${fmt(total)}</td></tr>
-    ${advance > 0 ? `<tr><td style="color:#666">Advance Received</td><td class="amt">Rs.${fmt(advance)}</td></tr>` : ''}
     ${(!isFullyPaid && balance > 0)
       ? `<tr class="brow"><td>Balance Due</td><td class="amt">Rs.${fmt(balance)}</td></tr>`
-      : (isFullyPaid ? `<tr><td style="color:#27ae60;font-weight:600">Fully Settled</td><td class="amt" style="color:#27ae60">Rs.0.00</td></tr>` : '')}
+      : ''}
   </table>
 </div>
 
