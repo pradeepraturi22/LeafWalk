@@ -5,6 +5,7 @@ import { COMPANY_DETAILS } from '@/lib/constants'
 import { getInvoicePartyMeta } from '@/lib/invoice-party'
 import { calculateGST, calculateGSTFromSubtotal } from '@/lib/gst-bill-service'
 import { formatDate } from '@/lib/utils'
+import { buildGSTInvoiceData } from '@/lib/gst-bill-generator'
 
 type ReceiptBooking = {
   id: string
@@ -83,6 +84,7 @@ const RESORT = {
   tagline: 'Stay in Lap of Nature',
   address: 'Vill- Banas, Narad Chatti, Hanuman Chatti',
   city: 'Yamunotri Road, Uttarkashi, Uttarakhand - 249193',
+  state: 'Uttarakhand',
   phone: '+91-9368080535 | +91-8630227541',
   email: 'info@leafwalk.in',
   website: 'www.leafwalk.in',
@@ -186,21 +188,6 @@ function sectionLabel(doc: jsPDF, label: string, x: number, y: number) {
   doc.text(label.toUpperCase(), x, y)
 }
 
-function isUttarakhandState(value?: string | null) {
-  return String(value || '').trim().toLowerCase().includes('uttarakhand')
-}
-
-function isBillToIntraState(
-  billTo: { stateCode?: string | null; gstState?: string | null },
-  sellerStateCode: string
-) {
-  const buyerStateCode = String(billTo.stateCode || '').trim()
-  if (buyerStateCode) return buyerStateCode === sellerStateCode
-  if (billTo.gstState) return isUttarakhandState(billTo.gstState)
-  return true
-}
-
-
 function labelValue(doc: jsPDF, label: string, value: string, x: number, y: number, width: number) {
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(7.5)
@@ -223,218 +210,208 @@ function tableRow(doc: jsPDF, label: string, value: string, x: number, y: number
   doc.text(value, x + width, y, { align: 'right' })
 }
 
-function createStructuredInvoicePdf(doc: jsPDF, booking: ReceiptBooking, invoiceRef: string, issueDate: string) {
-  const invoiceParty = getInvoicePartyMeta(booking)
-  const total = Number(booking.total_amount || 0)
-  const storedSubtotal = Number(booking.subtotal || 0)
-  const gstMath = total > 0 ? calculateGST(total) : calculateGSTFromSubtotal(storedSubtotal)
-  const taxable = gstMath.subtotal
-  const cgst = gstMath.cgst
-  const sgst = gstMath.sgst
-  const gstTotal = cgst + sgst
-  const nights = Number(booking.nights || 0)
-  const rooms = Number(booking.rooms_booked || 1)
-  const mealLabel = MEAL_LABELS[String(booking.meal_plan || '').toUpperCase()] || clean(booking.meal_plan)
-  const roomName = booking.room?.name || booking.room?.category || 'Accommodation'
+function createStructuredInvoicePdf(doc: jsPDF, booking: ReceiptBooking) {
+  const invoice = buildGSTInvoiceData(booking)
+  const invoiceRef = invoice.invoiceNo
   const bookingRef = booking.booking_number || booking.id.slice(0, 8).toUpperCase()
-  const buyerStateCode = invoiceParty.stateCode || ''
-  const sellerStateCode = String(COMPANY_DETAILS.gstin || '').slice(0, 2) || '05'
-  const isIntraState = isBillToIntraState(invoiceParty, sellerStateCode)
-  const taxRateLabel = isIntraState ? 'CGST 2.5% + SGST 2.5%' : 'IGST 5%'
-  const amountWords = `${clean(total ? `${Number(total).toLocaleString('en-IN', { maximumFractionDigits: 2, minimumFractionDigits: 2 })}` : '0.00')} INR`
-  const bankLines = [
-    COMPANY_DETAILS.bankAccountName ? `A/c Name: ${COMPANY_DETAILS.bankAccountName}` : '',
-    COMPANY_DETAILS.bankName ? `Bank Name: ${COMPANY_DETAILS.bankName}` : '',
-    COMPANY_DETAILS.accountNumber ? `A/c No.: ${COMPANY_DETAILS.accountNumber}` : '',
-    COMPANY_DETAILS.ifsc ? `IFSC Code: ${COMPANY_DETAILS.ifsc}` : '',
-    COMPANY_DETAILS.branch ? `Branch: ${COMPANY_DETAILS.branch}` : '',
-  ].filter(Boolean)
+  const amountWords = `${clean(invoice.total ? fmt(invoice.total) : '0.00')} INR`
 
-  const leftX = 10
-  const pageW = 190
-  const rightColW = 72
-  const leftColW = pageW - rightColW
-
+  setFill(doc, COLORS.white)
+  doc.rect(0, 0, 210, 297, 'F')
+  setFill(doc, COLORS.forest)
+  doc.rect(0, 0, 210, 34, 'F')
+  addLogo(doc, 14, 6, 20)
+  doc.setFont('times', 'bold')
+  doc.setFontSize(21)
+  setText(doc, COLORS.gold)
+  doc.text(RESORT.name, 40, 15)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(8)
+  setText(doc, COLORS.white)
+  doc.text(RESORT.tagline.toUpperCase(), 40, 21)
+  doc.setFontSize(7.4)
+  doc.text(`${RESORT.address}, ${RESORT.city}, ${RESORT.state}${COMPANY_DETAILS.pincode ? ` - ${COMPANY_DETAILS.pincode}` : ''}`, 40, 26)
+  doc.text(`${RESORT.phone} | ${RESORT.email} | ${RESORT.website}`, 40, 30)
   doc.setFont('helvetica', 'bold')
+  doc.text(`GSTIN: ${RESORT.gstin}`, 192, 15, { align: 'right' })
+  doc.setFont('helvetica', 'normal')
+  doc.text(`Invoice No: ${invoiceRef}`, 192, 21, { align: 'right' })
+  doc.text(`Date: ${invoice.billDate}`, 192, 27, { align: 'right' })
+  drawGoldLine(doc, 34)
+
+  setFill(doc, COLORS.faint)
+  setDraw(doc, COLORS.border)
+  doc.roundedRect(12, 40, 186, 16, 3, 3, 'FD')
+  doc.setFont('times', 'bold')
+  doc.setFontSize(17)
+  setText(doc, COLORS.ink)
+  doc.text('Tax Invoice', 18, 50)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(8.2)
+  setText(doc, COLORS.muted)
+  doc.text('Booking Ref', 128, 45.5)
+  doc.text('Payment Mode', 128, 50.5)
+  doc.text('Source', 128, 55.5)
+  doc.setFont('helvetica', 'bold')
+  setText(doc, COLORS.ink)
+  doc.text(bookingRef, 192, 45.5, { align: 'right' })
+  doc.text(invoice.paymentMode, 192, 50.5, { align: 'right' })
+  doc.text(invoice.source, 192, 55.5, { align: 'right' })
+
+  setDraw(doc, COLORS.border)
+  doc.roundedRect(12, 62, 112, 36, 3, 3)
+  doc.roundedRect(130, 62, 68, 36, 3, 3)
+  sectionLabel(doc, 'Bill To', 18, 69)
+  doc.setFont('times', 'bold')
   doc.setFontSize(12)
   setText(doc, COLORS.ink)
-  doc.text('Tax Invoice', 105, 10, { align: 'center' })
-
-  setDraw(doc, [0, 0, 0])
-  doc.rect(leftX, 14, leftColW, 48)
-  doc.rect(leftX + leftColW, 14, rightColW, 48)
-
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(9.5)
-  doc.text((COMPANY_DETAILS.name || RESORT.name).toUpperCase(), 12, 20)
+  doc.text(clean(invoice.invoiceParty.name), 18, 76)
   doc.setFont('helvetica', 'normal')
-  doc.setFontSize(8.5)
-  const sellerLines = [
-    COMPANY_DETAILS.address || RESORT.address,
-    `${COMPANY_DETAILS.city || RESORT.city}, ${COMPANY_DETAILS.state || ''}${COMPANY_DETAILS.pincode ? ` - ${COMPANY_DETAILS.pincode}` : ''}`.trim(),
-    COMPANY_DETAILS.phone ? `M.NO.- ${COMPANY_DETAILS.phone}` : '',
-    COMPANY_DETAILS.gstin ? `GSTIN/UIN : ${COMPANY_DETAILS.gstin}` : '',
-    `State Name : ${COMPANY_DETAILS.state || '-'}${sellerStateCode ? `, Code : ${sellerStateCode}` : ''}`,
-    COMPANY_DETAILS.email ? `E-Mail : ${COMPANY_DETAILS.email}` : '',
+  doc.setFontSize(8)
+  setText(doc, COLORS.body)
+  const billToLines = [
+    invoice.invoiceParty.phone ? `Phone: ${invoice.invoiceParty.phone}` : '',
+    invoice.invoiceParty.email ? `Email: ${invoice.invoiceParty.email}` : '',
+    invoice.invoiceParty.address ? `Address: ${invoice.invoiceParty.address}` : '',
+    invoice.invoiceParty.gstNumber ? `GSTIN: ${invoice.invoiceParty.gstNumber}` : '',
+    invoice.invoiceParty.gstState ? `State: ${invoice.invoiceParty.gstState}${invoice.invoiceParty.stateCode ? ` (${invoice.invoiceParty.stateCode})` : ''}` : '',
   ].filter(Boolean)
-  doc.text(sellerLines, 12, 25)
+  doc.text(doc.splitTextToSize(billToLines.join('\n'), 100), 18, 82)
 
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(8.5)
-  doc.text('Buyer (Bill to)', 12, 44)
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(8.5)
-  const buyerLines = [
-    invoiceParty.name,
-    invoiceParty.address || '',
-    invoiceParty.phone ? `M.NO.- ${invoiceParty.phone}` : '',
-    invoiceParty.email ? `E-Mail : ${invoiceParty.email}` : '',
-    invoiceParty.gstNumber ? `GSTIN/UIN : ${invoiceParty.gstNumber}` : '',
-    `State Name : ${invoiceParty.gstState || '-'}${buyerStateCode ? `, Code : ${buyerStateCode}` : ''}`,
-  ].filter(Boolean)
-  doc.text(buyerLines, 12, 49)
-
-  const rightX = leftX + leftColW
-  const rowH = 6
-  const rightRows: Array<[string, string]> = [
-    ['Invoice No.', invoiceRef],
-    ['Dated', issueDate],
-    ['Delivery Note', clean(String(booking.payment_method || '').replace(/_/g, ' ').toUpperCase())],
-    ['Reference No. & Date.', bookingRef],
-    ["Buyer's Order No.", bookingRef],
-    ['Dispatch Doc No.', ''],
-    ['Dispatched through', ''],
-    ['Destination', invoiceParty.gstState || ''],
+  sectionLabel(doc, 'Stay Information', 136, 69)
+  const stayRows: Array<[string, string]> = [
+    ['Check-in', invoice.checkIn],
+    ['Check-out', invoice.checkOut],
+    ['Room', invoice.roomName],
+    ['Meal Plan', invoice.mealLabel],
+    ['Stay', `${invoice.nights} night(s) · ${invoice.rooms} room(s)`],
   ]
-  rightRows.forEach(([label, value], index) => {
-    const y = 14 + index * rowH
-    if (index > 0) doc.line(rightX, y, rightX + rightColW, y)
-    doc.line(rightX + 34, y, rightX + 34, y + rowH)
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(7.5)
-    doc.text(label, rightX + 2, y + 4)
+  let stayY = 76
+  stayRows.forEach(([label, value]) => {
+    tableRow(doc, label, value, 136, stayY, 56)
+    stayY += 5.5
+  })
+
+  sectionLabel(doc, 'Invoice Line Items', 12, 107)
+  setDraw(doc, COLORS.border)
+  doc.roundedRect(12, 111, 186, 82, 3, 3)
+  setFill(doc, COLORS.forest)
+  doc.rect(12, 111, 186, 10, 'F')
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(7.8)
+  setText(doc, COLORS.gold)
+  const headers = [
+    ['#', 16, 'left'],
+    ['Description of Services', 24, 'left'],
+    ['Rate/Night', 142, 'right'],
+    ['Qty', 156, 'center'],
+    ['Nights', 170, 'center'],
+    ['Amount', 192, 'right'],
+  ] as const
+  headers.forEach(([label, x, align]) => doc.text(label, x, 117.4, { align }))
+
+  let rowY = 128
+  doc.setFont('helvetica', 'normal')
+  setText(doc, COLORS.ink)
+  invoice.items.forEach((item, index) => {
+    doc.setFontSize(8.2)
+    doc.text(String(index + 1), 16, rowY)
     doc.setFont('helvetica', 'bold')
-    doc.text(value || '', rightX + 36, y + 4)
-  })
-
-  let tableY = 66
-  const cols = [8, 80, 22, 18, 20, 14, 14, 22]
-  const colX = [10]
-  for (let i = 0; i < cols.length - 1; i += 1) colX.push(colX[i] + cols[i])
-  const headerH = 8
-  doc.rect(10, tableY, 198, headerH)
-  colX.slice(1).forEach((x) => doc.line(x, tableY, x, tableY + 170))
-  const headers = ['Sl', 'Description of Goods / Services', 'HSN/SAC', 'Qty', 'Rate', 'Per', 'Disc.%', 'Amount']
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(7.2)
-  headers.forEach((header, idx) => {
-    const x = colX[idx] + 1.5
-    doc.text(header, x, tableY + 5)
-  })
-
-  const itemTop = tableY + headerH
-  const rowHeight = 10
-  const itemRows = [
-    {
-      desc: `${roomName} - ${mealLabel}`,
-      sac: COMPANY_DETAILS.sacCode || RESORT.sacCode,
-      qty: rooms * Math.max(nights, 1),
-      rate: taxable,
-      per: 'Stay',
-      discount: '0',
-      amount: taxable,
-    },
-  ]
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(8)
-  itemRows.forEach((item, index) => {
-    const y = itemTop + index * rowHeight
-    doc.line(10, y, 208, y)
-    const values = [
-      String(index + 1),
-      item.desc,
-      item.sac,
-      String(item.qty),
-      fmt(item.rate),
-      item.per,
-      item.discount,
-      fmt(item.amount),
-    ]
-    values.forEach((value, idx) => {
-      const x = colX[idx] + 1.5
-      const align = idx >= 2 && idx !== 5 ? 'right' : idx === 5 ? 'center' : 'left'
-      const renderX = align === 'right' ? colX[idx] + cols[idx] - 1.5 : align === 'center' ? colX[idx] + cols[idx] / 2 : x
-      doc.text(value, renderX, y + 6, { align: align as any })
-    })
-  })
-
-  const totalsBaseY = itemTop + 150
-  doc.line(10, totalsBaseY, 208, totalsBaseY)
-  doc.setFont('helvetica', 'bold')
-  doc.text('Total', 156, totalsBaseY + 6)
-  doc.text(`₹ ${fmt(taxable)}`, 206, totalsBaseY + 6, { align: 'right' })
-
-  const wordsY = totalsBaseY + 10
-  doc.rect(10, wordsY, 120, 12)
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(7)
-  doc.text('Amount Chargeable (in words)', 12, wordsY + 4)
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(8)
-  doc.text(`INR ${amountWords} Only`, 12, wordsY + 9)
-
-  doc.rect(130, wordsY, 78, 18)
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(7)
-  doc.text('Taxable Value', 132, wordsY + 4)
-  doc.text('Rate', 162, wordsY + 4)
-  doc.text('GST Amount', 176, wordsY + 4)
-  doc.text('Total Tax Amount', 196, wordsY + 4, { align: 'right' })
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(8)
-  doc.text(fmt(taxable), 132, wordsY + 11)
-  doc.text(isIntraState ? '5%' : '5%', 163, wordsY + 11, { align: 'center' })
-  doc.text(fmt(gstTotal), 176, wordsY + 11)
-  doc.text(fmt(gstTotal), 206, wordsY + 11, { align: 'right' })
-  doc.setFont('helvetica', 'bold')
-  doc.text('Total', 168, wordsY + 16)
-  doc.text(fmt(gstTotal), 206, wordsY + 16, { align: 'right' })
-
-  const taxWordsY = wordsY + 20
-  doc.rect(10, taxWordsY, 198, 10)
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(7)
-  doc.text('Tax Amount (in words)', 12, taxWordsY + 4)
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(8)
-  doc.text(`INR ${clean(gstTotal ? `${fmt(gstTotal)}` : '0.00')} Only`, 42, taxWordsY + 4)
-
-  const declarationY = taxWordsY + 14
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(7)
-  doc.text('Declaration', 10, declarationY)
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(7.2)
-  const declaration = doc.splitTextToSize(
-    'We declare that this invoice shows the actual price of the services described and that all particulars are true and correct.',
-    92
-  )
-  doc.text(declaration, 10, declarationY + 5)
-
-  if (bankLines.length) {
-    doc.setFont('helvetica', 'bold')
-    doc.text("Company's Bank Details", 110, declarationY)
+    doc.text(clean(item.desc), 24, rowY)
     doc.setFont('helvetica', 'normal')
-    doc.text(bankLines, 110, declarationY + 5)
+    doc.setFontSize(7)
+    setText(doc, COLORS.muted)
+    doc.text(`SAC: ${invoice.sacCode} · Hotel Accommodation Services · GST: 5%`, 24, rowY + 4)
+    setText(doc, COLORS.ink)
+    doc.setFontSize(8)
+    doc.text(fmt(item.rate), 142, rowY, { align: 'right' })
+    doc.text(String(item.qty), 156, rowY, { align: 'center' })
+    doc.text(String(item.nights), 170, rowY, { align: 'center' })
+    doc.text(fmt(item.amount), 192, rowY, { align: 'right' })
+    doc.line(16, rowY + 6, 194, rowY + 6)
+    rowY += 12
+  })
+
+  setFill(doc, COLORS.goldSoft)
+  setDraw(doc, COLORS.border)
+  doc.roundedRect(12, 199, 108, 24, 3, 3, 'FD')
+  sectionLabel(doc, 'Amount in Words', 18, 206)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(9)
+  setText(doc, COLORS.ink)
+  doc.text(`INR ${amountWords} Only`, 18, 214)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(7.5)
+  setText(doc, COLORS.muted)
+  if (invoice.advance > 0) {
+    doc.text(`Advance: INR ${fmt(invoice.advance)} Only`, 18, 219)
   }
 
+  setDraw(doc, COLORS.border)
+  doc.roundedRect(126, 199, 72, 44, 3, 3)
+  let totalsY = 208
+  if (invoice.discountBeforeTax > 0) {
+    tableRow(doc, 'Gross Service Value', money(invoice.subtotal + invoice.discountBeforeTax), 132, totalsY, 60)
+    totalsY += 6
+    tableRow(doc, 'Less: Discount', money(invoice.discountBeforeTax), 132, totalsY, 60)
+    totalsY += 6
+  }
+  tableRow(doc, 'Taxable Amount', money(invoice.subtotal), 132, totalsY, 60)
+  totalsY += 6
+  if (invoice.isIntraState) {
+    tableRow(doc, 'CGST @ 2.5%', money(invoice.cgst), 132, totalsY, 60)
+    totalsY += 6
+    tableRow(doc, 'SGST @ 2.5%', money(invoice.sgst), 132, totalsY, 60)
+    totalsY += 6
+  } else {
+    tableRow(doc, 'IGST @ 5%', money(invoice.igst), 132, totalsY, 60)
+    totalsY += 6
+  }
+  setFill(doc, COLORS.forest)
+  doc.roundedRect(130, 231, 64, 8, 2, 2, 'F')
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(9.6)
+  setText(doc, COLORS.gold)
+  doc.text(money(invoice.total), 162, 236.2, { align: 'center' })
+
+  setDraw(doc, COLORS.border)
+  doc.roundedRect(12, 229, 108, 28, 3, 3)
+  sectionLabel(doc, 'Declaration', 18, 236)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(7.3)
+  setText(doc, COLORS.body)
+  doc.text(
+    doc.splitTextToSize(
+      'We declare that this invoice shows the actual price of the services described and that all particulars are true and correct.',
+      98
+    ),
+    18,
+    242
+  )
+
+  setFill(doc, COLORS.goldSoft)
+  doc.roundedRect(126, 249, 72, 28, 3, 3, 'FD')
+  sectionLabel(doc, 'LeafWalk Bank Details', 132, 256)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(7.1)
+  setText(doc, COLORS.body)
+  doc.text(doc.splitTextToSize(invoice.bankLines.join('\n') || 'Available on request', 60), 132, 262)
+
+  drawGoldLine(doc, 282)
+  doc.setFont('times', 'bold')
+  doc.setFontSize(10)
+  setText(doc, COLORS.gold)
+  doc.text(RESORT.name, 12, 287.5)
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(7)
-  doc.text('This is a Computer Generated Invoice', 105, 292, { align: 'center' })
+  setText(doc, COLORS.muted)
+  doc.text(`${RESORT.address}, ${RESORT.city}, ${RESORT.state}${COMPANY_DETAILS.pincode ? ` - ${COMPANY_DETAILS.pincode}` : ''}`, 12, 292)
+  doc.text('This is a system generated invoice.', 105, 292, { align: 'center' })
   doc.setFont('helvetica', 'bold')
-  doc.text(`for ${clean(COMPANY_DETAILS.name || RESORT.name).toUpperCase()}`, 206, 284, { align: 'right' })
+  setText(doc, COLORS.ink)
+  doc.text(`for ${clean(COMPANY_DETAILS.name || RESORT.name).toUpperCase()}`, 198, 287.5, { align: 'right' })
   doc.setFont('helvetica', 'normal')
-  doc.text('Authorised Signatory', 206, 289, { align: 'right' })
+  doc.text('Authorised Signatory', 198, 292, { align: 'right' })
 }
 
 export function createStyledBookingReceiptPdf(
@@ -446,7 +423,13 @@ export function createStyledBookingReceiptPdf(
   const invoiceRef = booking.invoice_number || `INV-${bookingRef}`
   const isFullyPaid = String(booking.payment_status || '').toLowerCase() === 'fully_paid'
   const isInvoiceDocument = options.documentMode === 'invoice' || (options.documentMode !== 'receipt' && isFullyPaid)
-  const docTitle = isInvoiceDocument ? 'GST Tax Invoice' : 'Booking Receipt'
+
+  if (isInvoiceDocument) {
+    createStructuredInvoicePdf(doc, booking)
+    return Buffer.from(doc.output('arraybuffer'))
+  }
+
+  const docTitle = 'Booking Receipt'
   const issueDate = shortDate(booking.created_at || new Date().toISOString())
   const checkIn = shortDate(booking.check_in)
   const checkOut = shortDate(booking.check_out)
@@ -502,25 +485,10 @@ export function createStyledBookingReceiptPdf(
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8.5)
   setText(doc, COLORS.muted)
-  if (isInvoiceDocument) {
-    doc.text('Invoice No:', 128, 49)
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(7.8)
-    setText(doc, COLORS.ink)
-    doc.text(invoiceRef, 192, 49, { align: 'right' })
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(8.5)
-    setText(doc, COLORS.muted)
-    doc.text('Booking Ref:', 128, 54.5)
-    doc.setFont('helvetica', 'bold')
-    setText(doc, COLORS.ink)
-    doc.text(bookingRef, 192, 54.5, { align: 'right' })
-  } else {
-    doc.text('Booking Ref:', 128, 50)
-    doc.setFont('helvetica', 'bold')
-    setText(doc, COLORS.ink)
-    doc.text(bookingRef, 192, 50, { align: 'right' })
-  }
+  doc.text('Booking Ref:', 128, 50)
+  doc.setFont('helvetica', 'bold')
+  setText(doc, COLORS.ink)
+  doc.text(bookingRef, 192, 50, { align: 'right' })
   doc.setFont('helvetica', 'normal')
   setText(doc, COLORS.muted)
   doc.text('Issued:', 128, 60)
@@ -536,23 +504,9 @@ export function createStyledBookingReceiptPdf(
   setDraw(doc, COLORS.border)
   doc.roundedRect(16, 83, 82, 38, 3, 3)
   doc.roundedRect(106, 83, 88, 38, 3, 3)
-  labelValue(doc, isInvoiceDocument ? 'Bill To' : 'Guest Name', clean(invoiceParty.name), 21, 92, 68)
-  labelValue(
-    doc,
-    isInvoiceDocument ? 'Email / GSTIN' : 'Email',
-    clean(isInvoiceDocument ? [invoiceParty.email, invoiceParty.gstNumber ? `GSTIN: ${invoiceParty.gstNumber}` : null].filter(Boolean).join(' | ') : booking.guest_email),
-    21,
-    104,
-    68
-  )
-  labelValue(
-    doc,
-    isInvoiceDocument ? 'Phone / State' : 'Phone',
-    clean(isInvoiceDocument ? [invoiceParty.phone, invoiceParty.gstState ? `${invoiceParty.gstState}${invoiceParty.stateCode ? ` (${invoiceParty.stateCode})` : ''}` : null].filter(Boolean).join(' | ') : phone),
-    21,
-    116,
-    68
-  )
+  labelValue(doc, 'Guest Name', clean(invoiceParty.name), 21, 92, 68)
+  labelValue(doc, 'Email', clean(booking.guest_email), 21, 104, 68)
+  labelValue(doc, 'Phone', clean(phone), 21, 116, 68)
   labelValue(doc, 'Check-in', checkIn, 112, 92, 66)
   labelValue(doc, 'Check-out', checkOut, 112, 104, 66)
   labelValue(doc, 'Stay', `${nights} nights | ${rooms} room(s)`, 112, 116, 66)
@@ -577,9 +531,6 @@ export function createStyledBookingReceiptPdf(
   doc.setFontSize(8.5)
   setText(doc, COLORS.muted)
   doc.text('DESCRIPTION', 21, 171)
-  if (isInvoiceDocument) {
-    doc.text('SAC', 142, 171, { align: 'right' })
-  }
   doc.text('AMOUNT', 188, 171, { align: 'right' })
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(10.2)
@@ -590,35 +541,20 @@ export function createStyledBookingReceiptPdf(
   setText(doc, COLORS.muted)
   doc.text(`${rooms} room x ${nights} nights | ${mealLabel} | ${adults} adult(s)`, 21, 187)
   doc.setFont('helvetica', 'bold')
-  doc.setFontSize(9.2)
-  setText(doc, COLORS.ink)
-  if (isInvoiceDocument) {
-    doc.text(RESORT.sacCode, 142, 184, { align: 'right' })
-  }
-  doc.setFont('helvetica', 'bold')
   doc.setFontSize(10.2)
   setText(doc, COLORS.ink)
   doc.text(money(total), 188, 184, { align: 'right' })
 
-  sectionLabel(doc, isInvoiceDocument ? 'GST Invoice Summary' : 'Payment Summary', 16, 207)
+  sectionLabel(doc, 'Payment Summary', 16, 207)
   setDraw(doc, COLORS.border)
   doc.roundedRect(16, 211, 86, 50, 3, 3)
   let y = 222
-  if (isInvoiceDocument) {
-    tableRow(doc, 'Taxable Amount', money(taxable), 22, y, 72)
-    y += 8
-    tableRow(doc, 'CGST @ 2.5%', money(cgst), 22, y, 72)
-    y += 8
-    tableRow(doc, 'SGST @ 2.5%', money(sgst), 22, y, 72)
-    y += 8
-  } else {
-    tableRow(doc, 'Booking Total', money(total), 22, y, 72)
-    y += 8
-    tableRow(doc, 'Amount Paid', money(advance), 22, y, 72)
-    y += 8
-    tableRow(doc, 'Balance Due', money(balance), 22, y, 72)
-    y += 8
-  }
+  tableRow(doc, 'Booking Total', money(total), 22, y, 72)
+  y += 8
+  tableRow(doc, 'Amount Paid', money(advance), 22, y, 72)
+  y += 8
+  tableRow(doc, 'Balance Due', money(balance), 22, y, 72)
+  y += 8
   setFill(doc, COLORS.forest)
   doc.roundedRect(20, 241, 78, 10, 2, 2, 'F')
   doc.setFont('times', 'bold')
@@ -630,10 +566,6 @@ export function createStyledBookingReceiptPdf(
   setDraw(doc, COLORS.border)
   doc.roundedRect(111, 211, 83, 50, 3, 3)
   let infoY = 222
-  if (isInvoiceDocument) {
-    tableRow(doc, 'Invoice No.', invoiceRef, 117, infoY, 70)
-    infoY += 8
-  }
   tableRow(doc, 'Booking No.', bookingRef, 117, infoY, 70)
   infoY += 8
   tableRow(doc, 'Payment Mode', paymentMode, 117, infoY, 70)
@@ -642,24 +574,22 @@ export function createStyledBookingReceiptPdf(
   infoY += 8
   tableRow(doc, 'Adults', String(adults), 117, infoY, 70)
 
-  if (!isInvoiceDocument) {
-    setFill(doc, COLORS.faint)
-    setDraw(doc, COLORS.border)
-    doc.roundedRect(16, 263, 178, 22, 3, 3, 'FD')
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(8)
-    setText(doc, COLORS.muted)
-    doc.text('IMPORTANT INFORMATION', 21, 270)
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(7.3)
-    setText(doc, COLORS.body)
-    doc.text('- Check-in after 3:00 PM | Check-out before 11:00 AM', 21, 276)
-    doc.text('- Valid government ID required at check-in', 21, 281)
-    doc.text('- Breakfast 8-10 AM | Kitchen closes at 10 PM', 107, 276)
-    doc.text('- Cancellation charges as per reservation policy', 107, 281)
-    doc.text('- Front desk support: +91-8630227541', 21, 286)
-    doc.text('- Outside food/alcohol as per resort policy', 107, 286)
-  }
+  setFill(doc, COLORS.faint)
+  setDraw(doc, COLORS.border)
+  doc.roundedRect(16, 263, 178, 22, 3, 3, 'FD')
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(8)
+  setText(doc, COLORS.muted)
+  doc.text('IMPORTANT INFORMATION', 21, 270)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(7.3)
+  setText(doc, COLORS.body)
+  doc.text('- Check-in after 3:00 PM | Check-out before 11:00 AM', 21, 276)
+  doc.text('- Valid government ID required at check-in', 21, 281)
+  doc.text('- Breakfast 8-10 AM | Kitchen closes at 10 PM', 107, 276)
+  doc.text('- Cancellation charges as per reservation policy', 107, 281)
+  doc.text('- Front desk support: +91-8630227541', 21, 286)
+  doc.text('- Outside food/alcohol as per resort policy', 107, 286)
 
   setFill(doc, COLORS.faint)
   doc.rect(0, 287, 210, 10, 'F')
