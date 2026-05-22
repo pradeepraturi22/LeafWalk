@@ -53,7 +53,7 @@ export default function TermsPage() {
                     ['3–7 days before check-in', '50% refund'],
                     ['Less than 3 days before check-in', 'No refund (0%)'],
                     ['No-show', 'No refund'],
-                    ['Peak season (Dec 20 – Jan 10 & May–Jun)', 'Non-refundable'],
+                    ['During Yatra Season (May to Oct)', 'No cancelation No refund....rescheduling is subject to availability'],
                   ].map(([period, refund]) => (
                     <tr key={period}>
                       <td className="py-3 pr-6 text-white/60">{period}</td>

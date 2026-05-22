@@ -229,9 +229,13 @@ function createStructuredInvoicePdf(doc: jsPDF, booking: ReceiptBooking) {
   doc.setFontSize(8)
   setText(doc, COLORS.white)
   doc.text(RESORT.tagline.toUpperCase(), 40, 21)
-  doc.setFontSize(7.4)
-  doc.text(`${RESORT.address}, ${RESORT.city}, ${RESORT.state}${COMPANY_DETAILS.pincode ? ` - ${COMPANY_DETAILS.pincode}` : ''}`, 40, 26)
-  doc.text(`${RESORT.phone} | ${RESORT.email} | ${RESORT.website}`, 40, 30)
+  doc.setFontSize(7.2)
+  const sellerAddress = doc.splitTextToSize(
+    `${RESORT.address}, ${RESORT.city}, ${RESORT.state}${COMPANY_DETAILS.pincode ? ` - ${COMPANY_DETAILS.pincode}` : ''}`,
+    105
+  )
+  doc.text(sellerAddress, 40, 26)
+  doc.text(`${RESORT.phone} | ${RESORT.email} | ${RESORT.website}`, 40, 31)
   doc.setFont('helvetica', 'bold')
   doc.text(`GSTIN: ${RESORT.gstin}`, 192, 15, { align: 'right' })
   doc.setFont('helvetica', 'normal')
@@ -258,9 +262,30 @@ function createStructuredInvoicePdf(doc: jsPDF, booking: ReceiptBooking) {
   doc.text(invoice.paymentMode, 192, 50.5, { align: 'right' })
   doc.text(invoice.source, 192, 55.5, { align: 'right' })
 
+  const billToLines = [
+    invoice.invoiceParty.phone ? `Phone: ${invoice.invoiceParty.phone}` : '',
+    invoice.invoiceParty.email ? `Email: ${invoice.invoiceParty.email}` : '',
+    invoice.invoiceParty.address ? `Address: ${invoice.invoiceParty.address}` : '',
+    invoice.invoiceParty.gstNumber ? `GSTIN: ${invoice.invoiceParty.gstNumber}` : '',
+    invoice.invoiceParty.gstState ? `State: ${invoice.invoiceParty.gstState}${invoice.invoiceParty.stateCode ? ` (${invoice.invoiceParty.stateCode})` : ''}` : '',
+  ].filter(Boolean)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(8)
+  const billToWrapped = doc.splitTextToSize(billToLines.join('\n'), 100)
+  const billToHeight = Math.max(42, 18 + billToWrapped.length * 4.2)
+  const stayRows: Array<[string, string]> = [
+    ['Check-in', invoice.checkIn],
+    ['Check-out', invoice.checkOut],
+    ['Room', invoice.roomName],
+    ['Meal Plan', invoice.mealLabel],
+    ['Stay', `${invoice.nights} night(s) · ${invoice.rooms} room(s)`],
+  ]
+  const stayHeight = Math.max(42, 12 + stayRows.length * 5.7)
+  const partyHeight = Math.max(billToHeight, stayHeight)
+
   setDraw(doc, COLORS.border)
-  doc.roundedRect(12, 62, 112, 36, 3, 3)
-  doc.roundedRect(130, 62, 68, 36, 3, 3)
+  doc.roundedRect(12, 62, 112, partyHeight, 3, 3)
+  doc.roundedRect(130, 62, 68, partyHeight, 3, 3)
   sectionLabel(doc, 'Bill To', 18, 69)
   doc.setFont('times', 'bold')
   doc.setFontSize(12)
@@ -269,34 +294,45 @@ function createStructuredInvoicePdf(doc: jsPDF, booking: ReceiptBooking) {
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8)
   setText(doc, COLORS.body)
-  const billToLines = [
-    invoice.invoiceParty.phone ? `Phone: ${invoice.invoiceParty.phone}` : '',
-    invoice.invoiceParty.email ? `Email: ${invoice.invoiceParty.email}` : '',
-    invoice.invoiceParty.address ? `Address: ${invoice.invoiceParty.address}` : '',
-    invoice.invoiceParty.gstNumber ? `GSTIN: ${invoice.invoiceParty.gstNumber}` : '',
-    invoice.invoiceParty.gstState ? `State: ${invoice.invoiceParty.gstState}${invoice.invoiceParty.stateCode ? ` (${invoice.invoiceParty.stateCode})` : ''}` : '',
-  ].filter(Boolean)
-  doc.text(doc.splitTextToSize(billToLines.join('\n'), 100), 18, 82)
+  doc.text(billToWrapped, 18, 82)
 
   sectionLabel(doc, 'Stay Information', 136, 69)
-  const stayRows: Array<[string, string]> = [
-    ['Check-in', invoice.checkIn],
-    ['Check-out', invoice.checkOut],
-    ['Room', invoice.roomName],
-    ['Meal Plan', invoice.mealLabel],
-    ['Stay', `${invoice.nights} night(s) · ${invoice.rooms} room(s)`],
-  ]
   let stayY = 76
   stayRows.forEach(([label, value]) => {
-    tableRow(doc, label, value, 136, stayY, 56)
-    stayY += 5.5
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8.3)
+    setText(doc, COLORS.body)
+    doc.text(label, 136, stayY)
+    doc.setFont('helvetica', 'bold')
+    setText(doc, COLORS.ink)
+    const valueLines = doc.splitTextToSize(value, 28)
+    doc.text(valueLines, 192, stayY, { align: 'right' })
+    stayY += Math.max(5.5, valueLines.length * 3.8 + 1.5)
   })
 
-  sectionLabel(doc, 'Invoice Line Items', 12, 107)
+  const lineItemsLabelY = 62 + partyHeight + 9
+  sectionLabel(doc, 'Invoice Line Items', 12, lineItemsLabelY)
+  const lineItemsBoxY = lineItemsLabelY + 4
+  const lineItemsHeaderH = 10
+  const lineItemStartY = lineItemsBoxY + 17
+  let currentRowY = lineItemStartY
+  const itemRows = invoice.items.map((item, index) => {
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(8.1)
+    const descLines = doc.splitTextToSize(clean(item.desc), 76)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(6.8)
+    const subLines = doc.splitTextToSize(`SAC: ${invoice.sacCode} · Hotel Accommodation Services · GST: 5%`, 76)
+    const rowHeight = 5 + descLines.length * 3.6 + subLines.length * 3 + 4
+    return { item, index, descLines, subLines, rowHeight }
+  })
+  const lineItemsContentHeight = itemRows.reduce((sum, row) => sum + row.rowHeight, 0)
+  const lineItemsBoxHeight = lineItemsHeaderH + 6 + lineItemsContentHeight + 6
+
   setDraw(doc, COLORS.border)
-  doc.roundedRect(12, 111, 186, 82, 3, 3)
+  doc.roundedRect(12, lineItemsBoxY, 186, lineItemsBoxHeight, 3, 3)
   setFill(doc, COLORS.forest)
-  doc.rect(12, 111, 186, 10, 'F')
+  doc.rect(12, lineItemsBoxY, 186, lineItemsHeaderH, 'F')
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(7.8)
   setText(doc, COLORS.gold)
@@ -308,110 +344,123 @@ function createStructuredInvoicePdf(doc: jsPDF, booking: ReceiptBooking) {
     ['Nights', 170, 'center'],
     ['Amount', 192, 'right'],
   ] as const
-  headers.forEach(([label, x, align]) => doc.text(label, x, 117.4, { align }))
+  headers.forEach(([label, x, align]) => doc.text(label, x, lineItemsBoxY + 6.4, { align }))
 
-  let rowY = 128
-  doc.setFont('helvetica', 'normal')
-  setText(doc, COLORS.ink)
-  invoice.items.forEach((item, index) => {
-    doc.setFontSize(8.2)
-    doc.text(String(index + 1), 16, rowY)
-    doc.setFont('helvetica', 'bold')
-    doc.text(clean(item.desc), 24, rowY)
+  itemRows.forEach((row) => {
+    const { item, index, descLines, subLines, rowHeight } = row
     doc.setFont('helvetica', 'normal')
-    doc.setFontSize(7)
-    setText(doc, COLORS.muted)
-    doc.text(`SAC: ${invoice.sacCode} · Hotel Accommodation Services · GST: 5%`, 24, rowY + 4)
-    setText(doc, COLORS.ink)
     doc.setFontSize(8)
-    doc.text(fmt(item.rate), 142, rowY, { align: 'right' })
-    doc.text(String(item.qty), 156, rowY, { align: 'center' })
-    doc.text(String(item.nights), 170, rowY, { align: 'center' })
-    doc.text(fmt(item.amount), 192, rowY, { align: 'right' })
-    doc.line(16, rowY + 6, 194, rowY + 6)
-    rowY += 12
+    setText(doc, COLORS.ink)
+    doc.text(String(index + 1), 16, currentRowY)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(8.1)
+    doc.text(descLines, 24, currentRowY)
+    const descHeight = descLines.length * 3.6
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(6.8)
+    setText(doc, COLORS.muted)
+    doc.text(subLines, 24, currentRowY + descHeight + 1.5)
+    const valueY = currentRowY + Math.max(0, rowHeight / 2 - 1)
+    setText(doc, COLORS.ink)
+    doc.setFontSize(7.8)
+    doc.text(fmt(item.rate), 142, valueY, { align: 'right' })
+    doc.text(String(item.qty), 156, valueY, { align: 'center' })
+    doc.text(String(item.nights), 170, valueY, { align: 'center' })
+    doc.text(fmt(item.amount), 192, valueY, { align: 'right' })
+    doc.line(16, currentRowY + rowHeight - 3, 194, currentRowY + rowHeight - 3)
+    currentRowY += rowHeight
   })
+
+  const totalsSectionY = lineItemsBoxY + lineItemsBoxHeight + 8
+  const amountWordsLines = doc.splitTextToSize(`INR ${amountWords} Only`, 96)
+  const amountWordsExtra = invoice.advance > 0 ? 1 : 0
+  const amountWordsHeight = Math.max(26, 12 + amountWordsLines.length * 4 + amountWordsExtra * 5)
 
   setFill(doc, COLORS.goldSoft)
   setDraw(doc, COLORS.border)
-  doc.roundedRect(12, 199, 108, 24, 3, 3, 'FD')
-  sectionLabel(doc, 'Amount in Words', 18, 206)
+  doc.roundedRect(12, totalsSectionY, 108, amountWordsHeight, 3, 3, 'FD')
+  sectionLabel(doc, 'Amount in Words', 18, totalsSectionY + 7)
   doc.setFont('helvetica', 'bold')
-  doc.setFontSize(9)
+  doc.setFontSize(8.6)
   setText(doc, COLORS.ink)
-  doc.text(`INR ${amountWords} Only`, 18, 214)
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(7.5)
-  setText(doc, COLORS.muted)
+  doc.text(amountWordsLines, 18, totalsSectionY + 14)
   if (invoice.advance > 0) {
-    doc.text(`Advance: INR ${fmt(invoice.advance)} Only`, 18, 219)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(7.2)
+    setText(doc, COLORS.muted)
+    doc.text(`Advance: INR ${fmt(invoice.advance)} Only`, 18, totalsSectionY + amountWordsHeight - 5)
   }
 
+  const totalsRows = [
+    ...(invoice.discountBeforeTax > 0 ? [
+      ['Gross Service Value', money(invoice.subtotal + invoice.discountBeforeTax)],
+      ['Less: Discount', money(invoice.discountBeforeTax)],
+    ] as Array<[string, string]> : []),
+    ['Taxable Amount', money(invoice.subtotal)],
+    ...(invoice.isIntraState
+      ? [
+          ['CGST @ 2.5%', money(invoice.cgst)],
+          ['SGST @ 2.5%', money(invoice.sgst)],
+        ] as Array<[string, string]>
+      : [['IGST @ 5%', money(invoice.igst)] as [string, string]]),
+  ]
+  const totalsBoxHeight = Math.max(44, 14 + totalsRows.length * 6 + 12)
   setDraw(doc, COLORS.border)
-  doc.roundedRect(126, 199, 72, 44, 3, 3)
-  let totalsY = 208
-  if (invoice.discountBeforeTax > 0) {
-    tableRow(doc, 'Gross Service Value', money(invoice.subtotal + invoice.discountBeforeTax), 132, totalsY, 60)
+  doc.roundedRect(126, totalsSectionY, 72, totalsBoxHeight, 3, 3)
+  let totalsY = totalsSectionY + 9
+  totalsRows.forEach(([label, value]) => {
+    tableRow(doc, label, value, 132, totalsY, 60)
     totalsY += 6
-    tableRow(doc, 'Less: Discount', money(invoice.discountBeforeTax), 132, totalsY, 60)
-    totalsY += 6
-  }
-  tableRow(doc, 'Taxable Amount', money(invoice.subtotal), 132, totalsY, 60)
-  totalsY += 6
-  if (invoice.isIntraState) {
-    tableRow(doc, 'CGST @ 2.5%', money(invoice.cgst), 132, totalsY, 60)
-    totalsY += 6
-    tableRow(doc, 'SGST @ 2.5%', money(invoice.sgst), 132, totalsY, 60)
-    totalsY += 6
-  } else {
-    tableRow(doc, 'IGST @ 5%', money(invoice.igst), 132, totalsY, 60)
-    totalsY += 6
-  }
+  })
   setFill(doc, COLORS.forest)
-  doc.roundedRect(130, 231, 64, 8, 2, 2, 'F')
+  doc.roundedRect(130, totalsSectionY + totalsBoxHeight - 12, 64, 8, 2, 2, 'F')
   doc.setFont('helvetica', 'bold')
-  doc.setFontSize(9.6)
+  doc.setFontSize(9.4)
   setText(doc, COLORS.gold)
-  doc.text(money(invoice.total), 162, 236.2, { align: 'center' })
+  doc.text(money(invoice.total), 162, totalsSectionY + totalsBoxHeight - 6.8, { align: 'center' })
+
+  const lowerSectionY = totalsSectionY + Math.max(amountWordsHeight, totalsBoxHeight) + 8
+  const declarationLines = doc.splitTextToSize(
+    'We declare that this invoice shows the actual price of the services described and that all particulars are true and correct.',
+    98
+  )
+  const declarationHeight = 14 + declarationLines.length * 4 + 6
+  const bankLinesWrapped = doc.splitTextToSize(invoice.bankLines.join('\n') || 'Available on request', 60)
+  const bankHeight = 14 + bankLinesWrapped.length * 4 + 6
+  const bottomBoxHeight = Math.max(declarationHeight, bankHeight)
 
   setDraw(doc, COLORS.border)
-  doc.roundedRect(12, 229, 108, 28, 3, 3)
-  sectionLabel(doc, 'Declaration', 18, 236)
+  doc.roundedRect(12, lowerSectionY, 108, bottomBoxHeight, 3, 3)
+  sectionLabel(doc, 'Declaration', 18, lowerSectionY + 7)
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(7.3)
   setText(doc, COLORS.body)
-  doc.text(
-    doc.splitTextToSize(
-      'We declare that this invoice shows the actual price of the services described and that all particulars are true and correct.',
-      98
-    ),
-    18,
-    242
-  )
+  doc.text(declarationLines, 18, lowerSectionY + 14)
 
   setFill(doc, COLORS.goldSoft)
-  doc.roundedRect(126, 249, 72, 28, 3, 3, 'FD')
-  sectionLabel(doc, 'LeafWalk Bank Details', 132, 256)
+  doc.roundedRect(126, lowerSectionY, 72, bottomBoxHeight, 3, 3, 'FD')
+  sectionLabel(doc, 'LeafWalk Bank Details', 132, lowerSectionY + 7)
   doc.setFont('helvetica', 'normal')
-  doc.setFontSize(7.1)
+  doc.setFontSize(7)
   setText(doc, COLORS.body)
-  doc.text(doc.splitTextToSize(invoice.bankLines.join('\n') || 'Available on request', 60), 132, 262)
+  doc.text(bankLinesWrapped, 132, lowerSectionY + 14)
 
-  drawGoldLine(doc, 282)
+  const footerY = Math.min(286, lowerSectionY + bottomBoxHeight + 8)
+  drawGoldLine(doc, footerY)
   doc.setFont('times', 'bold')
   doc.setFontSize(10)
   setText(doc, COLORS.gold)
-  doc.text(RESORT.name, 12, 287.5)
+  doc.text(RESORT.name, 12, footerY + 5.5)
   doc.setFont('helvetica', 'normal')
-  doc.setFontSize(7)
+  doc.setFontSize(6.8)
   setText(doc, COLORS.muted)
-  doc.text(`${RESORT.address}, ${RESORT.city}, ${RESORT.state}${COMPANY_DETAILS.pincode ? ` - ${COMPANY_DETAILS.pincode}` : ''}`, 12, 292)
-  doc.text('This is a system generated invoice.', 105, 292, { align: 'center' })
+  doc.text(`${RESORT.address}, ${RESORT.city}, ${RESORT.state}${COMPANY_DETAILS.pincode ? ` - ${COMPANY_DETAILS.pincode}` : ''}`, 12, footerY + 9.5)
+  doc.text('This is a system generated invoice.', 105, footerY + 9.5, { align: 'center' })
   doc.setFont('helvetica', 'bold')
   setText(doc, COLORS.ink)
-  doc.text(`for ${clean(COMPANY_DETAILS.name || RESORT.name).toUpperCase()}`, 198, 287.5, { align: 'right' })
+  doc.text(`for ${clean(COMPANY_DETAILS.name || RESORT.name).toUpperCase()}`, 198, footerY + 5.5, { align: 'right' })
   doc.setFont('helvetica', 'normal')
-  doc.text('Authorised Signatory', 198, 292, { align: 'right' })
+  doc.text('Authorised Signatory', 198, footerY + 9.5, { align: 'right' })
 }
 
 export function createStyledBookingReceiptPdf(

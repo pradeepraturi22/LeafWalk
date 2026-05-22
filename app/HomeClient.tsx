@@ -346,23 +346,6 @@ export default function HomeClient({ pageName }: { pageName?: string }) {
               hasDates={pricingReady}
               priceUnavailable={pricingReady && deluxePrice === null}
               priceSuffix={deluxePrice ? `for ${deluxePrice.nights} night${deluxePrice.nights > 1 ? 's' : ''} · room only` : 'for your selected stay'}
-              availabilityMessage={
-                pricingReady
-                  ? deluxeAvailability
-                    ? deluxeAvailability.availableRooms > 0
-                      ? `${deluxeAvailability.availableRooms} room(s) available for selected dates`
-                      : 'Not available for selected dates'
-                    : 'Checking availability for selected dates...'
-                  : null
-              }
-              availabilityTone={
-                pricingReady
-                  ? deluxeAvailability
-                    ? deluxeAvailability.availableRooms > 0 ? 'success' : 'danger'
-                    : 'warning'
-                  : 'neutral'
-              }
-              features={['2 guests', '3rd guest on chargeable extra bed', 'Free parking', 'Mountain & valley views']}
               primaryCta={{ label: 'View Deluxe Rooms', href: '/rooms?category=deluxe' }}
             />
 
@@ -378,23 +361,6 @@ export default function HomeClient({ pageName }: { pageName?: string }) {
               hasDates={pricingReady}
               priceUnavailable={pricingReady && premiumPrice === null}
               priceSuffix={premiumPrice ? `for ${premiumPrice.nights} night${premiumPrice.nights > 1 ? 's' : ''} · room only` : 'for your selected stay'}
-              availabilityMessage={
-                pricingReady
-                  ? premiumAvailability
-                    ? premiumAvailability.availableRooms > 0
-                      ? `${premiumAvailability.availableRooms} room(s) available for selected dates`
-                      : 'Not available for selected dates'
-                    : 'Checking availability for selected dates...'
-                  : null
-              }
-              availabilityTone={
-                pricingReady
-                  ? premiumAvailability
-                    ? premiumAvailability.availableRooms > 0 ? 'success' : 'danger'
-                    : 'warning'
-                  : 'neutral'
-              }
-              features={['2 guests', '3rd guest on chargeable extra bed', 'WiFi & Parking', 'Mountain & valley views']}
               primaryCta={{ label: 'View Premium Cottages', href: '/rooms?category=premium' }}
             />
           </div>
