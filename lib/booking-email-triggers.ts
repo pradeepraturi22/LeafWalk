@@ -83,6 +83,11 @@ function isBackdatedBookingEntry(booking: BookingEmailContext) {
   return Boolean(checkInKey) && checkInKey < getTodayDateKey()
 }
 
+function hasPastCheckoutDate(booking: BookingEmailContext) {
+  const checkOutKey = String(booking.check_out || '').slice(0, 10)
+  return Boolean(checkOutKey) && checkOutKey < getTodayDateKey()
+}
+
 async function hasNotificationMarker(bookingId: string | null, recipient: string, markerPrefix: string) {
   try {
     let query = getSupabaseAdmin()
@@ -201,18 +206,14 @@ async function sendTrackedGuestEmail(input: {
 }
 
 async function buildCheckInEmailAssets(booking: BookingEmailContext) {
-  const isTourOperatorGuest = normalize(booking.booking_source) === 'tour_operator'
   const wifiPayload = await buildWifiEmailPayload()
   const qrAttachment = wifiPayload?.qrAttachment
-  const attachments = isTourOperatorGuest
-    ? [
-        await generateCheckInPassAttachment(booking as any),
-        ...(qrAttachment ? [qrAttachment] : []),
-      ]
-    : [
-        await generateReceiptAttachment(booking as any, { documentMode: 'receipt' }),
-        ...(qrAttachment ? [qrAttachment] : []),
-      ]
+  const attachments = [
+    ...(normalize(booking.booking_source) === 'tour_operator'
+      ? []
+      : [await generateReceiptAttachment(booking as any, { documentMode: 'receipt' })]),
+    ...(qrAttachment ? [qrAttachment] : []),
+  ]
 
   return {
     html: generateCheckInCompletedEmail(booking as any, {
@@ -316,6 +317,8 @@ export async function sendBookingLifecycleEmails(bookingId: string, trigger: Boo
 
   const source = normalize(booking.booking_source)
   const suppressCreateEmailsForBackdatedEntry = trigger === 'admin_booking_created' && isBackdatedBookingEntry(booking)
+  const suppressAdminUpdateEmailsForPastCheckout =
+    trigger.startsWith('admin_') && hasPastCheckoutDate(booking)
   const results = {
     guestConfirmation: false,
     paymentSuccess: false,
@@ -331,7 +334,12 @@ export async function sendBookingLifecycleEmails(bookingId: string, trigger: Boo
       booking_status: booking.booking_status || 'unknown',
       payment_status: booking.payment_status || 'unknown',
       suppress_create_emails_for_backdated_entry: suppressCreateEmailsForBackdatedEntry,
+      suppress_admin_update_emails_for_past_checkout: suppressAdminUpdateEmailsForPastCheckout,
     })
+  }
+
+  if (suppressAdminUpdateEmailsForPastCheckout) {
+    return results
   }
 
   if (
