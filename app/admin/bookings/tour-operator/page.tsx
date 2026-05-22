@@ -88,6 +88,7 @@ export default function TourOperatorBooking() {
     admin_notes: '',
     hold_notes: '',
     payment_method: 'bank_transfer',
+    payment_date: new Date().toISOString().split('T')[0],
     advance_amount: 0,
     commission_rate: 10,
     calculate_gst: true,
@@ -297,6 +298,7 @@ export default function TourOperatorBooking() {
         gst_total: Math.round(grandGst * 100) / 100,
         total_amount: Math.round(grandTotal * 100) / 100,
         payment_method: bookingMode === 'confirm' ? form.payment_method : null,
+        payment_date: bookingMode === 'confirm' ? form.payment_date || null : null,
         payment_status: bookingMode === 'hold' ? 'pending'
           : form.advance_amount >= grandTotal ? 'fully_paid' : 'payment_processing',
         advance_amount: bookingMode === 'confirm' ? form.advance_amount : 0,
@@ -446,7 +448,7 @@ export default function TourOperatorBooking() {
             <div className="grid md:grid-cols-2 gap-4">
               <div>
                 <label className={LABEL}>Check-in *</label>
-                <input type="date" required value={form.check_in} min={todayIso()}
+                <input type="date" required value={form.check_in}
                   onChange={e => handleCheckInChange(e.target.value)}
                   className={INPUT} />
               </div>
@@ -687,7 +689,7 @@ export default function TourOperatorBooking() {
                 <span className="w-6 h-6 bg-[#c9a14a] text-black text-xs rounded-full flex items-center justify-center font-bold">6</span>
                 Payment Details
               </h2>
-              <div className="grid md:grid-cols-2 gap-4">
+              <div className="grid md:grid-cols-3 gap-4">
                 <div>
                   <label className={LABEL}>Payment Method</label>
                   <select value={form.payment_method} onChange={e => set('payment_method', e.target.value)} className={INPUT}>
@@ -696,6 +698,16 @@ export default function TourOperatorBooking() {
                     <option value="upi">UPI</option>
                     <option value="card">Card</option>
                   </select>
+                </div>
+                <div>
+                  <label className={LABEL}>Payment Date</label>
+                  <input
+                    type="date"
+                    value={form.payment_date}
+                    onChange={e => set('payment_date', e.target.value)}
+                    max={new Date().toISOString().split('T')[0]}
+                    className={INPUT}
+                  />
                 </div>
                 <div>
                   <label className={LABEL}>Advance Amount Received (₹)</label>

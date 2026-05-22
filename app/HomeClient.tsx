@@ -259,7 +259,7 @@ export default function HomeClient({ pageName }: { pageName?: string }) {
   return (
     <>
       <div className="hero">
-        <video autoPlay muted loop playsInline preload="none">
+        <video autoPlay muted loop playsInline preload="none" controlsList="nodownload noremoteplayback nofullscreen" disablePictureInPicture onContextMenu={(event) => event.preventDefault()}>
           <source src="/videos/Hero-Demo2.mp4" type="video/mp4" />
         </video>
         <div className="hero-overlay">

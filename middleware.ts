@@ -15,6 +15,27 @@ const MAINTENANCE_BYPASS = [
   '/favicon.ico',
 ]
 
+function isProtectedMediaPath(pathname: string) {
+  return (
+    pathname.startsWith('/gallery/') ||
+    pathname.startsWith('/images/') ||
+    pathname.startsWith('/videos/') ||
+    pathname.startsWith('/logo/') ||
+    pathname.startsWith('/_next/image') ||
+    /\.(png|jpe?g|webp|avif|gif|svg|mp4|webm|mov)$/i.test(pathname)
+  )
+}
+
+function isSameOriginReferer(request: NextRequest) {
+  const referer = request.headers.get('referer')
+  if (!referer) return false
+  try {
+    return new URL(referer).origin === request.nextUrl.origin
+  } catch {
+    return false
+  }
+}
+
 function hasInternalSecretHeader(request: NextRequest) {
   const expected = process.env.INTERNAL_API_SECRET
   if (!expected) return false
@@ -186,6 +207,29 @@ export async function middleware(request: NextRequest) {
   )
   response.headers.set('x-nonce', nonce)
 
+  if (isProtectedMediaPath(pathname)) {
+    response.headers.set('Cache-Control', 'private, no-store, no-cache, must-revalidate')
+    response.headers.set('Pragma', 'no-cache')
+    response.headers.set('Expires', '0')
+    response.headers.set('Content-Disposition', 'inline')
+    response.headers.set('X-Robots-Tag', 'noindex, noimageindex, noarchive, nosnippet')
+    response.headers.set('Accept-Ranges', 'none')
+    response.headers.set('Cross-Origin-Resource-Policy', 'same-origin')
+
+    const secFetchDest = request.headers.get('sec-fetch-dest') || ''
+    const sameOriginReferer = isSameOriginReferer(request)
+    const hasTrustedOrigin =
+      !request.headers.get('origin') || request.headers.get('origin') === request.nextUrl.origin
+
+    if (!hasTrustedOrigin) {
+      return new NextResponse('Forbidden', { status: 403, headers: response.headers })
+    }
+
+    if ((secFetchDest === 'document' || secFetchDest === 'empty') && !sameOriginReferer) {
+      return new NextResponse('Not Found', { status: 404, headers: response.headers })
+    }
+  }
+
   if (isMaintenanceMode()) {
     const isBypassed = MAINTENANCE_BYPASS.some((path) => pathname.startsWith(path))
     const hasPreviewAccess = await verifyPreviewAccessCookie(request.cookies.get(PREVIEW_ACCESS_COOKIE)?.value)
@@ -282,5 +326,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|logo|gallery|videos|images).*)'],
+  matcher: ['/((?!_next/static|favicon.ico).*)'],
 }

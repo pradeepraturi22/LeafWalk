@@ -203,19 +203,21 @@ async function sendTrackedGuestEmail(input: {
 async function buildCheckInEmailAssets(booking: BookingEmailContext) {
   const isTourOperatorGuest = normalize(booking.booking_source) === 'tour_operator'
   const wifiPayload = await buildWifiEmailPayload()
+  const qrAttachment = wifiPayload?.qrAttachment
   const attachments = isTourOperatorGuest
     ? [
         await generateCheckInPassAttachment(booking as any),
+        ...(qrAttachment ? [qrAttachment] : []),
       ]
     : [
         await generateReceiptAttachment(booking as any, { documentMode: 'receipt' }),
-        ...(wifiPayload?.qrAttachment ? [wifiPayload.qrAttachment] : []),
+        ...(qrAttachment ? [qrAttachment] : []),
       ]
 
   return {
     html: generateCheckInCompletedEmail(booking as any, {
       ...wifiPayload?.wifi,
-      qrCid: wifiPayload?.qrAttachment ? getWifiQrCid() : null,
+      qrCid: qrAttachment ? getWifiQrCid() : null,
     }),
     attachments,
   }

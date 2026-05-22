@@ -5,6 +5,7 @@ import { headers } from 'next/headers'
 import { Playfair_Display, Jost } from 'next/font/google'
 import ConditionalLayout from '@/components/ConditionalLayout'
 import { BookingProvider } from '@/context/BookingContext'
+import MediaProtection from '@/components/MediaProtection'
 
 const playfair = Playfair_Display({ subsets: ['latin'], variable: '--font-playfair', display: 'swap' })
 const jost = Jost({ subsets: ['latin'], weight: ['300', '400', '500', '600', '700'], variable: '--font-jost', display: 'swap' })
@@ -102,6 +103,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       </head>
       <body className="antialiased" style={{ fontFamily: 'var(--font-jost), sans-serif' }}>
         <BookingProvider>
+          <MediaProtection />
           <ConditionalLayout>{children}</ConditionalLayout>
         </BookingProvider>
       </body>
