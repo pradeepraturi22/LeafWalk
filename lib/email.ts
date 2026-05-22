@@ -583,9 +583,6 @@ export function renderCheckInCompletedEmail(booking: BookingLike, wifi?: WifiEma
   const paymentStatus = String(booking.payment_status || 'pending').replace(/_/g, ' ').toUpperCase()
   const receiptLabel = 'booking receipt'
   const showAttachmentNote = String(booking.booking_source || '').toLowerCase() !== 'tour_operator'
-  const wifiName = String(wifi?.ssid || 'Leafwalk Resort')
-  const wifiPassword = String(wifi?.password || 'Password-123456')
-  const wifiSecurity = String(wifi?.security || 'WPA')
   const wifiQrBlock = wifi?.qrCid ? `
         <div style="margin-top:18px;padding:18px;border:1px solid #e5e7eb;border-radius:16px;background:#faf7f1;text-align:center">
           <div style="font-size:12px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#6b7280;margin-bottom:10px">Wi-Fi QR</div>
@@ -625,8 +622,6 @@ export function renderCheckInCompletedEmail(booking: BookingLike, wifi?: WifiEma
         <div style="font-size:12px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#6b7280;margin-bottom:10px">Hotel Information</div>
         <table style="width:100%;border-collapse:collapse">
           ${[
-            ['Wi-Fi', `${wifiName} / ${wifiPassword}`],
-            ['Wi-Fi Security', wifiSecurity],
             ['Restaurant Timings', 'Breakfast 8:00 AM - 10:00 AM | Kitchen till 10:00 PM'],
             ['Contact', '+91-8630227541'],
           ].map(([label, value]) => `

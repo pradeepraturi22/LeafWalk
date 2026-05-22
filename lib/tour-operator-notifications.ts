@@ -173,8 +173,6 @@ function buildStatusHtml(
           <div style="font-size:12px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#6b7280;margin-bottom:10px">Hotel Information</div>
           <table style="width:100%;border-collapse:collapse">
             ${[
-              ['Wi-Fi', `${wifi?.ssid || 'Leafwalk Resort'} / ${wifi?.password || 'Password-123456'}`],
-              ['Wi-Fi Security', wifi?.security || 'WPA'],
               ['Restaurant Timings', 'Breakfast 8:00 AM - 10:00 AM | Kitchen till 10:00 PM'],
               ['Front Desk Contact', '+91-8630227541'],
             ].map(([label, value]) => `
