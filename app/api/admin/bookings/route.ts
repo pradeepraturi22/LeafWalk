@@ -18,22 +18,37 @@ async function requireAdmin(request: NextRequest) {
   return user
 }
 
+function getIstNow() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Calcutta',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(new Date())
+
+  const map = Object.fromEntries(parts.filter((part) => part.type !== 'literal').map((part) => [part.type, part.value]))
+  return {
+    date: `${map.year}-${map.month}-${map.day}`,
+    hour: Number(map.hour || 0),
+    minute: Number(map.minute || 0),
+  }
+}
+
 function validateAdminCheckInWindow(checkInDate?: string | null) {
   if (!checkInDate) {
     return 'Check-in date is missing for this booking'
   }
 
-  const now = new Date()
-  const today = new Date(now)
-  today.setHours(0, 0, 0, 0)
+  const now = getIstNow()
+  const bookingDate = String(checkInDate).slice(0, 10)
 
-  const bookingCheckInDate = new Date(`${checkInDate}T12:00:00`)
-  bookingCheckInDate.setHours(0, 0, 0, 0)
-
-  if (bookingCheckInDate.getTime() > today.getTime()) {
+  if (bookingDate > now.date) {
     return 'Guests can only be checked in on their actual check-in date'
   }
-  if (bookingCheckInDate.getTime() === today.getTime() && now.getHours() < 15) {
+  if (bookingDate === now.date && now.hour < 15) {
     return 'Guests can be checked in only after 3:00 PM on the check-in date'
   }
 
@@ -45,13 +60,10 @@ function validateAdminCheckOutWindow(checkOutDate?: string | null) {
     return 'Check-out date is missing for this booking'
   }
 
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
+  const now = getIstNow()
+  const bookingDate = String(checkOutDate).slice(0, 10)
 
-  const bookingCheckOutDate = new Date(`${checkOutDate}T12:00:00`)
-  bookingCheckOutDate.setHours(0, 0, 0, 0)
-
-  if (bookingCheckOutDate.getTime() > today.getTime()) {
+  if (bookingDate > now.date) {
     return 'Guests can only be checked out on or after their actual check-out date'
   }
 

@@ -339,7 +339,7 @@ export default function HomeClient({ pageName }: { pageName?: string }) {
               title={deluxeRoom?.name || 'Deluxe Rooms'}
               image={getRoomImage(deluxeRoom)}
               imageAlt={deluxeRoom?.name || 'Deluxe Rooms'}
-              description={deluxeRoom?.description || 'Elegant mountain-view rooms with premium interiors and modern amenities. Ideal for couples and small families seeking comfort in nature.'}
+              description={deluxeRoom?.description || 'Elegant mountain-view rooms with premium interiors and modern amenities. Perfect for couples seeking comfort in nature.'}
               badge="Deluxe"
               accent="deluxe"
               price={deluxePrice?.totalPrice ?? null}
