@@ -6,7 +6,7 @@ import { COMPANY_DETAILS } from '@/lib/constants'
 
 const RESORT = {
   name: COMPANY_DETAILS.name || 'LeafWalk Resort',
-  gstin: COMPANY_DETAILS.gstin || '05AADFL1234R1Z5',
+  gstin: COMPANY_DETAILS.gstin || '05BFOPR6010R1ZU',
   pan: COMPANY_DETAILS.pan || 'AADFL1234R',
   address: COMPANY_DETAILS.address || 'Vill- Banas, Narad Chatti, Hanuman Chatti',
   city: COMPANY_DETAILS.city || 'Yamunotri Road, Uttarkashi',

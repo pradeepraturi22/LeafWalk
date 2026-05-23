@@ -88,7 +88,7 @@ const RESORT = {
   phone: '+91-9368080535 | +91-8630227541',
   email: 'info@leafwalk.in',
   website: 'www.leafwalk.in',
-  gstin: '05AADFL1234R1Z5',
+  gstin: '05BFOPR6010R1ZU',
   sacCode: '996311',
 }
 
