@@ -104,7 +104,7 @@ function isBillToIntraState(
 export function buildGSTInvoiceData(booking: any): GstInvoiceDocumentData {
   const checkIn = formatDate(booking.check_in)
   const checkOut = formatDate(booking.check_out)
-  const billDate = formatDate(new Date())
+  const billDate = formatDate(booking.payment_date || booking.advance_paid_at || booking.confirmed_at || booking.created_at || new Date())
   const mealLabel = MEAL_LABELS[booking.meal_plan] || booking.meal_plan || '-'
   const operator = booking.tour_operator || null
   const invoiceParty = getInvoicePartyMeta(booking)
@@ -128,8 +128,7 @@ export function buildGSTInvoiceData(booking: any): GstInvoiceDocumentData {
       }
     : invoiceParty
 
-  const sellerStateCode = String(RESORT.gstin || '').slice(0, 2) || '05'
-  const isIntraState = isBillToIntraState(operatorInvoiceParty, sellerStateCode)
+  const isIntraState = true
 
   const items: GstInvoiceLineItem[] = []
   const roomRate = Number(booking.rate_per_room_per_night || 0)
@@ -152,7 +151,7 @@ export function buildGSTInvoiceData(booking: any): GstInvoiceDocumentData {
   const subtotal = gstMath.subtotal
   const cgst = gstMath.cgst
   const sgst = gstMath.sgst
-  const igst = cgst + sgst
+  const igst = 0
   const storedDiscount = Number(booking.discount_amount || 0)
   const advance = Number(booking.advance_amount || 0)
   const rawBalance = Number(booking.balance_amount || 0)
@@ -331,7 +330,7 @@ export function buildGSTBillHtml(booking: any): string {
       <div><div class="ml">Invoice No</div><div class="mv">${invoice.invoiceNo}</div></div>
       <div><div class="ml">Date</div><div class="mv">${invoice.billDate}</div></div>
       <div><div class="ml">Payment Mode</div><div class="mv">${invoice.paymentMode}</div></div>
-      <div><div class="ml">Tax Type</div><div class="mv" style="font-size:11px">${invoice.isIntraState ? 'CGST + SGST' : 'IGST'}</div></div>
+      <div><div class="ml">Tax Type</div><div class="mv" style="font-size:11px">CGST + SGST</div></div>
     </div>
   </div>
   <div class="meta-cell">
@@ -432,9 +431,8 @@ export function buildGSTBillHtml(booking: any): string {
     ${invoice.discountBeforeTax > 0 ? `<tr><td>Gross Service Value</td><td class="amt">Rs.${fmt(invoice.subtotal + invoice.discountBeforeTax)}</td></tr>` : ''}
     ${invoice.discountBeforeTax > 0 ? `<tr><td>Less: Discount (Before Tax)</td><td class="amt">Rs.${fmt(invoice.discountBeforeTax)}</td></tr>` : ''}
     <tr><td>Taxable Amount</td><td class="amt">Rs.${fmt(invoice.subtotal)}</td></tr>
-    ${invoice.isIntraState
-      ? `<tr><td>CGST @ 2.5%</td><td class="amt">Rs.${fmt(invoice.cgst)}</td></tr><tr><td>SGST @ 2.5%</td><td class="amt">Rs.${fmt(invoice.sgst)}</td></tr>`
-      : `<tr><td>IGST @ 5%</td><td class="amt">Rs.${fmt(invoice.igst)}</td></tr>`}
+    <tr><td>CGST @ 2.5%</td><td class="amt">Rs.${fmt(invoice.cgst)}</td></tr>
+    <tr><td>SGST @ 2.5%</td><td class="amt">Rs.${fmt(invoice.sgst)}</td></tr>
     <tr class="trow"><td>Total Amount</td><td class="amt">Rs.${fmt(invoice.total)}</td></tr>
     ${(!invoice.isFullyPaid && invoice.balance > 0) ? `<tr class="brow"><td>Balance Due</td><td class="amt">Rs.${fmt(invoice.balance)}</td></tr>` : ''}
   </table>

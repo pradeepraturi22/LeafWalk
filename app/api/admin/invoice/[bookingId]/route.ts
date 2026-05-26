@@ -47,7 +47,7 @@ export async function GET(
         guest_address, guest_district, guest_state, guest_country,
         check_in, check_out, nights, rooms_booked, adults, children_5_to_12, children_below_5, extra_beds,
         meal_plan, total_amount, subtotal, cgst, sgst, gst_total, advance_amount, balance_amount,
-        payment_method, payment_status, booking_status, booking_source, created_at, confirmed_at,
+        payment_method, payment_status, booking_status, booking_source, created_at, confirmed_at, payment_date, advance_paid_at,
         gst_invoice_requested, gst_company_name, gst_number, gst_state,
         room:rooms(name, category),
         tour_operator_id,

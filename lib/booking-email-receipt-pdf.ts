@@ -397,12 +397,8 @@ function createStructuredInvoicePdf(doc: jsPDF, booking: ReceiptBooking) {
       ['Less: Discount', money(invoice.discountBeforeTax)],
     ] as Array<[string, string]> : []),
     ['Taxable Amount', money(invoice.subtotal)],
-    ...(invoice.isIntraState
-      ? [
-          ['CGST @ 2.5%', money(invoice.cgst)],
-          ['SGST @ 2.5%', money(invoice.sgst)],
-        ] as Array<[string, string]>
-      : [['IGST @ 5%', money(invoice.igst)] as [string, string]]),
+    ['CGST @ 2.5%', money(invoice.cgst)],
+    ['SGST @ 2.5%', money(invoice.sgst)],
   ]
   const totalsBoxHeight = Math.max(44, 14 + totalsRows.length * 6 + 12)
   setDraw(doc, COLORS.border)

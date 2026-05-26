@@ -6,7 +6,6 @@ import Link from 'next/link'
 import toast, { Toaster } from 'react-hot-toast'
 import ReceiptButton from '@/components/ReceiptButton'
 import { INDIA_STATE_CODE_OPTIONS } from '@/lib/india-state-codes'
-import { getIndiaStateCodeByName } from '@/lib/india-state-codes'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const MEAL_PLANS = [
@@ -328,9 +327,6 @@ export default function WalkInBooking() {
   const gstTotal      = cgst + sgst
   const totalAmount   = grossAmt
   const balanceAmt    = Math.max(0, totalAmount - form.advance_amount)
-  const billToStateName = gstWanted && form.gst_company_name.trim() ? form.gst_state : form.guest_state
-  const billToStateCode = getIndiaStateCodeByName(billToStateName)
-  const isIntraStateBilling = !billToStateCode || billToStateCode === '05'
   const maxRoomsAllowed = Math.max(1, Number(availability?.available_rooms || selRoom?.total_rooms || 1))
   const maxAdultsAllowed = Math.max(1, form.rooms_booked * 4)
   const autoExtraBeds = Math.min(Math.max(0, form.adults - (form.rooms_booked * 2)), form.rooms_booked * 2)
@@ -755,14 +751,8 @@ export default function WalkInBooking() {
                 )}
                 <div className="border-t border-white/10 pt-2 space-y-1 text-xs text-white/40">
                   <div className="flex justify-between"><span>Subtotal (excl. GST 5%)</span><span>₹{subtotal.toLocaleString()}</span></div>
-                  {isIntraStateBilling ? (
-                    <>
-                      <div className="flex justify-between"><span>CGST @ 2.5%</span><span>₹{cgst.toLocaleString()}</span></div>
-                      <div className="flex justify-between"><span>SGST @ 2.5%</span><span>₹{sgst.toLocaleString()}</span></div>
-                    </>
-                  ) : (
-                    <div className="flex justify-between"><span>IGST @ 5%</span><span>₹{(cgst + sgst).toLocaleString()}</span></div>
-                  )}
+                  <div className="flex justify-between"><span>CGST @ 2.5%</span><span>₹{cgst.toLocaleString()}</span></div>
+                  <div className="flex justify-between"><span>SGST @ 2.5%</span><span>₹{sgst.toLocaleString()}</span></div>
                 </div>
                 <div className="border-t border-white/10 pt-2 flex justify-between font-bold">
                   <span className="text-white">Total Amount</span>
