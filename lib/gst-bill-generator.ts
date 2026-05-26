@@ -13,7 +13,7 @@ const RESORT = {
   address: COMPANY_DETAILS.address || 'Vill- Banas, Narad Chatti, Hanuman Chatti',
   city: COMPANY_DETAILS.city || 'Yamunotri Road, Uttarkashi',
   state: COMPANY_DETAILS.state || 'Uttarakhand',
-  pincode: COMPANY_DETAILS.pincode || '249193',
+  pincode: COMPANY_DETAILS.pincode || '249141',
   phone: COMPANY_DETAILS.phone || '+91-8630227541',
   email: COMPANY_DETAILS.email || 'info@leafwalk.in',
   website: COMPANY_DETAILS.website || 'www.leafwalk.in',
@@ -49,6 +49,7 @@ export type GstInvoiceDocumentData = {
   checkOut: string
   billDate: string
   mealLabel: string
+  guestName: string
   operator: any
   invoiceParty: ReturnType<typeof getInvoicePartyMeta>
   invoiceNo: string
@@ -200,6 +201,7 @@ export function buildGSTInvoiceData(booking: any): GstInvoiceDocumentData {
     checkOut,
     billDate,
     mealLabel,
+    guestName: String(booking.guest_name || '-').trim() || '-',
     operator,
     invoiceParty: operatorInvoiceParty,
     invoiceNo,
@@ -381,6 +383,7 @@ export function buildGSTBillHtml(booking: any): string {
   <div class="party-cell">
     <div class="ph">Stay Information</div>
     <div class="pd" style="margin-top:6px">
+      <strong>Guest:</strong> ${invoice.guestName}<br>
       <strong>Room:</strong> ${invoice.roomName}<br>
       <strong>Meal Plan:</strong> ${invoice.mealLabel}<br>
       <strong>Stay:</strong> ${invoice.nights} Night${invoice.nights === 1 ? '' : 's'} · ${invoice.rooms} Room${invoice.rooms === 1 ? '' : 's'}
@@ -457,6 +460,11 @@ export function buildGSTBillHtml(booking: any): string {
     <div class="block-title">Declaration</div>
     <div class="block-body">
       We declare that this invoice shows the actual price of the services described and that all particulars are true and correct.
+      <div style="margin-top:12px">
+        <div class="block-title" style="margin-bottom:6px">Corporate Office</div>
+        ${COMPANY_DETAILS.corporateOfficeAddress}<br>
+        Mobile: ${COMPANY_DETAILS.corporateOfficePhone}
+      </div>
     </div>
   </div>
   <div class="bank">

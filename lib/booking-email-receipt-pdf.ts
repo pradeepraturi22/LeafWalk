@@ -83,7 +83,7 @@ const RESORT = {
   name: 'LeafWalk Resort',
   tagline: 'Stay in Lap of Nature',
   address: 'Vill- Banas, Narad Chatti, Hanuman Chatti',
-  city: 'Yamunotri Road, Uttarkashi, Uttarakhand - 249193',
+  city: 'Yamunotri Road, Uttarkashi',
   state: 'Uttarakhand',
   phone: '+91-9368080535 | +91-8630227541',
   email: 'info@leafwalk.in',
@@ -274,6 +274,7 @@ function createStructuredInvoicePdf(doc: jsPDF, booking: ReceiptBooking) {
   const billToWrapped = doc.splitTextToSize(billToLines.join('\n'), 100)
   const billToHeight = Math.max(42, 18 + billToWrapped.length * 4.2)
   const stayRows: Array<[string, string]> = [
+    ['Guest', invoice.guestName],
     ['Check-in', invoice.checkIn],
     ['Check-out', invoice.checkOut],
     ['Room', invoice.roomName],
@@ -451,12 +452,14 @@ function createStructuredInvoicePdf(doc: jsPDF, booking: ReceiptBooking) {
   doc.setFontSize(6.8)
   setText(doc, COLORS.muted)
   doc.text(`${RESORT.address}, ${RESORT.city}, ${RESORT.state}${COMPANY_DETAILS.pincode ? ` - ${COMPANY_DETAILS.pincode}` : ''}`, 12, footerY + 9.5)
-  doc.text('This is a system generated invoice.', 105, footerY + 9.5, { align: 'center' })
+  doc.text(`Corporate Office: ${clean(COMPANY_DETAILS.corporateOfficeAddress || 'House number:210, Lane No-2, Krishna Puram, Majri Mafi, Dehradun-248005')}`, 105, footerY + 6.2, { align: 'center' })
+  doc.text(`Mobile: ${clean(COMPANY_DETAILS.corporateOfficePhone || '+91-9368080535')}`, 105, footerY + 9.5, { align: 'center' })
+  doc.text('This is a system generated invoice.', 105, footerY + 12.8, { align: 'center' })
   doc.setFont('helvetica', 'bold')
   setText(doc, COLORS.ink)
   doc.text(`for ${clean(COMPANY_DETAILS.name || RESORT.name).toUpperCase()}`, 198, footerY + 5.5, { align: 'right' })
   doc.setFont('helvetica', 'normal')
-  doc.text('Authorised Signatory', 198, footerY + 9.5, { align: 'right' })
+  doc.text('Authorised Signatory', 198, footerY + 12.8, { align: 'right' })
 }
 
 export function createStyledBookingReceiptPdf(
