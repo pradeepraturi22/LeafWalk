@@ -1,10 +1,10 @@
 // Company Details for GST Bill
 export const COMPANY_DETAILS = {
   name: "Leafwalk Resort",
-  address: process.env.COMPANY_ADDRESS || "Village Kanatal, Tehri Garhwal",
-  city: process.env.COMPANY_CITY || "Uttarakhand",
+  address: process.env.COMPANY_ADDRESS || "Vill- Banas, Narad Chatti, Hanuman Chatti",
+  city: process.env.COMPANY_CITY || "Yamunotri Road, Uttarkashi",
   state: process.env.COMPANY_STATE || "Uttarakhand",
-  pincode: process.env.COMPANY_PINCODE || "249130",
+  pincode: process.env.COMPANY_PINCODE || "249193",
   phone: process.env.COMPANY_PHONE || "+91 8630227541",
   email: process.env.COMPANY_EMAIL || "bookings@leafwalk.in",
   gstin: process.env.COMPANY_GSTIN || "05BFOPR6010R1ZU",
