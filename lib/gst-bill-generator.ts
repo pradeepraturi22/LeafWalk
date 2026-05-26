@@ -3,6 +3,8 @@ import { calculateGST, calculateGSTFromSubtotal } from '@/lib/gst-bill-service'
 import { getInvoicePartyMeta } from '@/lib/invoice-party'
 import { getIndiaStateCodeByName } from '@/lib/india-state-codes'
 import { COMPANY_DETAILS } from '@/lib/constants'
+import { readFileSync } from 'fs'
+import { join } from 'path'
 
 const RESORT = {
   name: COMPANY_DETAILS.name || 'LeafWalk Resort',
@@ -24,6 +26,15 @@ const MEAL_LABELS: Record<string, string> = {
   MAP: 'Room + Breakfast + Dinner (MAP)',
   AP: 'All Meals Included (AP)',
 }
+
+const LOGO_DATA_URL = (() => {
+  try {
+    const logoBuffer = readFileSync(join(process.cwd(), 'public', 'logo', 'leafwalk-logo.jpeg'))
+    return `data:image/jpeg;base64,${logoBuffer.toString('base64')}`
+  } catch {
+    return ''
+  }
+})()
 
 export type GstInvoiceLineItem = {
   desc: string
@@ -228,8 +239,9 @@ export function buildGSTBillHtml(booking: any): string {
   .page{width:210mm;min-height:297mm;margin:10px auto;background:#fff;box-shadow:0 4px 30px rgba(0,0,0,.15);position:relative;overflow:hidden}
   .hdr{background:linear-gradient(135deg,#0a0a0a 0%,#151208 50%,#1e1a0a 100%);padding:24px 32px 20px;display:flex;align-items:center;gap:18px;position:relative;overflow:hidden;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .hdr::before{content:'';position:absolute;top:-60px;right:-60px;width:220px;height:220px;background:radial-gradient(circle,rgba(201,161,74,.12) 0%,transparent 70%);border-radius:50%}
-  .logo-wrap{width:58px;height:58px;border:2px solid rgba(201,161,74,.7);border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(201,161,74,.08);flex-shrink:0}
-  .logo-emoji{font-size:24px}
+  .logo-wrap{width:58px;height:58px;border:2px solid rgba(201,161,74,.7);border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(201,161,74,.08);flex-shrink:0;overflow:hidden;padding:3px}
+  .logo-wrap img{display:block;width:100%;height:100%;object-fit:contain;border-radius:50%;background:#fff}
+  .logo-fallback{font-size:18px;font-weight:700;letter-spacing:1px;color:#c9a14a}
   .rinfo{flex:1}
   .rname{font-family:'Playfair Display','Georgia',serif;font-size:24px;font-weight:700;color:#c9a14a;letter-spacing:2px;line-height:1}
   .rtag{color:#8b6914;font-size:9px;letter-spacing:3px;text-transform:uppercase;margin-top:3px}
@@ -306,7 +318,9 @@ export function buildGSTBillHtml(booking: any): string {
 <div class="wm">LeafWalk Resort</div>
 
 <div class="hdr">
-  <div class="logo-wrap"><span class="logo-emoji">LW</span></div>
+  <div class="logo-wrap">${LOGO_DATA_URL
+    ? `<img src="${LOGO_DATA_URL}" alt="LeafWalk Resort Logo" />`
+    : `<span class="logo-fallback">LW</span>`}</div>
   <div class="rinfo">
     <div class="rname">LEAFWALK RESORT</div>
     <div class="rtag">Stay in Lap of Nature</div>
