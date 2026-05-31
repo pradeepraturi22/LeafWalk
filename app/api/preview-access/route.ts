@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
+import { isProduction } from '@/lib/runtime-mode'
 
 const PREVIEW_ACCESS_COOKIE = 'lw_preview_access'
 const PREVIEW_ACCESS_TTL_SECONDS = 12 * 60 * 60
@@ -62,6 +63,10 @@ export async function GET(request: NextRequest) {
   const cookieDomain = getPreviewCookieDomain(request)
 
   if (url.searchParams.get('debug') === '1') {
+    if (isProduction()) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    }
+
     if (!grantSecret || !providedSecret || !safeEquals(providedSecret, grantSecret)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }

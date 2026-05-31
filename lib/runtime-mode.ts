@@ -7,6 +7,9 @@ export function isProduction() {
 }
 
 export function isLocalTestMode() {
+  // Local/test conveniences must never become active in production even if an
+  // environment variable is accidentally copied during deployment.
+  if (isProduction()) return false
   return isDevelopment() || process.env.LOCAL_TEST_MODE === 'true'
 }
 
