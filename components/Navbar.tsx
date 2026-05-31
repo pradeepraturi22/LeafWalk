@@ -2,6 +2,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
+import { useRef } from 'react'
 import type { MouseEvent } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
@@ -19,6 +20,7 @@ const WA_ICON = <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24
 const CUSTOMER_IDLE_TIMEOUT_MS = Number(process.env.NEXT_PUBLIC_CUSTOMER_IDLE_TIMEOUT_MINUTES || 120) * 60 * 1000
 const NAVBAR_SESSION_CACHE_KEY = 'leafwalk-navbar-session'
 const NAVBAR_SESSION_CACHE_TTL_MS = 60 * 1000
+const CUSTOMER_SESSION_REFRESH_INTERVAL_MS = 5 * 60 * 1000
 
 type NavUser = {
   id?: string
@@ -34,6 +36,8 @@ export default function Navbar() {
   const [user, setUser]                 = useState<NavUser | null>(null)
   const [userRole, setUserRole]         = useState<string>('')
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const lastCustomerRefreshRef = useRef(0)
+  const customerRefreshInFlightRef = useRef(false)
   const path   = usePathname()
   const router = useRouter()
 
@@ -131,11 +135,32 @@ async function loadCustomerSession() {
       : 1000 * 60 * 60 * 2
     let timer: number | undefined
 
+    async function refreshActiveSessionIfNeeded() {
+      if (user.authType !== 'customer') return
+      if (customerRefreshInFlightRef.current) return
+      if (Date.now() - lastCustomerRefreshRef.current < CUSTOMER_SESSION_REFRESH_INTERVAL_MS) return
+
+      customerRefreshInFlightRef.current = true
+      try {
+        const response = await fetch('/api/auth/me', { cache: 'no-store' })
+        if (response.ok) {
+          lastCustomerRefreshRef.current = Date.now()
+        } else if (response.status === 401) {
+          await handleLogout()
+        }
+      } catch {
+        // Ignore transient failures; next authenticated request will re-check.
+      } finally {
+        customerRefreshInFlightRef.current = false
+      }
+    }
+
     const resetTimer = () => {
       if (timer) window.clearTimeout(timer)
       timer = window.setTimeout(() => {
         void handleLogout()
       }, timeoutMs)
+      void refreshActiveSessionIfNeeded()
     }
 
     const events = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart']
@@ -146,7 +171,7 @@ async function loadCustomerSession() {
       if (timer) window.clearTimeout(timer)
       events.forEach((eventName) => window.removeEventListener(eventName, resetTimer))
     }
-  }, [user?.email])
+  }, [user?.email, user?.authType])
 
   async function fetchRole(userId: string, token?: string) {
     // Try fast: user_metadata first

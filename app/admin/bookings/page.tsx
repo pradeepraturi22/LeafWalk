@@ -148,7 +148,13 @@ export default function AdminBookingsPage() {
 
     const today = new Date(); today.setHours(0, 0, 0, 0)
     if (dateFilter === 'upcoming') f = f.filter(b => new Date(b.check_in) > today)
-    else if (dateFilter === 'current') f = f.filter(b => new Date(b.check_in) <= today && new Date(b.check_out) >= today)
+    else if (dateFilter === 'current') {
+      f = f.filter(b =>
+        !['checked_out', 'cancelled', 'no_show', 'completed'].includes(String(b.booking_status || '').trim().toLowerCase()) &&
+        new Date(b.check_in) <= today &&
+        new Date(b.check_out) >= today
+      )
+    }
     else if (dateFilter === 'past') f = f.filter(b => new Date(b.check_out) < today)
 
     if (searchQuery) {

@@ -422,6 +422,7 @@ async function createBookingFromStoredDraft(input: ReconcileSuccessInput): Promi
     .update({
       booking_number: bookingNumber,
       invoice_number: invoiceNumber,
+      payment_date: today,
       updated_at: nowIso,
     } as any)
     .eq('id', insertedBooking.id)
@@ -607,6 +608,7 @@ export async function reconcileSuccessfulPayment(input: ReconcileSuccessInput): 
     advance_amount: booking.total_amount,
     balance_amount: 0,
     advance_paid_at: nowIso,
+    payment_date: today,
     payment_id: input.paymentId,
     razorpay_payment_id: input.paymentId,
     razorpay_order_id: input.orderId,

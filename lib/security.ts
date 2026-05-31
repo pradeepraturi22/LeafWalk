@@ -3,6 +3,7 @@ import crypto from 'crypto'
 import { ZodType } from 'zod'
 
 export const ADMIN_SESSION_COOKIE = 'lw_admin_session'
+const DEFAULT_ADMIN_IDLE_TIMEOUT_MS = 1000 * 60 * 60 * 2
 
 export function sanitizeString(value: string, maxLength = 500) {
   return value
@@ -63,11 +64,18 @@ export async function parseJsonBody<T>(request: Request, schema: ZodType<T>) {
 }
 
 export function createAdminSessionValue(userId: string, role: string) {
-  const payload = Buffer.from(JSON.stringify({ userId, role, ts: Date.now() })).toString('base64url')
+  const now = Date.now()
+  const payload = Buffer.from(JSON.stringify({ userId, role, ts: now, lastActivity: now })).toString('base64url')
   const secret = process.env.ADMIN_SESSION_SECRET
   if (!secret) throw new Error('Admin session secret is not configured')
   const signature = crypto.createHmac('sha256', secret).update(payload).digest('base64url')
   return `${payload}.${signature}`
+}
+
+export function getAdminSessionIdleTimeoutMs() {
+  const minutes = Number(process.env.ADMIN_SESSION_IDLE_MINUTES || 120)
+  if (!Number.isFinite(minutes) || minutes <= 0) return DEFAULT_ADMIN_IDLE_TIMEOUT_MS
+  return minutes * 60 * 1000
 }
 
 export function clearAdminSession(response: NextResponse) {

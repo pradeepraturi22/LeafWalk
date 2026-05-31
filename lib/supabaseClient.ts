@@ -7,18 +7,18 @@ export const isSupabaseBrowserConfigured = Boolean(
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
 const supabaseAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key'
 
-const sessionStorageAdapter = {
+const browserStorageAdapter = {
   getItem(key: string) {
     if (typeof window === 'undefined') return null
-    return window.sessionStorage.getItem(key)
+    return window.localStorage.getItem(key)
   },
   setItem(key: string, value: string) {
     if (typeof window === 'undefined') return
-    window.sessionStorage.setItem(key, value)
+    window.localStorage.setItem(key, value)
   },
   removeItem(key: string) {
     if (typeof window === 'undefined') return
-    window.sessionStorage.removeItem(key)
+    window.localStorage.removeItem(key)
   },
 }
 
@@ -28,6 +28,6 @@ export const supabase = createClient(supabaseUrl, supabaseAnon, {
     autoRefreshToken: true,
     detectSessionInUrl: true,
     storageKey: 'sb-leafwalk-auth',
-    storage: sessionStorageAdapter,
+    storage: browserStorageAdapter,
   },
 })

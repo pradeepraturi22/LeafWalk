@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 
 const ADMIN_LINKS = [
@@ -16,16 +16,81 @@ const ADMIN_LINKS = [
   { href: '/admin/tour-operators', label: 'Tour Operators', icon: 'TO' },
 ]
 
+const ADMIN_IDLE_TIMEOUT_MS = Number(process.env.NEXT_PUBLIC_ADMIN_IDLE_TIMEOUT_MINUTES || 120) * 60 * 1000
+const ADMIN_SESSION_REFRESH_INTERVAL_MS = 5 * 60 * 1000
+
 export default function AdminNavbar() {
   const router = useRouter()
   const path = usePathname()
   const [open, setOpen] = useState(false)
+  const refreshInFlightRef = useRef(false)
+  const lastRefreshRef = useRef(0)
 
-  async function logout() {
+  const logout = useCallback(async () => {
     await supabase.auth.signOut()
+    await fetch('/api/auth/logout', { method: 'POST' }).catch(() => null)
     router.push('/')
     router.refresh()
-  }
+  }, [router])
+
+  useEffect(() => {
+    const timeoutMs = Number.isFinite(ADMIN_IDLE_TIMEOUT_MS) && ADMIN_IDLE_TIMEOUT_MS > 0
+      ? ADMIN_IDLE_TIMEOUT_MS
+      : 1000 * 60 * 60 * 2
+
+    let timer: number | undefined
+
+    async function refreshAdminSessionIfNeeded() {
+      if (refreshInFlightRef.current) return
+      if (Date.now() - lastRefreshRef.current < ADMIN_SESSION_REFRESH_INTERVAL_MS) return
+
+      refreshInFlightRef.current = true
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session?.access_token) {
+          await logout()
+          return
+        }
+
+        const res = await fetch('/api/admin/verify', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          cache: 'no-store',
+        })
+
+        if (!res.ok) {
+          await logout()
+          return
+        }
+
+        lastRefreshRef.current = Date.now()
+      } catch {
+        // Ignore transient refresh errors and let the next protected request decide.
+      } finally {
+        refreshInFlightRef.current = false
+      }
+    }
+
+    const resetTimer = () => {
+      if (timer) window.clearTimeout(timer)
+      timer = window.setTimeout(() => {
+        void logout()
+      }, timeoutMs)
+      void refreshAdminSessionIfNeeded()
+    }
+
+    const events = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart']
+    events.forEach((eventName) => window.addEventListener(eventName, resetTimer, { passive: true }))
+    resetTimer()
+
+    return () => {
+      if (timer) window.clearTimeout(timer)
+      events.forEach((eventName) => window.removeEventListener(eventName, resetTimer))
+    }
+  }, [logout])
 
   return (
     <nav className="sticky top-0 z-40 w-full border-b border-white/10 bg-[#0d0d0d] text-white">

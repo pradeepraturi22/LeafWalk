@@ -15,7 +15,7 @@ const PAY_BADGE: Record<string,string> = {
   payment_processing:'bg-orange-500/20 text-orange-400', pending:'bg-red-500/20 text-red-400',
 }
 const isPaid = (b:any) => ['paid','fully_paid'].includes(b.payment_status)
-const isActive = (b:any) => !['cancelled','no_show'].includes(b.booking_status)
+const isActive = (b:any) => !['cancelled','no_show','checked_out','completed'].includes(String(b.booking_status || '').trim().toLowerCase())
 const fmt = (n:any) => `₹${Number(n||0).toLocaleString()}`
 
 const realizedRevenue = (b:any) => {

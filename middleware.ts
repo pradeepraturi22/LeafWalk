@@ -5,6 +5,7 @@ import { logDebug } from '@/lib/logger'
 
 const ADMIN_SESSION_COOKIE = 'lw_admin_session'
 const PREVIEW_ACCESS_COOKIE = 'lw_preview_access'
+const DEFAULT_ADMIN_IDLE_TIMEOUT_MS = 1000 * 60 * 60 * 2
 
 const MAINTENANCE_BYPASS = [
   '/maintenance',
@@ -111,8 +112,23 @@ async function verifyAdminSessionCookie(value?: string) {
     if (expected !== signature) return false
 
     const session = JSON.parse(new TextDecoder().decode(base64UrlToBytes(payload)))
-    const ageMs = Date.now() - Number(session.ts || 0)
-    return Boolean(session.userId && ['admin', 'manager'].includes(session.role) && ageMs >= 0 && ageMs <= 8 * 60 * 60 * 1000)
+    const issuedAt = Number(session.ts || 0)
+    const lastActivity = Number(session.lastActivity || issuedAt)
+    const ageMs = Date.now() - issuedAt
+    const idleMs = Date.now() - lastActivity
+    const idleTimeoutMs = (() => {
+      const minutes = Number(process.env.ADMIN_SESSION_IDLE_MINUTES || 120)
+      if (!Number.isFinite(minutes) || minutes <= 0) return DEFAULT_ADMIN_IDLE_TIMEOUT_MS
+      return minutes * 60 * 1000
+    })()
+    return Boolean(
+      session.userId &&
+      ['admin', 'manager'].includes(session.role) &&
+      ageMs >= 0 &&
+      ageMs <= 8 * 60 * 60 * 1000 &&
+      idleMs >= 0 &&
+      idleMs <= idleTimeoutMs
+    )
   } catch {
     return false
   }
@@ -208,9 +224,9 @@ export async function middleware(request: NextRequest) {
   response.headers.set('x-nonce', nonce)
 
   if (isProtectedMediaPath(pathname)) {
-    response.headers.set('Cache-Control', 'private, no-store, no-cache, must-revalidate')
-    response.headers.set('Pragma', 'no-cache')
-    response.headers.set('Expires', '0')
+    response.headers.set('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800')
+    response.headers.delete('Pragma')
+    response.headers.delete('Expires')
     response.headers.set('Content-Disposition', 'inline')
     response.headers.set('X-Robots-Tag', 'noindex, noimageindex, noarchive, nosnippet')
     response.headers.set('Accept-Ranges', 'none')
