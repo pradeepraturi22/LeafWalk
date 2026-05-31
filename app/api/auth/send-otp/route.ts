@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { maskOtpTarget, sendEmailOtp } from '@/lib/otp'
+import { sendEmailOtp } from '@/lib/otp'
+import { logWarn } from '@/lib/logger'
 import { parseJsonBody, sanitizeEmail } from '@/lib/security'
 
 const sendOtpSchema = z.object({
@@ -8,6 +9,11 @@ const sendOtpSchema = z.object({
   bookingId: z.string().uuid().optional().or(z.literal('')),
   purpose: z.enum(['login', 'booking_claim', 'email_fallback']).optional(),
 })
+
+const GENERIC_OTP_RESPONSE = {
+  success: true,
+  message: 'If the account exists, an OTP has been sent.',
+}
 
 export async function POST(request: NextRequest) {
   const parsed = await parseJsonBody(request, sendOtpSchema)
@@ -17,20 +23,14 @@ export async function POST(request: NextRequest) {
 
   try {
     const email = sanitizeEmail(parsed.data.email)
-    const sent = await sendEmailOtp(email)
+    await sendEmailOtp(email)
 
-    return NextResponse.json({
-      success: true,
-      channel: sent.channel,
-      maskedTarget: maskOtpTarget(sent.contact),
-    })
+    return NextResponse.json(GENERIC_OTP_RESPONSE)
   } catch (error: any) {
-    const code = error?.code || 'OTP_SEND_FAILED'
-    const status = code === 'RATE_LIMITED' ? 429 : 500
-
-    return NextResponse.json({
-      success: false,
-      error: { code, message: error.message || 'Could not send OTP' },
-    }, { status })
+    logWarn('OTP send request did not complete normally', {
+      code: error?.code || 'OTP_SEND_FAILED',
+      message: error?.message || 'Could not send OTP',
+    })
+    return NextResponse.json(GENERIC_OTP_RESPONSE)
   }
 }

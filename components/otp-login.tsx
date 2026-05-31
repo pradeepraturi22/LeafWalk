@@ -110,7 +110,7 @@ export default function OtpLogin({
 
       setOtpSent(true)
       setCountdown(30)
-      toast.success(`OTP sent to ${result.maskedTarget || displayTarget}`)
+      toast.success(result.message || 'If the account exists, an OTP has been sent.')
     } catch (error: any) {
       toast.error(error.message || 'Could not send OTP')
     } finally {

@@ -107,6 +107,100 @@ const operatorSchema = z.object({
   status: z.enum(['active', 'inactive']).default('active'),
 })
 
+const nullableString = (maxLength = 500) => z.preprocess(
+  emptyToNull,
+  z.string().trim().max(maxLength).nullable().optional()
+)
+
+const nullableUuid = z.preprocess(
+  emptyToNull,
+  z.string().uuid().nullable().optional()
+)
+
+const dateString = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
+const timestampString = z.string().trim().max(80)
+
+const adminBookingRoomItemSchema = z.object({
+  room_id: z.string().uuid(),
+  rooms_booked: z.coerce.number().int().min(1).max(20),
+  adults: z.coerce.number().int().min(1).max(80),
+  children_below_5: z.coerce.number().int().min(0).max(80).optional().default(0),
+  children_5_to_12: z.coerce.number().int().min(0).max(80).optional().default(0),
+  extra_beds: z.coerce.number().int().min(0).max(40).optional().default(0),
+  meal_plan: z.string().trim().max(30).optional().default('EP'),
+  rate_per_room_per_night: z.coerce.number().finite().min(0),
+  extra_bed_rate_per_night: z.coerce.number().finite().min(0).optional().default(0),
+  child_rate_per_night: z.coerce.number().finite().min(0).optional().default(0),
+  subtotal: z.coerce.number().finite().min(0),
+  cgst: z.coerce.number().finite().min(0).optional().default(0),
+  sgst: z.coerce.number().finite().min(0).optional().default(0),
+  line_total: z.coerce.number().finite().min(0),
+  season_id: nullableUuid,
+})
+
+const adminBookingSchema = z.object({
+  tour_operator_id: nullableUuid,
+  guest_name: z.string().trim().min(2).max(200),
+  guest_email: z.preprocess(emptyToNull, z.string().trim().email().max(254).nullable().optional()),
+  guest_phone: nullableString(20),
+  guest_id_type: nullableString(60),
+  guest_id_number: nullableString(80),
+  guest_country: nullableString(80),
+  guest_address: nullableString(500),
+  guest_state: nullableString(100),
+  guest_district: nullableString(100),
+  room_id: z.string().uuid(),
+  check_in: dateString,
+  check_out: dateString,
+  nights: z.coerce.number().int().min(1).max(365),
+  rooms_booked: z.coerce.number().int().min(1).max(20),
+  adults: z.coerce.number().int().min(1).max(80),
+  children_below_5: z.coerce.number().int().min(0).max(80).optional().default(0),
+  children_5_to_12: z.coerce.number().int().min(0).max(80).optional().default(0),
+  children_above_12: z.coerce.number().int().min(0).max(80).optional().default(0),
+  extra_beds: z.coerce.number().int().min(0).max(40).optional().default(0),
+  meal_plan: z.string().trim().max(30).optional().default('EP'),
+  booking_source: z.enum(['walk_in', 'direct', 'website', 'tour_operator']).default('direct'),
+  booking_type: z.string().trim().max(40).optional().default('direct'),
+  is_multi_room: z.coerce.boolean().optional().default(false),
+  booking_status: z.enum(['hold', 'pending', 'confirmed', 'checked_in', 'checked_out', 'cancelled', 'no_show', 'completed']).default('confirmed'),
+  rate_per_room_per_night: z.coerce.number().finite().min(0),
+  extra_bed_rate_per_night: z.coerce.number().finite().min(0).optional().default(0),
+  child_rate_per_night: z.coerce.number().finite().min(0).optional().default(0),
+  subtotal: z.coerce.number().finite().min(0),
+  cgst: z.coerce.number().finite().min(0).optional().default(0),
+  sgst: z.coerce.number().finite().min(0).optional().default(0),
+  gst_total: z.coerce.number().finite().min(0).optional().default(0),
+  total_amount: z.coerce.number().finite().min(0),
+  payment_method: nullableString(60),
+  payment_status: z.preprocess(normalizePaymentStatus, z.enum(['pending', 'payment_processing', 'fully_paid', 'failed', 'refunded'])),
+  advance_amount: z.coerce.number().finite().min(0).optional().default(0),
+  balance_amount: z.coerce.number().finite().min(0).optional().default(0),
+  payment_ref: nullableString(120),
+  payment_date: z.preprocess(emptyToNull, dateString.nullable().optional()),
+  advance_paid_at: z.preprocess(emptyToNull, dateString.nullable().optional()),
+  payment_id: nullableString(120),
+  special_requests: nullableString(500),
+  admin_notes: nullableString(1000),
+  hold_notes: nullableString(500),
+  held_at: z.preprocess(emptyToNull, timestampString.nullable().optional()),
+  confirmed_at: z.preprocess(emptyToNull, timestampString.nullable().optional()),
+  checked_in_at: z.preprocess(emptyToNull, timestampString.nullable().optional()),
+  season_id: nullableUuid,
+  gst_invoice_requested: z.coerce.boolean().optional().default(false),
+  gst_company_name: nullableString(200),
+  gst_number: nullableString(30),
+  gst_state: nullableString(100),
+}).superRefine((value, ctx) => {
+  if (value.check_out <= value.check_in) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Check-out must be after check-in',
+      path: ['check_out'],
+    })
+  }
+})
+
 function normalizeOperatorPayload(body: any) {
   return {
     ...body,
@@ -627,7 +721,20 @@ export async function POST(request: NextRequest) {
 
     if (type === 'booking') {
       // Admin-created booking (walk-in, tour operator)
-      const { room_items, ...bookingData } = body
+      const rawRoomItems = Array.isArray(body.room_items) ? body.room_items : []
+      const parsedBooking = adminBookingSchema.safeParse(body)
+      if (!parsedBooking.success) {
+        return NextResponse.json({ error: 'Invalid booking payload', details: parsedBooking.error.flatten() }, { status: 400 })
+      }
+      const parsedRoomItems = rawRoomItems.length
+        ? z.array(adminBookingRoomItemSchema).safeParse(rawRoomItems)
+        : null
+      if (parsedRoomItems && !parsedRoomItems.success) {
+        return NextResponse.json({ error: 'Invalid booking room line payload', details: parsedRoomItems.error.flatten() }, { status: 400 })
+      }
+
+      const bookingData = parsedBooking.data
+      const room_items = parsedRoomItems?.success ? parsedRoomItems.data : null
       const primaryRoomId = bookingData.room_id
       const bookingLines = room_items?.length
         ? room_items.map((item: any) => ({ room_id: item.room_id, rooms_booked: Number(item.rooms_booked || 1) }))
@@ -672,11 +779,11 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Sanitize: remove any computed/generated fields
-      delete bookingData.guests
-      bookingData.payment_status = normalizePaymentStatus(bookingData.payment_status)
       // Set created_by
-      bookingData.created_by = admin.userId
+      const insertBookingData = {
+        ...bookingData,
+        created_by: admin.userId,
+      }
       if (String(bookingData.booking_status || '').trim().toLowerCase() === 'checked_in' && bookingData.payment_status !== 'fully_paid') {
         return NextResponse.json({ error: 'Kindly record the full payment before check in' }, { status: 400 })
       }
@@ -686,7 +793,7 @@ export async function POST(request: NextRequest) {
         }
       }
       const { data, error } = await getSupabaseAdmin()
-        .from('bookings').insert(bookingData).select('id, booking_number, invoice_number').single() as any
+        .from('bookings').insert(insertBookingData).select('id, booking_number, invoice_number').single() as any
       if (error) throw error
       if (data?.id && !data?.booking_number) {
         const referenceNumber = bookingData.booking_status === 'hold'

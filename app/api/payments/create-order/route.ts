@@ -48,6 +48,13 @@ function getRazorpayClient() {
   })
 }
 
+function phoneMatches(customerPhone?: string | null, bookingPhone?: string | null) {
+  const left = String(customerPhone || '').replace(/\D/g, '')
+  const right = String(bookingPhone || '').replace(/\D/g, '')
+  if (!left || !right) return false
+  return left === right || left.endsWith(right) || right.endsWith(left)
+}
+
 export async function POST(request: NextRequest) {
   const parsed = await parseJsonBody(request, createOrderSchema)
   if (!parsed.success) {
@@ -149,13 +156,32 @@ export async function POST(request: NextRequest) {
     }
 
     const existingBookingId = booking_id
+    const auth = await getAuthenticatedCustomer(request)
+    if (!auth) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const { data: existingBooking, error: bookingError } = await supabase
       .from('bookings')
-      .select('id, total_amount, payment_status, guest_name, razorpay_order_id')
+      .select('id, user_id, guest_email, guest_phone, total_amount, payment_status, guest_name, razorpay_order_id')
       .eq('id', existingBookingId)
       .single() as any
 
     if (bookingError || !existingBooking) {
+      return NextResponse.json({ error: 'Booking not found' }, { status: 404 })
+    }
+
+    const emailMatches = Boolean(
+      auth.user.email &&
+      existingBooking.guest_email &&
+      String(auth.user.email).toLowerCase() === String(existingBooking.guest_email).toLowerCase()
+    )
+    const isOwner =
+      existingBooking.user_id === auth.userId ||
+      emailMatches ||
+      phoneMatches(auth.user.phone, existingBooking.guest_phone)
+
+    if (!isOwner) {
       return NextResponse.json({ error: 'Booking not found' }, { status: 404 })
     }
 
