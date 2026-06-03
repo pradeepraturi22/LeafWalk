@@ -4,7 +4,17 @@ import { useState } from 'react'
 import toast from 'react-hot-toast'
 import { supabase } from '@/lib/supabaseClient'
 
-export default function GSTBillButton({ booking, disabled, primary }: { booking: any; disabled?: boolean; primary?: boolean }) {
+export default function GSTBillButton({
+  booking,
+  disabled,
+  primary,
+  compact = false,
+}: {
+  booking: any
+  disabled?: boolean
+  primary?: boolean
+  compact?: boolean
+}) {
   const [generating, setGenerating] = useState(false)
 
   async function getToken() {
@@ -73,7 +83,8 @@ export default function GSTBillButton({ booking, disabled, primary }: { booking:
         onClick={openInvoicePreview}
         disabled={disabled || generating || !canGenerate}
         title={!canGenerate ? 'Only available after full payment' : 'Open invoice preview'}
-        className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all
+        className={`flex items-center justify-center gap-2 rounded-lg font-semibold transition-all
+          ${compact ? 'px-3 py-1.5 text-xs w-full' : 'px-5 py-2.5 text-sm'}
           ${canGenerate
             ? primary
               ? 'bg-[#c9a14a] hover:opacity-90 text-black border border-[#c9a14a] cursor-pointer'
@@ -83,10 +94,10 @@ export default function GSTBillButton({ booking, disabled, primary }: { booking:
       >
         {generating
           ? <>Opening...</>
-          : <>{canGenerate ? 'Open Invoice' : 'Invoice (After Full Payment)'}</>
+          : <>{canGenerate ? (compact ? 'Open Invoice' : 'Open Invoice') : 'Invoice (After Full Payment)'}</>
         }
       </button>
-      {!canGenerate && (
+      {!canGenerate && !compact && (
         <p className="text-white/30 text-xs mt-1.5">Payment fully paid mark karne ke baad available hogi</p>
       )}
     </div>

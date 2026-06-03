@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
     const { data, error } = await getSupabaseAdmin()
       .from('bookings')
       .select(`
-        id, booking_number, guest_name, guest_email, guest_phone,
+        id, booking_number, invoice_number, guest_name, guest_email, guest_phone,
         room_id, check_in, check_out, nights, adults, rooms_booked,
         total_amount, advance_amount, balance_amount,
         booking_status, payment_status, meal_plan,

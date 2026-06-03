@@ -8,6 +8,7 @@ import AdminNavbar from '@/components/AdminNavbar'
 import toast, { Toaster } from 'react-hot-toast'
 import { formatDate } from '@/lib/utils'
 import ReceiptButton from '@/components/ReceiptButton'
+import GSTBillButton from '@/components/GSTBillButton'
 
 // ── Correct DB enums ──────────────────────────────────────────────────────────
 // booking_status: hold | pending | confirmed | checked_in | checked_out | cancelled | no_show | completed
@@ -16,6 +17,7 @@ import ReceiptButton from '@/components/ReceiptButton'
 interface Booking {
   id: string
   booking_number: string | null
+  invoice_number: string | null
   guest_name: string
   guest_email: string | null
   guest_phone: string
@@ -394,9 +396,11 @@ export default function AdminBookingsPage() {
                           className="px-3 py-1.5 bg-white/8 hover:bg-white/15 border border-white/15 text-white rounded-lg text-xs transition-all">
                           View
                         </button>
-                        {b.booking_source === 'tour_operator' && (
+                        {b.invoice_number ? (
+                          <GSTBillButton booking={b} compact />
+                        ) : b.booking_source === 'tour_operator' ? (
                           <ReceiptButton booking={b} variant="check_in_pass" compact />
-                        )}
+                        ) : null}
                         {userRole === 'admin' && b.booking_status === 'pending' && (
                           <button onClick={() => updateStatus(b.id, 'confirmed')}
                             className="px-3 py-1.5 bg-green-500/15 hover:bg-green-500/25 border border-green-500/25 text-green-400 rounded-lg text-xs transition-all">
